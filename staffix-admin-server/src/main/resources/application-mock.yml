@@ -1,0 +1,4 @@
+staffix:
+  admin:
+    security:
+      jaas-config: classpath:jaas/dev.conf

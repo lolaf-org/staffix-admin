@@ -12,4 +12,11 @@
 
     <artifactId>staffix-admin-logs-spi</artifactId>
     <description>SPI for the logs backends (Loki, ...) queried by the admin console</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
+    </dependencies>
 </project>

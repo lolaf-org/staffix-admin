@@ -1,6 +1,9 @@
 spring:
   application:
     name: staffix-admin
+  profiles:
+    # Until the HTTP engine gateway exists (phase 3), the simulator is the only gateway
+    default: mock
   mvc:
     problemdetails:
       enabled: true

@@ -21,7 +21,7 @@ import java.util.Map;
 @Component
 public class NullabilityModelConverter implements ModelConverter {
 
-    private static final String DTO_PACKAGE = "org.lolaf.staffix.admin.server";
+    private static final String DTO_PACKAGE = "org.lolaf.staffix.admin";
 
     @Override
     public Schema<?> resolve(AnnotatedType type, ModelConverterContext context, Iterator<ModelConverter> chain) {

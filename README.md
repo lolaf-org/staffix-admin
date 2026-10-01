@@ -31,6 +31,28 @@ java -jar staffix-admin-app/target/staffix-admin.jar
 
 Open http://localhost:8080. The build downloads its own Node into `staffix-admin-ui/node/`; no system Node needed.
 
+Until the real engine connector lands, the app runs on simulated engines (Spring profile `mock`, the default):
+three engines whose sessions drop, reconnect and follow session windows, with generated metrics and FIX logs.
+Development users, password = name: `reader`, `writer`, `engine` (announcement only).
+
+## Security
+
+Operators log in against JAAS. Point `staffix.admin.security.jaas-config` at a JAAS configuration whose login
+context is `staffix-admin` (or use the JVM's `-Djava.security.auth.login.config`). Roles are `READER`, `WRITER`
+(implies `READER`) and `ENGINE`; map your JAAS principals to them with `staffix.admin.security.role-mappings`, e.g.
+
+```yaml
+staffix:
+  admin:
+    security:
+      jaas-config: file:/etc/staffix-admin/jaas.conf
+      role-mappings:
+        fix-ops: [WRITER]
+        fix-support: [READER]
+```
+
+Every state-changing action is logged on the `staffix.admin.audit` logger.
+
 ## UI development with hot reload
 
 1. Run `StaffixAdminApplication` from the IDE (port 8080).

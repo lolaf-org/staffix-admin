@@ -12,4 +12,11 @@
 
     <artifactId>staffix-admin-metrics-spi</artifactId>
     <description>SPI for the metrics backends (Prometheus, ...) queried by the admin console</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
+    </dependencies>
 </project>

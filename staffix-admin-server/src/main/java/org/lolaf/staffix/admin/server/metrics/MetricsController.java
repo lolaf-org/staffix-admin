@@ -1,6 +1,18 @@
 package org.lolaf.staffix.admin.server.metrics;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.lolaf.staffix.admin.metrics.MetricKind;
+import org.lolaf.staffix.admin.metrics.MetricQuery;
+import org.lolaf.staffix.admin.metrics.MetricSeries;
+import org.lolaf.staffix.admin.metrics.MetricsSource;
+import org.lolaf.staffix.admin.metrics.MetricsSourceException;
+import org.lolaf.staffix.admin.server.web.TelemetryProblems;
+import org.lolaf.staffix.admin.server.web.TimeRange;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -8,20 +20,40 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Instant;
 import java.util.List;
 
-import static org.lolaf.staffix.admin.server.web.NotImplemented.notImplemented;
-
 @RestController
+@Validated
+@RequiredArgsConstructor
 public class MetricsController {
 
+    private final ObjectProvider<MetricsSource> metricsSource;
+
     /**
-     * One series per message type and direction.
+     * Per message type kinds give one series per type and direction, the others one series per session.
      */
     @GetMapping("/api/metrics")
     public List<MetricSeries> queryMetrics(@RequestParam String instanceId,
                                            @RequestParam(required = false) @Nullable String sessionId,
+                                           @RequestParam MetricKind kind,
+                                           @RequestParam(defaultValue = "0.99") @DecimalMin("0") @DecimalMax("1") double quantile,
                                            @RequestParam Instant from,
-                                           @RequestParam Instant to,
-                                           @RequestParam MetricKind metric) {
-        throw notImplemented();
+                                           @RequestParam Instant to) {
+        MetricsSource source = metricsSource.getIfAvailable();
+        if (source == null) {
+            throw TelemetryProblems.notConfigured("metrics");
+        }
+        TimeRange range = TimeRange.of(from, to);
+        try {
+            return source.query(MetricQuery.builder()
+                    .instanceId(instanceId)
+                    .sessionId(sessionId)
+                    .kind(kind)
+                    .quantile(kind.isLatency() ? quantile : null)
+                    .from(range.getFrom())
+                    .to(range.getTo())
+                    .step(range.chartStep())
+                    .build());
+        } catch (MetricsSourceException e) {
+            throw TelemetryProblems.backendFailed("metrics", e);
+        }
     }
 }

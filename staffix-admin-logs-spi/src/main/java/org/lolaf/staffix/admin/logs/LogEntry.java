@@ -1,4 +1,4 @@
-package org.lolaf.staffix.admin.server.logs;
+package org.lolaf.staffix.admin.logs;
 
 import lombok.Builder;
 import lombok.Value;
@@ -13,6 +13,9 @@ public class LogEntry {
     @Nullable
     String sessionId;
     @Nullable
-    String logType;
+    LogType type;
+    /**
+     * A FIX message with {@code |} between fields, or an event's text.
+     */
     String line;
 }
