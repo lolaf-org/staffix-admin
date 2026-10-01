@@ -26,6 +26,15 @@
         <module>staffix-admin-app</module>
     </modules>
 
+    <profiles>
+        <profile>
+            <id>sandbox</id>
+            <modules>
+                <module>staffix-admin-sandbox</module>
+            </modules>
+        </profile>
+    </profiles>
+
     <properties>
         <java.version>21</java.version>
         <node.version>v24.21.0</node.version>

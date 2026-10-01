@@ -1,0 +1,35 @@
+name: staffix-admin-sandbox
+
+services:
+
+  otel-collector:
+    image: otel/opentelemetry-collector:0.158.0
+    command: --config=/etc/otel/config.yaml
+    ports:
+      - "4318:4318"
+    volumes:
+      - ./conf/otel-collector.yaml:/etc/otel/config.yaml
+
+  prometheus:
+    image: prom/prometheus:v3.13.1
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./conf/prometheus.yml:/etc/prometheus/prometheus.yml
+
+  loki:
+    image: grafana/loki:3.7.3
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+
+  grafana:
+    image: grafana/grafana-enterprise:13.0.3
+    profiles: [ grafana ]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./conf/grafana/provisioning:/etc/grafana/provisioning
