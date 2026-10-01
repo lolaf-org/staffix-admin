@@ -27,7 +27,7 @@ export function SessionStatusTab({ sessionRef, detail }: Props) {
           { label: 'Group', children: summary.group },
           { label: 'Session', children: summary.id },
           { label: 'Instance', children: `${summary.type.toLowerCase()} ${summary.instanceId}` },
-          { label: 'Running config', children: summary.runningConfigId },
+          { label: 'Selected config', children: summary.runningConfigId },
           { label: 'FIX session id', children: <Typography.Text copyable>{summary.fixSessionId}</Typography.Text> },
           { label: 'Connected', children: yesNo(summary.connected) },
           { label: 'Within session time', children: yesNo(summary.withinSessionTime) },
@@ -39,15 +39,20 @@ export function SessionStatusTab({ sessionRef, detail }: Props) {
           { label: 'Next outgoing seq num', children: detail.outgoingSeqNum },
         ]}
       />
-      <Flex wrap gap={8}>
-        <WriteButton type="primary" loading={logon.isPending} onConfirm={() => logon.mutate(undefined)}>
-          Log on
-        </WriteButton>
-        <WriteButton danger loading={logout.isPending} onConfirm={() => logout.mutate(undefined)} confirm={`Log out ${summary.group}.${summary.id}?`}>
-          Log out
-        </WriteButton>
-        <SeqNumsButton sessionRef={sessionRef} detail={detail} />
-      </Flex>
+      <div>
+        <Divider titlePlacement="start" plain>
+          Session control
+        </Divider>
+        <Flex wrap gap={8}>
+          <WriteButton type="primary" loading={logon.isPending} onConfirm={() => logon.mutate(undefined)}>
+            Log on
+          </WriteButton>
+          <WriteButton danger loading={logout.isPending} onConfirm={() => logout.mutate(undefined)} confirm={`Log out ${summary.group}.${summary.id}?`}>
+            Log out
+          </WriteButton>
+          <SeqNumsButton sessionRef={sessionRef} detail={detail} />
+        </Flex>
+      </div>
       <ResetSection sessionRef={sessionRef} summary={summary} />
       {summary.type === 'INITIATOR' && detail.configs.length > 1 && <Configs sessionRef={sessionRef} detail={detail} />}
     </Flex>
@@ -158,13 +163,13 @@ function Configs({ sessionRef, detail }: Props) {
             align: 'right',
             render: (_, config) =>
               config.id === detail.summary.runningConfigId ? (
-                <Tag color="processing">running</Tag>
+                <Tag color="processing">selected</Tag>
               ) : (
                 <WriteButton
                   size="small"
                   loading={activate.isPending}
                   onConfirm={() => activate.mutate(config.id)}
-                  confirm={`Switch ${detail.summary.group}.${detail.summary.id} to ${config.id}? The running config is logged out first.`}
+                  confirm={`Switch ${detail.summary.group}.${detail.summary.id} to ${config.id}? The selected config is logged out first.`}
                 >
                   Switch to
                 </WriteButton>

@@ -4,6 +4,7 @@ import { AppLayout } from './layout/AppLayout'
 
 const LoginPage = lazy(() => import('./auth/LoginPage').then((m) => ({ default: m.LoginPage })))
 const OverviewPage = lazy(() => import('./pages/OverviewPage').then((m) => ({ default: m.OverviewPage })))
+const MetricsPage = lazy(() => import('./pages/MetricsPage').then((m) => ({ default: m.MetricsPage })))
 const LogsPage = lazy(() => import('./pages/LogsPage').then((m) => ({ default: m.LogsPage })))
 const SessionDrawer = lazy(() => import('./sessions/SessionDrawer').then((m) => ({ default: m.SessionDrawer })))
 
@@ -18,6 +19,7 @@ export const router = createBrowserRouter([
         element: <OverviewPage />,
         children: [{ path: 'engines/:engineId/groups/:group/sessions/:sessionId', element: <SessionDrawer /> }],
       },
+      { path: 'metrics', element: <MetricsPage /> },
       { path: 'logs', element: <LogsPage /> },
     ],
   },

@@ -1,12 +1,18 @@
-import { Button, Flex, Layout, Menu, Segmented, Spin, Tag, Typography } from 'antd'
-import { AppstoreOutlined, DesktopOutlined, FileSearchOutlined, LogoutOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
+import { Button, Flex, Layout, Segmented, Spin, Tabs, Tag, Typography, theme } from 'antd'
+import { AppstoreOutlined, AreaChartOutlined, DesktopOutlined, FileSearchOutlined, LogoutOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
 import { useQueryClient } from '@tanstack/react-query'
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router'
 import { isUnauthorized } from '../api/client'
 import { logout, useCurrentUser } from '../api/queries'
 import { useThemeMode, type ThemeMode } from '../theme/ThemeMode'
 
-const { Header, Sider, Content } = Layout
+const { Header, Content } = Layout
+
+const TABS = [
+  { path: '/', label: 'Sessions', icon: <AppstoreOutlined /> },
+  { path: '/metrics', label: 'Metrics', icon: <AreaChartOutlined /> },
+  { path: '/logs', label: 'Logs', icon: <FileSearchOutlined /> },
+]
 
 export function AppLayout() {
   const navigate = useNavigate()
@@ -14,6 +20,7 @@ export function AppLayout() {
   const queryClient = useQueryClient()
   const me = useCurrentUser()
   const themeMode = useThemeMode()
+  const { token } = theme.useToken()
 
   if (me.isPending) {
     return <Spin fullscreen />
@@ -49,27 +56,19 @@ export function AppLayout() {
             ]}
           />
           <Typography.Text style={{ color: 'white' }}>{me.data.username}</Typography.Text>
-          <Tag color={me.data.roles.includes('WRITER') ? 'blue' : 'default'}>
-            {me.data.roles.includes('WRITER') ? 'writer' : 'reader'}
-          </Tag>
+          {!me.data.roles.includes('WRITER') && <Tag color="warning">read only</Tag>}
           <Button icon={<LogoutOutlined />} onClick={signOut} aria-label="Log out" />
         </Flex>
       </Header>
-      <Layout>
-        <Sider width={180} theme="light" breakpoint="md" collapsedWidth={0}>
-          <Menu
-            mode="inline"
-            selectedKeys={[location.pathname.startsWith('/logs') ? 'logs' : 'sessions']}
-            items={[
-              { key: 'sessions', icon: <AppstoreOutlined />, label: 'Sessions', onClick: () => navigate('/') },
-              { key: 'logs', icon: <FileSearchOutlined />, label: 'Logs', onClick: () => navigate('/logs') },
-            ]}
-          />
-        </Sider>
-        <Content style={{ padding: 16 }}>
-          <Outlet />
-        </Content>
-      </Layout>
+      <Tabs
+        activeKey={TABS.find((tab) => tab.path !== '/' && location.pathname.startsWith(tab.path))?.path ?? '/'}
+        onChange={(path) => navigate(path)}
+        items={TABS.map((tab) => ({ key: tab.path, icon: tab.icon, label: tab.label }))}
+        tabBarStyle={{ margin: 0, paddingInline: 16, background: token.colorBgContainer }}
+      />
+      <Content style={{ padding: 16 }}>
+        <Outlet />
+      </Content>
     </Layout>
   )
 }

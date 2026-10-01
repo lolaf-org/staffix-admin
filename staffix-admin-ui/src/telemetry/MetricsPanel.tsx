@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Alert, Empty, Flex, Segmented, Select, Skeleton } from 'antd'
+import { Alert, Empty, Flex, Segmented, Select, Skeleton, Typography } from 'antd'
+import { useEffect } from 'react'
 import { AreaChartOutlined, TableOutlined } from '@ant-design/icons'
-import { useMetrics, type MetricKind, type SessionRef } from '../api/queries'
+import { useMetrics, type MetricKind, type MetricScope } from '../api/queries'
 import type { Schemas } from '../api/client'
 import { formatRateValue, formatSeconds } from './format'
 import { MetricChart, SeriesLegend, niceTicks, type ChartSeries } from './MetricChart'
@@ -10,14 +11,17 @@ import { messageTypeName, plottedMessageTypes, seriesColors } from './series'
 import { useThemeMode } from '../theme/ThemeMode'
 import { TIME_WINDOWS } from './timeWindows'
 
-const KINDS: { value: MetricKind; label: string; title: string }[] = [
+/**
+ * RTT and clock offset are per session: over a group or an engine they would draw one line per session.
+ */
+const KINDS: { value: MetricKind; label: string; title: string; perSession?: boolean }[] = [
   { value: 'MESSAGE_RATE', label: 'Rate', title: 'Messages per second' },
   { value: 'READ_LATENCY', label: 'Read', title: 'Read latency' },
   { value: 'WRITE_LATENCY', label: 'Write', title: 'Write latency' },
   { value: 'DECODING_LATENCY', label: 'Decoding', title: 'Decoding latency' },
   { value: 'ENCODING_LATENCY', label: 'Encoding', title: 'Encoding latency' },
-  { value: 'ROUND_TRIP_TIME', label: 'RTT', title: 'Round-trip time' },
-  { value: 'CLOCK_OFFSET', label: 'Clock offset', title: 'Clock offset, remote minus local' },
+  { value: 'ROUND_TRIP_TIME', label: 'RTT', title: 'Round-trip time', perSession: true },
+  { value: 'CLOCK_OFFSET', label: 'Clock offset', title: 'Clock offset, remote minus local', perSession: true },
 ]
 
 const QUANTILES = [0.5, 0.9, 0.99, 0.999]
@@ -32,20 +36,40 @@ interface Facet {
   series: ChartSeries[]
 }
 
-export function MetricsTab({ sessionRef }: { sessionRef: SessionRef }) {
+interface Props {
+  scope: MetricScope
+  chartHeight?: number
+}
+
+export function MetricsPanel({ scope, chartHeight }: Props) {
   const [kind, setKind] = useState<MetricKind>('MESSAGE_RATE')
   const [quantile, setQuantile] = useState(0.99)
   const [minutes, setMinutes] = useState(60)
   const [view, setView] = useState<'chart' | 'table'>('chart')
-  const metrics = useMetrics(sessionRef, kind, quantile, minutes)
+  const sessionScoped = scope.sessionId !== undefined
+  const metrics = useMetrics(scope, kind, quantile, minutes)
   const colors = seriesColors(useThemeMode().dark)
+  useEffect(() => {
+    if (!sessionScoped && KINDS.find((k) => k.value === kind)?.perSession) {
+      setKind('MESSAGE_RATE')
+    }
+  }, [sessionScoped, kind])
   const format = kind === 'MESSAGE_RATE' ? formatRateValue : formatSeconds
   const selected = KINDS.find((k) => k.value === kind)!
   const title = LATENCIES.includes(kind) ? `${selected.title}, p${quantile * 100}` : selected.title
 
   return (
     <Flex vertical gap={16}>
-      <Segmented<MetricKind> options={KINDS} value={kind} onChange={setKind} />
+      <Segmented<MetricKind>
+        options={KINDS.map((k) => ({
+          value: k.value,
+          label: k.label,
+          disabled: k.perSession && !sessionScoped,
+          title: k.perSession && !sessionScoped ? 'Pick a session' : k.title,
+        }))}
+        value={kind}
+        onChange={setKind}
+      />
       <Flex wrap gap={8}>
         {LATENCIES.includes(kind) && (
           <Select
@@ -66,6 +90,12 @@ export function MetricsTab({ sessionRef }: { sessionRef: SessionRef }) {
           ]}
         />
       </Flex>
+      {!sessionScoped && (
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          Over every session of the {scope.group ? `group ${scope.group}` : `engine ${scope.engineId}`}: rates are summed, latencies
+          are the worst session's.
+        </Typography.Text>
+      )}
       {metrics.isPending && <Skeleton active />}
       {metrics.isError && <Alert type="error" title={metrics.error.message} />}
       {metrics.isSuccess && metrics.data.length === 0 && <Empty description="No data for this period" />}
@@ -79,7 +109,7 @@ export function MetricsTab({ sessionRef }: { sessionRef: SessionRef }) {
             <SeriesLegend series={facets[0]!.series} />
             <Flex wrap gap={16}>
               {facets.map((facet) => (
-                <MetricChart key={facet.title} title={facet.title} series={facet.series} format={format} yTicks={yTicks} />
+                <MetricChart key={facet.title} title={facet.title} series={facet.series} format={format} yTicks={yTicks} height={chartHeight} />
               ))}
             </Flex>
           </Flex>

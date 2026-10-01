@@ -107,10 +107,19 @@ function window(minutes: number) {
   return { from: new Date(to.getTime() - minutes * 60_000).toISOString(), to: to.toISOString() }
 }
 
-export function useMetrics(ref: SessionRef, kind: MetricKind, quantile: number, minutes: number) {
+/**
+ * An engine, one of its groups, or one config of a group.
+ */
+export interface MetricScope {
+  engineId: string
+  group?: string
+  sessionId?: string
+}
+
+export function useMetrics(scope: MetricScope, kind: MetricKind, quantile: number, minutes: number) {
   return useQuery({
-    queryKey: ['metrics', ref, kind, quantile, minutes],
-    queryFn: () => call(api.GET('/api/metrics', { params: { query: { ...ref, kind, quantile, ...window(minutes) } } })),
+    queryKey: ['metrics', scope, kind, quantile, minutes],
+    queryFn: () => call(api.GET('/api/metrics', { params: { query: { ...scope, kind, quantile, ...window(minutes) } } })),
     refetchInterval: 15_000,
     placeholderData: (previous) => previous,
   })

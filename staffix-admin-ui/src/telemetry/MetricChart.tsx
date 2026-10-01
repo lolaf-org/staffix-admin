@@ -17,9 +17,10 @@ interface Props {
    * Shared by small multiples so they compare at a glance; unset for an automatic, possibly negative, range.
    */
   yTicks?: number[]
+  height?: number
 }
 
-export function MetricChart({ title, series, format, yTicks }: Props) {
+export function MetricChart({ title, series, format, yTicks, height = 220 }: Props) {
   const { token } = theme.useToken()
   const rows = mergeByTimestamp(series)
   const signed = yTicks === undefined && series.some((s) => s.points.some((p) => p.value < 0))
@@ -28,7 +29,7 @@ export function MetricChart({ title, series, format, yTicks }: Props) {
   return (
     <div style={{ flex: '1 1 300px', minWidth: 0 }}>
       <Typography.Text strong>{title}</Typography.Text>
-      <ResponsiveContainer width="100%" height={220}>
+      <ResponsiveContainer width="100%" height={height}>
         <LineChart data={rows} margin={{ top: 12, right: 16, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} stroke={token.colorBorderSecondary} />
           <XAxis dataKey="t" type="number" scale="time" domain={['dataMin', 'dataMax']} tickFormatter={formatClock} minTickGap={40} {...axis} />
