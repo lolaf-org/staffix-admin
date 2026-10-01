@@ -1,8 +1,16 @@
 /**
  * First three slots of the validated reference palette: distinct for every pair, colour-blind safe included.
- * A fourth series would be ambiguous, so charts plot at most three.
+ * Dark mode has its own steps, validated against the dark surface. A fourth series would be ambiguous, so charts
+ * plot at most three.
  */
-export const SERIES_COLORS = ['#2a78d6', '#eb6834', '#1baf7a']
+const LIGHT_SERIES_COLORS = ['#2a78d6', '#eb6834', '#1baf7a']
+const DARK_SERIES_COLORS = ['#3987e5', '#d95926', '#199e70']
+
+export const SERIES_COUNT = LIGHT_SERIES_COLORS.length
+
+export function seriesColors(dark: boolean): string[] {
+  return dark ? DARK_SERIES_COLORS : LIGHT_SERIES_COLORS
+}
 
 const MESSAGE_TYPE_NAMES: Record<string, string> = {
   D: 'NewOrderSingle',
@@ -30,5 +38,5 @@ export function messageTypeName(code: string): string {
 
 export function plottedMessageTypes(codes: string[]): string[] {
   const rank = (code: string) => (PRIORITY.includes(code) ? PRIORITY.indexOf(code) : PRIORITY.length)
-  return [...new Set(codes)].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b)).slice(0, SERIES_COLORS.length)
+  return [...new Set(codes)].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b)).slice(0, SERIES_COUNT)
 }

@@ -6,7 +6,8 @@ import type { Schemas } from '../api/client'
 import { formatRateValue, formatSeconds } from './format'
 import { MetricChart, SeriesLegend, niceTicks, type ChartSeries } from './MetricChart'
 import { MetricTable } from './MetricTable'
-import { SERIES_COLORS, messageTypeName, plottedMessageTypes } from './series'
+import { messageTypeName, plottedMessageTypes, seriesColors } from './series'
+import { useThemeMode } from '../theme/ThemeMode'
 import { TIME_WINDOWS } from './timeWindows'
 
 const KINDS: { value: MetricKind; label: string; title: string }[] = [
@@ -37,6 +38,7 @@ export function MetricsTab({ sessionRef }: { sessionRef: SessionRef }) {
   const [minutes, setMinutes] = useState(60)
   const [view, setView] = useState<'chart' | 'table'>('chart')
   const metrics = useMetrics(sessionRef, kind, quantile, minutes)
+  const colors = seriesColors(useThemeMode().dark)
   const format = kind === 'MESSAGE_RATE' ? formatRateValue : formatSeconds
   const selected = KINDS.find((k) => k.value === kind)!
   const title = LATENCIES.includes(kind) ? `${selected.title}, p${quantile * 100}` : selected.title
@@ -68,7 +70,7 @@ export function MetricsTab({ sessionRef }: { sessionRef: SessionRef }) {
       {metrics.isError && <Alert type="error" title={metrics.error.message} />}
       {metrics.isSuccess && metrics.data.length === 0 && <Empty description="No data for this period" />}
       {metrics.isSuccess && metrics.data.length > 0 && (() => {
-        const facets = toFacets(metrics.data, title)
+        const facets = toFacets(metrics.data, title, colors)
         if (view === 'table') return <MetricTable facets={facets} format={format} />
         const perDirection = facets.length > 1
         const yTicks = perDirection ? niceTicks(Math.max(...facets.flatMap((f) => f.series.flatMap((s) => s.points.map((p) => p.value))))) : undefined
@@ -87,17 +89,17 @@ export function MetricsTab({ sessionRef }: { sessionRef: SessionRef }) {
   )
 }
 
-function toFacets(series: Schemas['MetricSeries'][], title: string): Facet[] {
+function toFacets(series: Schemas['MetricSeries'][], title: string, colors: string[]): Facet[] {
   const perMessageType = series.some((s) => s.labels['messageType'])
   if (!perMessageType) {
-    return [{ title, series: series.map((s, i) => ({ key: `s${i}`, name: title, color: SERIES_COLORS[0]!, points: s.points })) }]
+    return [{ title, series: series.map((s, i) => ({ key: `s${i}`, name: title, color: colors[0]!, points: s.points })) }]
   }
   const types = plottedMessageTypes(series.map((s) => s.labels['messageType']!))
   return DIRECTIONS.map((direction) => ({
     title: `${title}, ${direction.title}`,
     series: types.flatMap((type, slot): ChartSeries[] => {
       const match = series.find((s) => s.labels['messageType'] === type && s.labels['direction'] === direction.value)
-      return match ? [{ key: `t${type}`, name: messageTypeName(type), color: SERIES_COLORS[slot]!, points: match.points }] : []
+      return match ? [{ key: `t${type}`, name: messageTypeName(type), color: colors[slot]!, points: match.points }] : []
     }),
   }))
 }

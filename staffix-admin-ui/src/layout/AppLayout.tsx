@@ -1,9 +1,10 @@
-import { Button, Flex, Layout, Menu, Spin, Tag, Typography } from 'antd'
-import { AppstoreOutlined, FileSearchOutlined, LogoutOutlined } from '@ant-design/icons'
+import { Button, Flex, Layout, Menu, Segmented, Spin, Tag, Typography } from 'antd'
+import { AppstoreOutlined, DesktopOutlined, FileSearchOutlined, LogoutOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
 import { useQueryClient } from '@tanstack/react-query'
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router'
 import { isUnauthorized } from '../api/client'
 import { logout, useCurrentUser } from '../api/queries'
+import { useThemeMode, type ThemeMode } from '../theme/ThemeMode'
 
 const { Header, Sider, Content } = Layout
 
@@ -12,6 +13,7 @@ export function AppLayout() {
   const location = useLocation()
   const queryClient = useQueryClient()
   const me = useCurrentUser()
+  const themeMode = useThemeMode()
 
   if (me.isPending) {
     return <Spin fullscreen />
@@ -36,6 +38,16 @@ export function AppLayout() {
           staffix admin
         </Typography.Title>
         <Flex align="center" gap={8}>
+          <Segmented<ThemeMode>
+            size="small"
+            value={themeMode.mode}
+            onChange={themeMode.setMode}
+            options={[
+              { value: 'light', icon: <SunOutlined />, title: 'Light' },
+              { value: 'dark', icon: <MoonOutlined />, title: 'Dark' },
+              { value: 'system', icon: <DesktopOutlined />, title: 'Follow the system' },
+            ]}
+          />
           <Typography.Text style={{ color: 'white' }}>{me.data.username}</Typography.Text>
           <Tag color={me.data.roles.includes('WRITER') ? 'blue' : 'default'}>
             {me.data.roles.includes('WRITER') ? 'writer' : 'reader'}
