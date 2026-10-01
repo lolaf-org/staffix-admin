@@ -6,8 +6,8 @@ import java.util.List;
  * A metrics backend (Prometheus, ...) holding what staffix's monitoring exports, queried by the admin console
  * rather than the engines, which do not serve their own history.
  *
- * <p>Series are selected by the labels staffix tags its meters with: {@code fix.iid} (engine), {@code fix.sgid}
- * (group), {@code fix.sid} (session, unique per group only), {@code fix.msg.type} and {@code fix.msg.dir}.
+ * <p>Series are selected by the labels staffix tags its meters with: {@code fix.iid} (engine), {@code fix.sg}
+ * (group), {@code fix.sn} (session name, unique per group only), {@code fix.msg.type} and {@code fix.msg.dir}.
  */
 public interface MetricsSource {
 

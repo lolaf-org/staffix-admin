@@ -1,0 +1,1 @@
+java -jar staffix-admin-app/target/staffix-admin.jar
