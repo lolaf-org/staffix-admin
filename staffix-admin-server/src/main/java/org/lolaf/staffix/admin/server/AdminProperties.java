@@ -14,8 +14,14 @@ public class AdminProperties {
      * announcement does not flag it.
      */
     Duration engineHeartbeatTimeout;
+    /**
+     * How long a call to an engine may take, connecting included, before the operator is told it did not answer.
+     */
+    Duration engineRequestTimeout;
 
-    public AdminProperties(@DefaultValue("90s") Duration engineHeartbeatTimeout) {
+    public AdminProperties(@DefaultValue("90s") Duration engineHeartbeatTimeout,
+                           @DefaultValue("5s") Duration engineRequestTimeout) {
         this.engineHeartbeatTimeout = engineHeartbeatTimeout;
+        this.engineRequestTimeout = engineRequestTimeout;
     }
 }

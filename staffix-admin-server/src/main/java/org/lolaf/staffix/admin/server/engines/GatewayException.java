@@ -40,6 +40,23 @@ public class GatewayException extends ErrorResponseException {
         return new GatewayException(HttpStatus.CONFLICT, detail, null);
     }
 
+    public static GatewayException notFound(String detail) {
+        return new GatewayException(HttpStatus.NOT_FOUND, detail, null);
+    }
+
+    /**
+     * The engine no longer accepts the token it announced, typically after a restart; its next announcement
+     * brings the new one.
+     */
+    public static GatewayException tokenRefused(String engineId) {
+        return new GatewayException(HttpStatus.BAD_GATEWAY,
+                "Engine '" + engineId + "' refused its token; it was probably restarted and will announce a new one", null);
+    }
+
+    public static GatewayException failed(String engineId, String detail) {
+        return new GatewayException(HttpStatus.BAD_GATEWAY, "Engine '" + engineId + "' failed: " + detail, null);
+    }
+
     public static GatewayException unavailable(String engineId, Throwable cause) {
         return new GatewayException(HttpStatus.BAD_GATEWAY,
                 "Engine '" + engineId + "' did not answer: " + cause.getMessage(), cause);
