@@ -1,33 +1,26 @@
 import { Alert, Badge, Drawer, Skeleton, Tabs } from 'antd'
 import { useLocation, useNavigate, useParams } from 'react-router'
-import { useSession } from '../api/queries'
+import { useSession, type SessionRef } from '../api/queries'
 import { HEALTH_STATUS } from './health'
 import { SendMessageTab } from './SendMessageTab'
 import { SessionSettingsTab } from './SessionSettingsTab'
 import { SessionStatusTab } from './SessionStatusTab'
-import { LogsPanel } from '../telemetry/LogsPanel'
-import { MetricsTab } from '../telemetry/MetricsTab'
+import { SessionTelemetryTab } from '../telemetry/SessionTelemetryTab'
 
 export function SessionDrawer() {
-  const { instanceId = '', sessionId = '' } = useParams()
+  const params = useParams()
+  const ref: SessionRef = { engineId: params.engineId ?? '', group: params.group ?? '', sessionId: params.sessionId ?? '' }
   const navigate = useNavigate()
   const location = useLocation()
-  const session = useSession(instanceId, sessionId)
-
-  const close = () => navigate({ pathname: '/', search: location.search })
+  const session = useSession(ref)
+  const title = `${ref.group}.${ref.sessionId} on ${ref.engineId}`
 
   return (
     <Drawer
       open
-      onClose={close}
+      onClose={() => navigate({ pathname: '/', search: location.search })}
       size={760}
-      title={
-        session.data ? (
-          <Badge status={HEALTH_STATUS[session.data.summary.health]} text={`${sessionId} on ${instanceId}`} />
-        ) : (
-          `${sessionId} on ${instanceId}`
-        )
-      }
+      title={session.data ? <Badge status={HEALTH_STATUS[session.data.summary.health]} text={title} /> : title}
     >
       {session.isPending && <Skeleton active />}
       {session.isError && <Alert type="error" title={session.error.message} />}
@@ -35,11 +28,15 @@ export function SessionDrawer() {
         <Tabs
           destroyOnHidden
           items={[
-            { key: 'status', label: 'Status', children: <SessionStatusTab instanceId={instanceId} detail={session.data} /> },
-            { key: 'settings', label: 'Settings', children: <SessionSettingsTab instanceId={instanceId} sessionId={sessionId} /> },
-            { key: 'metrics', label: 'Metrics', children: <MetricsTab instanceId={instanceId} sessionId={sessionId} /> },
-            { key: 'logs', label: 'Logs', children: <LogsPanel instanceId={instanceId} sessionId={sessionId} /> },
-            { key: 'send', label: 'Send message', children: <SendMessageTab instanceId={instanceId} summary={session.data.summary} /> },
+            { key: 'status', label: 'Status', children: <SessionStatusTab sessionRef={ref} detail={session.data} /> },
+            {
+              key: 'settings',
+              label: 'Settings',
+              children: <SessionSettingsTab sessionRef={ref} runningConfigId={session.data.summary.runningConfigId} />,
+            },
+            { key: 'metrics', label: 'Metrics', children: <SessionTelemetryTab sessionRef={ref} summary={session.data.summary} view="metrics" /> },
+            { key: 'logs', label: 'Logs', children: <SessionTelemetryTab sessionRef={ref} summary={session.data.summary} view="logs" /> },
+            { key: 'send', label: 'Send message', children: <SendMessageTab sessionRef={ref} summary={session.data.summary} /> },
           ]}
         />
       )}

@@ -3,6 +3,7 @@ package org.lolaf.staffix.admin.server.simulator;
 import org.jspecify.annotations.Nullable;
 import org.lolaf.staffix.admin.server.engines.EngineGateway;
 import org.lolaf.staffix.admin.server.engines.GatewayException;
+import org.lolaf.staffix.admin.server.engines.SessionRef;
 import org.lolaf.staffix.admin.server.sessions.ResetMode;
 import org.lolaf.staffix.admin.server.sessions.SessionDetail;
 import org.lolaf.staffix.admin.server.sessions.SessionGroup;
@@ -20,11 +21,19 @@ class SimulatedEngineGateway implements EngineGateway {
     private final Map<String, SimulatedEngine> engines;
 
     SimulatedEngineGateway(List<SimulatedEngine> engines) {
-        this.engines = engines.stream().collect(Collectors.toUnmodifiableMap(e -> e.instanceId, Function.identity()));
+        this.engines = engines.stream().collect(Collectors.toUnmodifiableMap(e -> e.engineId, Function.identity()));
     }
 
     Collection<SimulatedEngine> engines() {
         return engines.values();
+    }
+
+    SimulatedEngine engine(String engineId) {
+        SimulatedEngine engine = engines.get(engineId);
+        if (engine == null) {
+            throw GatewayException.unknownEngine(engineId);
+        }
+        return engine;
     }
 
     void tick(Random random) {
@@ -32,55 +41,47 @@ class SimulatedEngineGateway implements EngineGateway {
     }
 
     @Override
-    public List<SessionGroup> listSessions(String instanceId) {
-        return engine(instanceId).listSessions();
+    public List<SessionGroup> listGroups(String engineId) {
+        return engine(engineId).listGroups();
     }
 
     @Override
-    public SessionDetail getSession(String instanceId, String sessionId) {
-        return engine(instanceId).getSession(sessionId);
+    public SessionDetail getSession(SessionRef session) {
+        return engine(session.getEngineId()).getSession(session);
     }
 
     @Override
-    public JsonNode getSessionSettings(String instanceId, String sessionId) {
-        return engine(instanceId).getSessionSettings(sessionId);
+    public JsonNode getSessionSettings(SessionRef session) {
+        return engine(session.getEngineId()).getSessionSettings(session);
     }
 
     @Override
-    public void logon(String instanceId, String sessionId) {
-        engine(instanceId).logon(sessionId);
+    public void logon(SessionRef session) {
+        engine(session.getEngineId()).logon(session);
     }
 
     @Override
-    public void logout(String instanceId, String sessionId) {
-        engine(instanceId).logout(sessionId);
+    public void logout(SessionRef session) {
+        engine(session.getEngineId()).logout(session);
     }
 
     @Override
-    public void reset(String instanceId, String sessionId, ResetMode mode) {
-        engine(instanceId).reset(sessionId, mode);
+    public void reset(SessionRef session, ResetMode mode) {
+        engine(session.getEngineId()).reset(session, mode);
     }
 
     @Override
-    public void activateInitiatorTarget(String instanceId, String sessionId) {
-        engine(instanceId).activateInitiatorTarget(sessionId);
+    public void activate(SessionRef session, String configId) {
+        engine(session.getEngineId()).activate(session, configId);
     }
 
     @Override
-    public void setSeqNums(String instanceId, String sessionId, @Nullable Long incoming, @Nullable Long outgoing) {
-        engine(instanceId).setSeqNums(sessionId, incoming, outgoing);
+    public void setSeqNums(SessionRef session, @Nullable Long incoming, @Nullable Long outgoing) {
+        engine(session.getEngineId()).setSeqNums(session, incoming, outgoing);
     }
 
     @Override
-    public void sendMessage(String instanceId, String sessionId, String message, char separator, boolean possDup) {
-        engine(instanceId).sendMessage(sessionId, message, separator, possDup);
-    }
-
-    private SimulatedEngine engine(String instanceId) {
-        SimulatedEngine engine = engines.get(instanceId);
-        if (engine == null) {
-            throw GatewayException.unknownEngine(instanceId);
-        }
-        return engine;
+    public void sendMessage(SessionRef session, String message, char separator, boolean possDup) {
+        engine(session.getEngineId()).sendMessage(session, message, separator, possDup);
     }
 }

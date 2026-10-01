@@ -1,8 +1,9 @@
 package org.lolaf.staffix.admin.server.simulator;
 
 import lombok.experimental.UtilityClass;
+import org.lolaf.staffix.admin.server.engines.GatewayException;
+import org.lolaf.staffix.admin.server.engines.SessionRef;
 import org.lolaf.staffix.admin.server.sessions.SessionGroup;
-import org.lolaf.staffix.admin.server.sessions.SessionSummary;
 
 import java.util.List;
 import java.util.SplittableRandom;
@@ -18,11 +19,25 @@ class SimulatedTelemetry {
         return new SplittableRandom(key.hashCode() * 1_000_003L ^ epochSecond).nextDouble();
     }
 
-    static List<SessionSummary> sessions(SimulatedEngineGateway gateway, String instanceId, String sessionId) {
-        return gateway.listSessions(instanceId).stream()
+    /**
+     * A config that exists but does not run yields nothing, as a real backend holds nothing for it.
+     */
+    static List<SimulatedSession> runningConfigs(SimulatedEngineGateway gateway, String engineId, String group, String configId) {
+        SimulatedEngine engine = gateway.engine(engineId);
+        if (configId != null && engine.listGroups().stream()
+                .filter(g -> g.getGroup().equals(group))
                 .map(SessionGroup::getSessions)
                 .flatMap(List::stream)
-                .filter(s -> sessionId == null || s.getId().equals(sessionId))
+                .noneMatch(s -> s.getConfigIds().contains(configId))) {
+            throw GatewayException.unknownSession(SessionRef.of(engineId, group, configId));
+        }
+        return engine.runningConfigs().stream()
+                .filter(s -> group == null || s.group.equals(group))
+                .filter(s -> configId == null || s.id.equals(configId))
                 .toList();
+    }
+
+    static String key(SimulatedSession session) {
+        return session.group + "." + session.id;
     }
 }

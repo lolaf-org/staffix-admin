@@ -1,24 +1,20 @@
 import { useState } from 'react'
 import { Badge, Descriptions, Divider, Flex, InputNumber, Modal, Select, Table, Tag, Typography } from 'antd'
-import { useNavigate, useLocation } from 'react-router'
 import { api, call, type Schemas } from '../api/client'
-import { useEngineMutation } from '../api/queries'
+import { sessionPath, useEngineMutation, type SessionRef } from '../api/queries'
 import { HEALTH_LABELS, HEALTH_STATUS } from './health'
 import { RESET_MODES } from './resetModes'
 import { WriteButton } from './WriteButton'
 
 interface Props {
-  instanceId: string
+  sessionRef: SessionRef
   detail: Schemas['SessionDetail']
 }
 
-export function SessionStatusTab({ instanceId, detail }: Props) {
+export function SessionStatusTab({ sessionRef, detail }: Props) {
   const { summary } = detail
-  const sessionId = summary.id
-  const path = { params: { path: { instanceId, sessionId } } }
-
-  const logon = useEngineMutation(instanceId, () => call(api.POST('/api/engines/{instanceId}/sessions/{sessionId}/logon', path)), 'Logon requested')
-  const logout = useEngineMutation(instanceId, () => call(api.POST('/api/engines/{instanceId}/sessions/{sessionId}/logout', path)), 'Logout requested')
+  const logon = useEngineMutation(sessionRef.engineId, () => call(api.POST('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/logon', sessionPath(sessionRef))), 'Logon requested')
+  const logout = useEngineMutation(sessionRef.engineId, () => call(api.POST('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/logout', sessionPath(sessionRef))), 'Logout requested')
 
   return (
     <Flex vertical gap={16}>
@@ -28,10 +24,11 @@ export function SessionStatusTab({ instanceId, detail }: Props) {
         bordered
         items={[
           { label: 'Status', children: <Badge status={HEALTH_STATUS[summary.health]} text={HEALTH_LABELS[summary.health]} /> },
-          { label: 'FIX session id', children: <Typography.Text copyable>{summary.fixSessionId}</Typography.Text> },
-          { label: 'Engine', children: instanceId },
           { label: 'Group', children: summary.group },
-          { label: 'Type', children: summary.type.toLowerCase() },
+          { label: 'Session', children: summary.id },
+          { label: 'Instance', children: `${summary.type.toLowerCase()} ${summary.instanceId}` },
+          { label: 'Running config', children: summary.runningConfigId },
+          { label: 'FIX session id', children: <Typography.Text copyable>{summary.fixSessionId}</Typography.Text> },
           { label: 'Connected', children: yesNo(summary.connected) },
           { label: 'Within session time', children: yesNo(summary.withinSessionTime) },
           {
@@ -46,31 +43,23 @@ export function SessionStatusTab({ instanceId, detail }: Props) {
         <WriteButton type="primary" loading={logon.isPending} onConfirm={() => logon.mutate(undefined)}>
           Log on
         </WriteButton>
-        <WriteButton danger loading={logout.isPending} onConfirm={() => logout.mutate(undefined)} confirm={`Log out ${sessionId}?`}>
+        <WriteButton danger loading={logout.isPending} onConfirm={() => logout.mutate(undefined)} confirm={`Log out ${summary.group}.${summary.id}?`}>
           Log out
         </WriteButton>
-        <SeqNumsButton instanceId={instanceId} detail={detail} />
+        <SeqNumsButton sessionRef={sessionRef} detail={detail} />
       </Flex>
-      <ResetSection instanceId={instanceId} summary={summary} />
-      {detail.initiators.map((initiator) => (
-        <BackupTargets key={initiator.initiatorId} instanceId={instanceId} initiator={initiator} />
-      ))}
+      <ResetSection sessionRef={sessionRef} summary={summary} />
+      {summary.type === 'INITIATOR' && detail.configs.length > 1 && <Configs sessionRef={sessionRef} detail={detail} />}
     </Flex>
   )
 }
 
-function ResetSection({ instanceId, summary }: { instanceId: string; summary: Schemas['SessionSummary'] }) {
+function ResetSection({ sessionRef, summary }: { sessionRef: SessionRef; summary: Schemas['SessionSummary'] }) {
   const modes = RESET_MODES.filter((m) => !m.initiatorOnly || summary.type === 'INITIATOR')
   const [mode, setMode] = useState(modes[0]!.mode)
   const reset = useEngineMutation(
-    instanceId,
-    () =>
-      call(
-        api.POST('/api/engines/{instanceId}/sessions/{sessionId}/reset', {
-          params: { path: { instanceId, sessionId: summary.id } },
-          body: { mode },
-        }),
-      ),
+    sessionRef.engineId,
+    () => call(api.POST('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/reset', { ...sessionPath(sessionRef), body: { mode } })),
     'Reset requested',
   )
   const selected = RESET_MODES.find((m) => m.mode === mode)!
@@ -82,7 +71,7 @@ function ResetSection({ instanceId, summary }: { instanceId: string; summary: Sc
       </Divider>
       <Flex wrap gap={8}>
         <Select value={mode} onChange={setMode} options={modes.map((m) => ({ value: m.mode, label: m.label }))} style={{ minWidth: 240 }} />
-        <WriteButton danger loading={reset.isPending} onConfirm={() => reset.mutate(undefined)} confirm={`${selected.label} on ${summary.id}?`}>
+        <WriteButton danger loading={reset.isPending} onConfirm={() => reset.mutate(undefined)} confirm={`${selected.label} on ${summary.group}.${summary.id}?`}>
           Reset
         </WriteButton>
       </Flex>
@@ -93,20 +82,13 @@ function ResetSection({ instanceId, summary }: { instanceId: string; summary: Sc
   )
 }
 
-function SeqNumsButton({ instanceId, detail }: Props) {
+function SeqNumsButton({ sessionRef, detail }: Props) {
   const [open, setOpen] = useState(false)
   const [incoming, setIncoming] = useState<number | null>(null)
   const [outgoing, setOutgoing] = useState<number | null>(null)
-  const sessionId = detail.summary.id
   const update = useEngineMutation(
-    instanceId,
-    () =>
-      call(
-        api.PUT('/api/engines/{instanceId}/sessions/{sessionId}/seqnums', {
-          params: { path: { instanceId, sessionId } },
-          body: { incoming, outgoing },
-        }),
-      ),
+    sessionRef.engineId,
+    () => call(api.PUT('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/seqnums', { ...sessionPath(sessionRef), body: { incoming, outgoing } })),
     'Sequence numbers updated',
   )
 
@@ -120,7 +102,7 @@ function SeqNumsButton({ instanceId, detail }: Props) {
     <>
       <WriteButton onConfirm={show}>Set seq nums</WriteButton>
       <Modal
-        title={`Sequence numbers of ${sessionId}`}
+        title={`Sequence numbers of ${detail.summary.runningConfigId}`}
         open={open}
         okText="Apply"
         confirmLoading={update.isPending}
@@ -142,46 +124,31 @@ function SeqNumsButton({ instanceId, detail }: Props) {
   )
 }
 
-function BackupTargets({ instanceId, initiator }: { instanceId: string; initiator: Schemas['InitiatorTargets'] }) {
-  const navigate = useNavigate()
-  const location = useLocation()
+function Configs({ sessionRef, detail }: Props) {
   const activate = useEngineMutation(
-    instanceId,
-    (sessionId: string) =>
-      call(
-        api.POST('/api/engines/{instanceId}/sessions/{sessionId}/activate', {
-          params: { path: { instanceId, sessionId } },
-        }),
-      ).then(() => sessionId),
+    sessionRef.engineId,
+    (configId: string) =>
+      call(api.POST('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/activate', { ...sessionPath(sessionRef), body: { configId } })),
     'Switch requested',
   )
-
-  if (initiator.targets.length < 2) {
-    return null
-  }
-
-  const switchTo = (sessionId: string) =>
-    activate.mutate(sessionId, {
-      onSuccess: () => navigate({ pathname: `/engines/${instanceId}/sessions/${sessionId}`, search: location.search }),
-    })
 
   return (
     <div>
       <Divider titlePlacement="start" plain>
-        Backup targets
+        Configs
       </Divider>
-      <Table<Schemas['InitiatorTarget']>
+      <Table<Schemas['SessionConfig']>
         size="small"
         pagination={false}
-        rowKey="sessionId"
-        dataSource={initiator.targets}
+        rowKey="id"
+        dataSource={detail.configs}
         columns={[
           {
-            title: 'Session',
-            dataIndex: 'sessionId',
+            title: 'Config',
+            dataIndex: 'id',
             render: (id: string, _, index) => (
               <>
-                {id} {index === 0 ? <Tag>main</Tag> : <Tag>backup</Tag>}
+                {id} <Tag>{index === 0 ? 'main' : 'backup'}</Tag>
               </>
             ),
           },
@@ -189,11 +156,16 @@ function BackupTargets({ instanceId, initiator }: { instanceId: string; initiato
           {
             title: '',
             align: 'right',
-            render: (_, target) =>
-              target.sessionId === initiator.activeSessionId ? (
-                <Tag color="processing">active</Tag>
+            render: (_, config) =>
+              config.id === detail.summary.runningConfigId ? (
+                <Tag color="processing">running</Tag>
               ) : (
-                <WriteButton size="small" loading={activate.isPending} onConfirm={() => switchTo(target.sessionId)} confirm={`Switch to ${target.sessionId}? The active session is logged out first.`}>
+                <WriteButton
+                  size="small"
+                  loading={activate.isPending}
+                  onConfirm={() => activate.mutate(config.id)}
+                  confirm={`Switch ${detail.summary.group}.${detail.summary.id} to ${config.id}? The running config is logged out first.`}
+                >
                   Switch to
                 </WriteButton>
               ),

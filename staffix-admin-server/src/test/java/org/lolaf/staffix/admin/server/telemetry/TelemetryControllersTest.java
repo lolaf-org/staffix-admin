@@ -30,7 +30,7 @@ class TelemetryControllersTest {
 
     @Test
     void givesOneSeriesPerMessageTypeAndDirection() throws Exception {
-        mockMvc.perform(get("/api/metrics?instanceId=paris-prod&sessionId=DROPCOPY&kind=READ_LATENCY&quantile=0.99" + LAST_HOUR))
+        mockMvc.perform(get("/api/metrics?engineId=paris-prod&group=acme&sessionId=trading&kind=READ_LATENCY&quantile=0.99" + LAST_HOUR))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(6)))
                 .andExpect(jsonPath("$[0].labels.messageType").exists())
@@ -39,29 +39,36 @@ class TelemetryControllersTest {
 
     @Test
     void givesOneSeriesPerSessionForSessionWideKinds() throws Exception {
-        mockMvc.perform(get("/api/metrics?instanceId=nyc-uat&kind=ROUND_TRIP_TIME" + LAST_HOUR))
+        mockMvc.perform(get("/api/metrics?engineId=nyc-uat&kind=ROUND_TRIP_TIME" + LAST_HOUR))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].labels.sessionId", hasSize(5)));
+                .andExpect(jsonPath("$[*].labels.group", hasSize(3)));
     }
 
     @Test
     void rejectsAnInvertedTimeRange() throws Exception {
-        mockMvc.perform(get("/api/metrics?instanceId=nyc-uat&kind=ROUND_TRIP_TIME&from=" + TO + "&to=" + TO.minusSeconds(60)))
+        mockMvc.perform(get("/api/metrics?engineId=nyc-uat&kind=ROUND_TRIP_TIME&from=" + TO + "&to=" + TO.minusSeconds(60)))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void filtersLogsByTypeAndText() throws Exception {
-        mockMvc.perform(get("/api/logs?instanceId=paris-prod&sessionId=EQ-BROKER&types=OUT&text=35=D&limit=20" + LAST_HOUR))
+        mockMvc.perform(get("/api/logs?engineId=paris-prod&group=ubs&sessionId=trading&types=OUT&text=35=D&limit=20" + LAST_HOUR))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(20)))
                 .andExpect(jsonPath("$[*].type", everyItem(is("OUT"))))
-                .andExpect(jsonPath("$[*].sessionId", everyItem(is("EQ-BROKER"))));
+                .andExpect(jsonPath("$[*].group", everyItem(is("ubs"))))
+                .andExpect(jsonPath("$[*].sessionId", everyItem(is("trading"))));
+    }
+
+    @Test
+    void needsTheGroupOfASession() throws Exception {
+        mockMvc.perform(get("/api/logs?engineId=paris-prod&sessionId=trading" + LAST_HOUR))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
     void reportsAnUnknownSession() throws Exception {
-        mockMvc.perform(get("/api/logs?instanceId=paris-prod&sessionId=NOPE" + LAST_HOUR))
+        mockMvc.perform(get("/api/logs?engineId=paris-prod&group=ubs&sessionId=nope" + LAST_HOUR))
                 .andExpect(status().isNotFound());
     }
 }

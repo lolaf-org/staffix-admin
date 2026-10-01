@@ -5,8 +5,6 @@ import org.lolaf.staffix.admin.logs.LogEntry;
 import org.lolaf.staffix.admin.logs.LogQuery;
 import org.lolaf.staffix.admin.logs.LogType;
 import org.lolaf.staffix.admin.logs.LogsSource;
-import org.lolaf.staffix.admin.server.engines.GatewayException;
-import org.lolaf.staffix.admin.server.sessions.SessionSummary;
 import org.lolaf.staffix.admin.server.sessions.SessionType;
 
 import java.time.Instant;
@@ -38,10 +36,7 @@ class SimulatedLogsSource implements LogsSource {
 
     @Override
     public List<LogEntry> query(LogQuery query) {
-        List<SessionSummary> sessions = SimulatedTelemetry.sessions(gateway, query.getInstanceId(), query.getSessionId());
-        if (query.getSessionId() != null && sessions.isEmpty()) {
-            throw GatewayException.unknownSession(query.getInstanceId(), query.getSessionId());
-        }
+        List<SimulatedSession> sessions = SimulatedTelemetry.runningConfigs(gateway, query.getEngineId(), query.getGroup(), query.getSessionId());
         List<LogEntry> entries = new ArrayList<>();
         long earliest = Math.max(query.getFrom().getEpochSecond(), query.getTo().getEpochSecond() - MAX_SECONDS_SCANNED / Math.max(sessions.size(), 1));
         for (long second = query.getTo().getEpochSecond(); second >= earliest && entries.size() < query.getLimit(); second--) {
@@ -58,12 +53,12 @@ class SimulatedLogsSource implements LogsSource {
         return entries;
     }
 
-    private static List<LogEntry> secondOfTraffic(SessionSummary session, long second) {
-        double random = noise(session.getId(), second);
+    private static List<LogEntry> secondOfTraffic(SimulatedSession session, long second) {
+        double random = noise(SimulatedTelemetry.key(session), second);
         List<LogEntry> entries = new ArrayList<>();
         Instant t = Instant.ofEpochSecond(second, (long) (random * 999_000_000));
-        String[] parties = session.getFixSessionId().substring(session.getFixSessionId().lastIndexOf(':') + 1).split("->");
-        boolean weSendOrders = session.getType() == SessionType.INITIATOR;
+        String[] parties = session.fixSessionId.substring(session.fixSessionId.lastIndexOf(':') + 1).split("->");
+        boolean weSendOrders = session.type == SessionType.INITIATOR;
         if (random < 0.01) {
             entries.add(entry(session, t, LogType.EVENT, EVENTS.get((int) (random * 100 * EVENTS.size()) % EVENTS.size())));
         }
@@ -93,7 +88,7 @@ class SimulatedLogsSource implements LogsSource {
         return "8=FIX.4.4|9=" + fields.length() + "|" + fields + "|10=" + String.format("%03d", fields.length() % 256) + "|";
     }
 
-    private static LogEntry entry(SessionSummary session, Instant t, LogType type, String line) {
-        return LogEntry.builder().timestamp(t).sessionId(session.getId()).type(type).line(line).build();
+    private static LogEntry entry(SimulatedSession session, Instant t, LogType type, String line) {
+        return LogEntry.builder().timestamp(t).group(session.group).sessionId(session.id).type(type).line(line).build();
     }
 }

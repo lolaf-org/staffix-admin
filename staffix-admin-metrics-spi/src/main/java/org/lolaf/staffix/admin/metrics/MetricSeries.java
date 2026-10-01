@@ -12,10 +12,12 @@ import java.util.Map;
 public class MetricSeries {
     public static final String MESSAGE_TYPE = "messageType";
     public static final String DIRECTION = "direction";
+    public static final String GROUP = "group";
     public static final String SESSION_ID = "sessionId";
 
     /**
-     * Among {@link #MESSAGE_TYPE}, {@link #DIRECTION} ({@code in} or {@code out}) and {@link #SESSION_ID}.
+     * Among {@link #MESSAGE_TYPE}, {@link #DIRECTION} ({@code in} or {@code out}), {@link #GROUP} and
+     * {@link #SESSION_ID}.
      */
     @Singular
     Map<String, String> labels;

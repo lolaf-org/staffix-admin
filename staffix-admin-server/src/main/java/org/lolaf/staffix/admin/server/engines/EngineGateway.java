@@ -9,32 +9,32 @@ import tools.jackson.databind.JsonNode;
 import java.util.List;
 
 /**
- * Operations on a registered engine's sessions. Failures are {@link GatewayException}s.
+ * Operations on a registered engine's sessions. Session operations act on the config the session runs: an
+ * initiator's main or one of its backups. Failures are {@link GatewayException}s.
  */
 public interface EngineGateway {
 
     /**
      * Sorted by group, then by session id within a group.
      */
-    List<SessionGroup> listSessions(String instanceId);
+    List<SessionGroup> listGroups(String engineId);
 
-    SessionDetail getSession(String instanceId, String sessionId);
+    SessionDetail getSession(SessionRef session);
 
-    JsonNode getSessionSettings(String instanceId, String sessionId);
+    JsonNode getSessionSettings(SessionRef session);
 
-    void logon(String instanceId, String sessionId);
+    void logon(SessionRef session);
 
-    void logout(String instanceId, String sessionId);
+    void logout(SessionRef session);
 
-    void reset(String instanceId, String sessionId, ResetMode mode);
+    void reset(SessionRef session, ResetMode mode);
 
     /**
-     * Unlike the other operations, {@code sessionId} names an initiator target, which is not a managed session
-     * until it becomes the active one.
+     * Makes an initiator run another of its configs, its main or a backup.
      */
-    void activateInitiatorTarget(String instanceId, String sessionId);
+    void activate(SessionRef session, String configId);
 
-    void setSeqNums(String instanceId, String sessionId, @Nullable Long incoming, @Nullable Long outgoing);
+    void setSeqNums(SessionRef session, @Nullable Long incoming, @Nullable Long outgoing);
 
-    void sendMessage(String instanceId, String sessionId, String message, char separator, boolean possDup);
+    void sendMessage(SessionRef session, String message, char separator, boolean possDup);
 }

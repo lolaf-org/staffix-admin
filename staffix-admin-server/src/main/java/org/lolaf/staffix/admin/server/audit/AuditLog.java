@@ -1,6 +1,7 @@
 package org.lolaf.staffix.admin.server.audit;
 
 import lombok.extern.slf4j.Slf4j;
+import org.lolaf.staffix.admin.server.engines.SessionRef;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -14,14 +15,15 @@ import org.springframework.web.ErrorResponse;
 @Component
 public class AuditLog {
 
-    public void record(String instanceId, String sessionId, String operation, Runnable action) {
+    public void record(SessionRef session, String operation, Runnable action) {
         String user = currentUser();
         try {
             action.run();
-            log.info("user={} engine={} session={} operation=[{}] outcome=OK", user, instanceId, sessionId, operation);
+            log.info("user={} engine={} group={} session={} operation=[{}] outcome=OK",
+                    user, session.getEngineId(), session.getGroup(), session.getSessionId(), operation);
         } catch (RuntimeException e) {
-            log.warn("user={} engine={} session={} operation=[{}] outcome=FAILED reason=[{}]",
-                    user, instanceId, sessionId, operation, reason(e));
+            log.warn("user={} engine={} group={} session={} operation=[{}] outcome=FAILED reason=[{}]",
+                    user, session.getEngineId(), session.getGroup(), session.getSessionId(), operation, reason(e));
             throw e;
         }
     }

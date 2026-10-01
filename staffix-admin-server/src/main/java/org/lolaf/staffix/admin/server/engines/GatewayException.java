@@ -13,17 +13,17 @@ public class GatewayException extends ErrorResponseException {
         super(status, ProblemDetail.forStatusAndDetail(status, detail), cause);
     }
 
-    public static GatewayException unknownEngine(String instanceId) {
-        return new GatewayException(HttpStatus.NOT_FOUND, "Unknown engine '" + instanceId + "'", null);
+    public static GatewayException unknownEngine(String engineId) {
+        return new GatewayException(HttpStatus.NOT_FOUND, "Unknown engine '" + engineId + "'", null);
     }
 
-    public static GatewayException unknownSession(String instanceId, String sessionId) {
-        return new GatewayException(HttpStatus.NOT_FOUND,
-                "Engine '" + instanceId + "' has no session '" + sessionId + "'", null);
+    public static GatewayException unknownSession(SessionRef session) {
+        return new GatewayException(HttpStatus.NOT_FOUND, "Engine '" + session.getEngineId() + "' has no session '"
+                + session.getGroup() + "." + session.getSessionId() + "'", null);
     }
 
     /**
-     * The request itself is wrong, e.g. a malformed FIX message.
+     * The request itself is wrong, e.g. a malformed FIX message or a config the session does not have.
      */
     public static GatewayException invalid(String detail) {
         return new GatewayException(HttpStatus.BAD_REQUEST, detail, null);
@@ -36,8 +36,8 @@ public class GatewayException extends ErrorResponseException {
         return new GatewayException(HttpStatus.CONFLICT, detail, null);
     }
 
-    public static GatewayException unavailable(String instanceId, Throwable cause) {
+    public static GatewayException unavailable(String engineId, Throwable cause) {
         return new GatewayException(HttpStatus.BAD_GATEWAY,
-                "Engine '" + instanceId + "' did not answer: " + cause.getMessage(), cause);
+                "Engine '" + engineId + "' did not answer: " + cause.getMessage(), cause);
     }
 }

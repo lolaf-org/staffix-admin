@@ -1,6 +1,6 @@
 import { Alert, Checkbox, Flex, Form, Input, Radio, Typography } from 'antd'
 import { api, call, type Schemas } from '../api/client'
-import { useEngineMutation } from '../api/queries'
+import { sessionPath, useEngineMutation, type SessionRef } from '../api/queries'
 import { WriteButton } from './WriteButton'
 
 const SOH = '\u0001'
@@ -11,17 +11,11 @@ interface MessageForm {
   possDup: boolean
 }
 
-export function SendMessageTab({ instanceId, summary }: { instanceId: string; summary: Schemas['SessionSummary'] }) {
+export function SendMessageTab({ sessionRef, summary }: { sessionRef: SessionRef; summary: Schemas['SessionSummary'] }) {
   const [form] = Form.useForm<MessageForm>()
   const send = useEngineMutation(
-    instanceId,
-    (body: MessageForm) =>
-      call(
-        api.POST('/api/engines/{instanceId}/sessions/{sessionId}/messages', {
-          params: { path: { instanceId, sessionId: summary.id } },
-          body,
-        }),
-      ),
+    sessionRef.engineId,
+    (body: MessageForm) => call(api.POST('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/messages', { ...sessionPath(sessionRef), body })),
     'Message sent',
   )
 
@@ -51,7 +45,7 @@ export function SendMessageTab({ instanceId, summary }: { instanceId: string; su
         <WriteButton
           type="primary"
           loading={send.isPending}
-          confirm={`Send this message on ${summary.id}?`}
+          confirm={`Send this message on ${summary.group}.${summary.id}, config ${summary.runningConfigId}?`}
           onConfirm={() => form.validateFields().then((values) => send.mutate(values))}
         >
           Send

@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.lolaf.staffix.admin.server.audit.AuditLog;
 import org.lolaf.staffix.admin.server.engines.EngineGateway;
+import org.lolaf.staffix.admin.server.engines.SessionRef;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,82 +20,88 @@ import tools.jackson.databind.JsonNode;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/engines/{instanceId}/sessions")
+@RequestMapping("/api/engines/{engineId}/groups")
 @RequiredArgsConstructor
 public class SessionsController {
 
+    private static final String SESSION = "/{group}/sessions/{sessionId}";
     private static final String WRITER = "hasRole('WRITER')";
 
     private final EngineGateway gateway;
     private final AuditLog auditLog;
 
     @GetMapping
-    public List<SessionGroup> listSessions(@PathVariable String instanceId) {
-        return gateway.listSessions(instanceId);
+    public List<SessionGroup> listGroups(@PathVariable String engineId) {
+        return gateway.listGroups(engineId);
     }
 
-    @GetMapping("/{sessionId}")
-    public SessionDetail getSession(@PathVariable String instanceId, @PathVariable String sessionId) {
-        return gateway.getSession(instanceId, sessionId);
+    @GetMapping(SESSION)
+    public SessionDetail getSession(@PathVariable String engineId, @PathVariable String group, @PathVariable String sessionId) {
+        return gateway.getSession(SessionRef.of(engineId, group, sessionId));
     }
 
     /**
-     * The session's FixSessionSettings as JSON, free form until its format is settled.
+     * The running config's FixSessionSettings as JSON, free form until its format is settled.
      */
-    @GetMapping("/{sessionId}/settings")
-    public JsonNode getSessionSettings(@PathVariable String instanceId, @PathVariable String sessionId) {
-        return gateway.getSessionSettings(instanceId, sessionId);
+    @GetMapping(SESSION + "/settings")
+    public JsonNode getSessionSettings(@PathVariable String engineId, @PathVariable String group, @PathVariable String sessionId) {
+        return gateway.getSessionSettings(SessionRef.of(engineId, group, sessionId));
     }
 
     @PreAuthorize(WRITER)
-    @PostMapping("/{sessionId}/logon")
+    @PostMapping(SESSION + "/logon")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void logonSession(@PathVariable String instanceId, @PathVariable String sessionId) {
-        auditLog.record(instanceId, sessionId, "logon", () -> gateway.logon(instanceId, sessionId));
+    public void logonSession(@PathVariable String engineId, @PathVariable String group, @PathVariable String sessionId) {
+        SessionRef session = SessionRef.of(engineId, group, sessionId);
+        auditLog.record(session, "logon", () -> gateway.logon(session));
     }
 
     @PreAuthorize(WRITER)
-    @PostMapping("/{sessionId}/logout")
+    @PostMapping(SESSION + "/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void logoutSession(@PathVariable String instanceId, @PathVariable String sessionId) {
-        auditLog.record(instanceId, sessionId, "logout", () -> gateway.logout(instanceId, sessionId));
+    public void logoutSession(@PathVariable String engineId, @PathVariable String group, @PathVariable String sessionId) {
+        SessionRef session = SessionRef.of(engineId, group, sessionId);
+        auditLog.record(session, "logout", () -> gateway.logout(session));
     }
 
     @PreAuthorize(WRITER)
-    @PostMapping("/{sessionId}/reset")
+    @PostMapping(SESSION + "/reset")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void resetSession(@PathVariable String instanceId, @PathVariable String sessionId,
+    public void resetSession(@PathVariable String engineId, @PathVariable String group, @PathVariable String sessionId,
                              @Valid @RequestBody ResetRequest request) {
-        auditLog.record(instanceId, sessionId, "reset " + request.getMode(),
-                () -> gateway.reset(instanceId, sessionId, request.getMode()));
+        SessionRef session = SessionRef.of(engineId, group, sessionId);
+        auditLog.record(session, "reset " + request.getMode(), () -> gateway.reset(session, request.getMode()));
     }
 
     /**
-     * Makes this session the active target of every initiator listing it.
+     * Makes an initiator run another of its configs.
      */
     @PreAuthorize(WRITER)
-    @PostMapping("/{sessionId}/activate")
+    @PostMapping(SESSION + "/activate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void activateInitiatorTarget(@PathVariable String instanceId, @PathVariable String sessionId) {
-        auditLog.record(instanceId, sessionId, "activate initiator target",
-                () -> gateway.activateInitiatorTarget(instanceId, sessionId));
+    public void activateConfig(@PathVariable String engineId, @PathVariable String group, @PathVariable String sessionId,
+                               @Valid @RequestBody ActivateRequest request) {
+        SessionRef session = SessionRef.of(engineId, group, sessionId);
+        auditLog.record(session, "activate config " + request.getConfigId(), () -> gateway.activate(session, request.getConfigId()));
     }
 
     @PreAuthorize(WRITER)
-    @PutMapping("/{sessionId}/seqnums")
+    @PutMapping(SESSION + "/seqnums")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void setSeqNums(@PathVariable String instanceId, @PathVariable String sessionId,
+    public void setSeqNums(@PathVariable String engineId, @PathVariable String group, @PathVariable String sessionId,
                            @Valid @RequestBody SeqNumsRequest request) {
-        auditLog.record(instanceId, sessionId, "set seqnums incoming=" + request.getIncoming() + " outgoing=" + request.getOutgoing(),
-                () -> gateway.setSeqNums(instanceId, sessionId, request.getIncoming(), request.getOutgoing()));
+        SessionRef session = SessionRef.of(engineId, group, sessionId);
+        auditLog.record(session, "set seqnums incoming=" + request.getIncoming() + " outgoing=" + request.getOutgoing(),
+                () -> gateway.setSeqNums(session, request.getIncoming(), request.getOutgoing()));
     }
 
     @PreAuthorize(WRITER)
-    @PostMapping("/{sessionId}/messages")
+    @PostMapping(SESSION + "/messages")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void sendMessage(@PathVariable String instanceId, @PathVariable String sessionId,
+    public void sendMessage(@PathVariable String engineId, @PathVariable String group, @PathVariable String sessionId,
                             @Valid @RequestBody SendMessageRequest request) {
-        auditLog.record(instanceId, sessionId, "send possDup=" + request.isPossDup() + " message=" + request.getMessage(),
-                () -> gateway.sendMessage(instanceId, sessionId, request.getMessage(), request.getSeparator(), request.isPossDup()));
+        SessionRef session = SessionRef.of(engineId, group, sessionId);
+        auditLog.record(session, "send possDup=" + request.isPossDup() + " message=" + request.getMessage(),
+                () -> gateway.sendMessage(session, request.getMessage(), request.getSeparator(), request.isPossDup()));
     }
 }

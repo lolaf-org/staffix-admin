@@ -20,7 +20,7 @@ class SimulatedLogsSourceTest {
     void listsNewestFirstWithinTheRange() {
         Instant to = Instant.parse("2026-10-01T10:00:00Z");
         List<LogEntry> entries = logs.query(LogQuery.builder()
-                .instanceId("paris-prod")
+                .engineId("paris-prod")
                 .from(to.minusSeconds(600))
                 .to(to)
                 .limit(300)
@@ -33,7 +33,7 @@ class SimulatedLogsSourceTest {
 
     @Test
     void givesTheSameEntriesOnEveryQuery() {
-        LogQuery query = LogQuery.builder().instanceId("nyc-uat").from(Instant.EPOCH).to(Instant.ofEpochSecond(3600)).limit(50).build();
+        LogQuery query = LogQuery.builder().engineId("nyc-uat").from(Instant.EPOCH).to(Instant.ofEpochSecond(3600)).limit(50).build();
 
         assertThat(logs.query(query)).isEqualTo(logs.query(query));
     }

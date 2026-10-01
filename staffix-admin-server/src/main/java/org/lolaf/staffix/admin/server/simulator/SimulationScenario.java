@@ -8,11 +8,11 @@ import tools.jackson.databind.node.ObjectNode;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.IntStream;
 
 /**
- * Three engines covering every case the UI must render: all three colours, an operator logout, flaky sessions,
- * session windows opening and closing, initiators with and without backup targets.
+ * Three engines whose groups are counterparties: liquidity providers we connect to (initiators, with backup
+ * configs), clients connecting to us (acceptors), one group mixing both. Between them they show every colour, an
+ * operator logout, flaky sessions, session windows opening and closing, and a backup running.
  */
 @RequiredArgsConstructor
 class SimulationScenario {
@@ -25,87 +25,86 @@ class SimulationScenario {
 
     private SimulatedEngine paris() {
         EngineBuilder engine = new EngineBuilder("paris-prod", "0.9.1", "STAFFIX-PAR", "Europe/Paris");
-        IntStream.rangeClosed(1, 10).forEach(i -> engine.acceptor("equities", "EQ-CLIENT-%02d".formatted(i))
-                .flaky(i == 3)
-                .withinSessionTime(i != 7)
-                .desiredState(i == 9 ? SessionState.LOGGED_OUT : SessionState.LOGGED_IN));
-        engine.initiator("equities", "EQ-BROKER", "EQ-BROKER-DR");
-        engine.initiator("fx", "FX-LP1").get(0).flaky(true);
-        engine.initiator("fx", "FX-LP2", "FX-LP2-DR");
-        IntStream.rangeClosed(1, 4).forEach(i -> engine.acceptor("fx", "FX-CLIENT-%02d".formatted(i))
-                .sessionTimeCycleTicks(i == 2 ? 30 : 0));
-        engine.acceptor("default", "DROPCOPY");
+        engine.initiator("ubs", "trading", "trading-drp");
+        engine.initiator("ubs", "market-data", "market-data-drp").getFirst().flaky(true);
+        engine.initiator("ubs", "drop-copy");
+        engine.initiator("jpm", "trading", "trading-drp");
+        engine.initiator("jpm", "market-data").getFirst().sessionTimeCycleTicks(45);
+        engine.initiator("citi", "trading", "trading-drp");
+        engine.acceptor("citi", "drop-copy", "dropcopy-acceptor");
+        engine.acceptor("acme", "trading", "clients-acceptor");
+        engine.acceptor("acme", "drop-copy", "clients-acceptor");
+        engine.acceptor("globex", "trading", "clients-acceptor").desiredState(SessionState.LOGGED_OUT);
+        engine.acceptor("globex", "drop-copy", "clients-acceptor").withinSessionTime(false);
+        engine.acceptor("initech", "trading", "clients-acceptor").flaky(true);
+        engine.acceptor("initech", "drop-copy", "clients-acceptor");
         return engine.build();
     }
 
     private SimulatedEngine london() {
         EngineBuilder engine = new EngineBuilder("london-prod", "0.9.1", "STAFFIX-LDN", "Europe/London");
-        engine.initiator("derivatives", "DRV-EUREX").get(0).sessionTimeCycleTicks(45);
-        engine.initiator("derivatives", "DRV-ICE", "DRV-ICE-DR");
-        engine.initiator("derivatives", "DRV-CME").get(0).flaky(true);
-        engine.initiator("equities", "EQ-LSE");
-        IntStream.rangeClosed(21, 26).forEach(i -> engine.acceptor("equities", "EQ-CLIENT-%02d".formatted(i)));
+        engine.initiator("barclays", "trading", "trading-drp");
+        engine.initiator("barclays", "market-data");
+        engine.initiator("ice", "trading", "trading-drp").getFirst().flaky(true);
+        engine.acceptor("fund-alpha", "trading", "clients-acceptor");
+        engine.acceptor("fund-alpha", "drop-copy", "clients-acceptor");
+        engine.acceptor("fund-beta", "trading", "clients-acceptor").sessionTimeCycleTicks(30);
         return engine.build();
     }
 
     private SimulatedEngine newYork() {
         EngineBuilder engine = new EngineBuilder("nyc-uat", "0.9.0", "STAFFIX-NYC", "America/New_York");
-        IntStream.rangeClosed(1, 5).forEach(i -> engine.acceptor("default", "UAT-CLIENT-%02d".formatted(i))
-                .flaky(i == 2)
-                .desiredState(i == 3 ? SessionState.LOGGED_OUT : SessionState.LOGGED_IN));
+        engine.acceptor("uat-client-1", "trading", "uat-acceptor");
+        engine.acceptor("uat-client-2", "trading", "uat-acceptor").flaky(true);
+        engine.acceptor("uat-client-3", "trading", "uat-acceptor").desiredState(SessionState.LOGGED_OUT);
         return engine.build();
     }
 
     private class EngineBuilder {
 
-        private final String instanceId;
+        private final String engineId;
         private final String staffixVersion;
         private final String compId;
         private final String timeZone;
-        private final List<SimulatedSession.SimulatedSessionBuilder> acceptors = new ArrayList<>();
-        private final List<List<SimulatedSession.SimulatedSessionBuilder>> initiators = new ArrayList<>();
+        private final List<Connection> connections = new ArrayList<>();
         private int nextPort = 9001;
 
-        EngineBuilder(String instanceId, String staffixVersion, String compId, String timeZone) {
-            this.instanceId = instanceId;
+        EngineBuilder(String engineId, String staffixVersion, String compId, String timeZone) {
+            this.engineId = engineId;
             this.staffixVersion = staffixVersion;
             this.compId = compId;
             this.timeZone = timeZone;
         }
 
-        SimulatedSession.SimulatedSessionBuilder acceptor(String group, String id) {
-            SimulatedSession.SimulatedSessionBuilder session = session(group, id, SessionType.ACCEPTOR, null);
-            acceptors.add(session);
-            return session;
+        SimulatedSession.SimulatedSessionBuilder acceptor(String group, String id, String instanceId) {
+            SimulatedSession.SimulatedSessionBuilder config = config(group, id, SessionType.ACCEPTOR, null);
+            connections.add(new Connection(instanceId, List.of(config)));
+            return config;
         }
 
         /**
-         * The first target is the main one, the others its backups.
+         * One initiator per session, named after it; the first config is the main one, the others its backups.
          */
-        List<SimulatedSession.SimulatedSessionBuilder> initiator(String group, String... targetIds) {
-            List<SimulatedSession.SimulatedSessionBuilder> targets = new ArrayList<>();
-            for (String id : targetIds) {
-                String host = id.toLowerCase().replace("-dr", "") + (id.endsWith("-DR") ? ".dr" : "") + ".example.com";
-                targets.add(session(group, id, SessionType.INITIATOR, host + ":" + nextPort++));
+        List<SimulatedSession.SimulatedSessionBuilder> initiator(String group, String... configIds) {
+            List<SimulatedSession.SimulatedSessionBuilder> configs = new ArrayList<>();
+            for (String configId : configIds) {
+                String host = "fix" + (configId.endsWith("-drp") ? "-dr" : "") + "." + group + ".example.com";
+                configs.add(config(group, configId, SessionType.INITIATOR, host + ":" + nextPort++));
             }
-            initiators.add(targets);
-            return targets;
+            connections.add(new Connection(group + "-" + configIds[0], configs));
+            return configs;
         }
 
         SimulatedEngine build() {
-            return new SimulatedEngine(instanceId, staffixVersion,
-                    acceptors.stream().map(SimulatedSession.SimulatedSessionBuilder::build).toList(),
-                    initiators.stream().map(EngineBuilder::initiator).toList());
+            return new SimulatedEngine(engineId, staffixVersion, connections.stream()
+                    .map(c -> new SimulatedConnection(c.instanceId(), c.configs().stream()
+                            .map(SimulatedSession.SimulatedSessionBuilder::build)
+                            .toList()))
+                    .toList());
         }
 
-        private static SimulatedInitiator initiator(List<SimulatedSession.SimulatedSessionBuilder> targetBuilders) {
-            List<SimulatedSession> targets = targetBuilders.stream().map(SimulatedSession.SimulatedSessionBuilder::build).toList();
-            return new SimulatedInitiator(targets.getFirst().id + "-initiator", targets);
-        }
-
-        private SimulatedSession.SimulatedSessionBuilder session(String group, String id, SessionType type,
-                                                                 String connectAddress) {
-            String counterparty = id.replace("-DR", "");
+        private SimulatedSession.SimulatedSessionBuilder config(String group, String id, SessionType type, String connectAddress) {
+            String counterparty = group.toUpperCase();
             String fixSessionId = id + ":FIX.4.4:" + compId + "->" + counterparty;
             return SimulatedSession.builder()
                     .id(id)
@@ -145,5 +144,8 @@ class SimulationScenario {
             }
             return settings;
         }
+    }
+
+    private record Connection(String instanceId, List<SimulatedSession.SimulatedSessionBuilder> configs) {
     }
 }

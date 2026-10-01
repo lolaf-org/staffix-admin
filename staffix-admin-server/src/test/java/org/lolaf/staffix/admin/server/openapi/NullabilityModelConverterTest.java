@@ -25,7 +25,7 @@ class NullabilityModelConverterTest {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(ENGINE + ".required").value(containsInAnyOrder(
-                        "instanceId", "reachable", "lastAnnouncedAt")));
+                        "engineId", "reachable", "lastAnnouncedAt")));
     }
 
     @Test

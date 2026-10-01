@@ -12,7 +12,7 @@ import java.time.Instant;
 @Value
 @Builder
 public class Engine {
-    String instanceId;
+    String engineId;
     @Nullable
     String staffixVersion;
     boolean reachable;

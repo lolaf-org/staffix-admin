@@ -31,7 +31,8 @@ public class MetricsController {
      * Per message type kinds give one series per type and direction, the others one series per session.
      */
     @GetMapping("/api/metrics")
-    public List<MetricSeries> queryMetrics(@RequestParam String instanceId,
+    public List<MetricSeries> queryMetrics(@RequestParam String engineId,
+                                           @RequestParam(required = false) @Nullable String group,
                                            @RequestParam(required = false) @Nullable String sessionId,
                                            @RequestParam MetricKind kind,
                                            @RequestParam(defaultValue = "0.99") @DecimalMin("0") @DecimalMax("1") double quantile,
@@ -41,10 +42,12 @@ public class MetricsController {
         if (source == null) {
             throw TelemetryProblems.notConfigured("metrics");
         }
+        TelemetryProblems.requireGroupForSession(group, sessionId);
         TimeRange range = TimeRange.of(from, to);
         try {
             return source.query(MetricQuery.builder()
-                    .instanceId(instanceId)
+                    .engineId(engineId)
+                    .group(group)
                     .sessionId(sessionId)
                     .kind(kind)
                     .quantile(kind.isLatency() ? quantile : null)

@@ -31,7 +31,8 @@ public class LogsController {
      * Matching entries, newest first.
      */
     @GetMapping("/api/logs")
-    public List<LogEntry> queryLogs(@RequestParam String instanceId,
+    public List<LogEntry> queryLogs(@RequestParam String engineId,
+                                    @RequestParam(required = false) @Nullable String group,
                                     @RequestParam(required = false) @Nullable String sessionId,
                                     @RequestParam Instant from,
                                     @RequestParam Instant to,
@@ -42,10 +43,12 @@ public class LogsController {
         if (source == null) {
             throw TelemetryProblems.notConfigured("logs");
         }
+        TelemetryProblems.requireGroupForSession(group, sessionId);
         TimeRange range = TimeRange.of(from, to);
         try {
             return source.query(LogQuery.builder()
-                    .instanceId(instanceId)
+                    .engineId(engineId)
+                    .group(group)
                     .sessionId(sessionId)
                     .from(range.getFrom())
                     .to(range.getTo())

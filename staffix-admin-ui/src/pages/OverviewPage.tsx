@@ -1,7 +1,7 @@
-import { Alert, Badge, Card, Empty, Flex, Input, Select, Skeleton, Space, Tag, Typography } from 'antd'
+import { Alert, Badge, Card, Empty, Flex, Input, Select, Skeleton, Space, Tag, Typography, theme } from 'antd'
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router'
 import type { Schemas } from '../api/client'
-import { useEngines, useSessions } from '../api/queries'
+import { sessionRoute, useEngines, useGroups } from '../api/queries'
 import { HEALTH_LABELS, HEALTH_STATUS, HEALTHS, type Health } from '../sessions/health'
 import { SessionBox } from '../sessions/SessionBox'
 import { useSessionFilters } from '../sessions/filters'
@@ -13,17 +13,17 @@ export function OverviewPage() {
   if (engines.isPending) return <Skeleton active />
   if (engines.isError) return <Alert type="error" title={engines.error.message} />
 
-  const shown = engines.data.filter((e) => filters.engines.length === 0 || filters.engines.includes(e.instanceId))
+  const shown = engines.data.filter((e) => filters.engines.length === 0 || filters.engines.includes(e.engineId))
 
   return (
     <Flex vertical gap={16}>
       <Flex wrap gap={8}>
         <Input.Search
-          placeholder="Session id or FIX session id"
+          placeholder="Group, session, instance or FIX session id"
           allowClear
           defaultValue={filters.text}
           onChange={(e) => filters.setText(e.target.value)}
-          style={{ width: 280, maxWidth: '100%' }}
+          style={{ width: 320, maxWidth: '100%' }}
         />
         <Select<Health[]>
           mode="multiple"
@@ -40,13 +40,13 @@ export function OverviewPage() {
           placeholder="Any engine"
           value={filters.engines}
           onChange={filters.setEngines}
-          options={engines.data.map((e) => ({ value: e.instanceId, label: e.instanceId }))}
+          options={engines.data.map((e) => ({ value: e.engineId, label: e.engineId }))}
           style={{ minWidth: 200, maxWidth: '100%' }}
         />
       </Flex>
       {shown.length === 0 && <Empty description="No engine has announced itself yet" />}
       {shown.map((engine) => (
-        <EngineCard key={engine.instanceId} engine={engine} />
+        <EngineCard key={engine.engineId} engine={engine} />
       ))}
       <Outlet />
     </Flex>
@@ -54,18 +54,15 @@ export function OverviewPage() {
 }
 
 function EngineCard({ engine }: { engine: Schemas['Engine'] }) {
-  const sessions = useSessions(engine.instanceId)
+  const groups = useGroups(engine.engineId)
   const filters = useSessionFilters()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const selected = useParams()
 
-  const groups = (sessions.data ?? [])
+  const shown = (groups.data ?? [])
     .map((group) => ({ ...group, sessions: group.sessions.filter(filters.matches) }))
     .filter((group) => group.sessions.length > 0)
   const counts = HEALTHS.map((health) => ({
     health,
-    count: (sessions.data ?? []).flatMap((g) => g.sessions).filter((s) => s.health === health).length,
+    count: (groups.data ?? []).flatMap((g) => g.sessions).filter((s) => s.health === health).length,
   }))
 
   return (
@@ -73,7 +70,7 @@ function EngineCard({ engine }: { engine: Schemas['Engine'] }) {
       size="small"
       title={
         <Space wrap>
-          <Typography.Text strong>{engine.instanceId}</Typography.Text>
+          <Typography.Text strong>{engine.engineId}</Typography.Text>
           {engine.reachable ? <Tag color="success">reachable</Tag> : <Tag color="error">unreachable</Tag>}
           {engine.staffixVersion && <Typography.Text type="secondary">staffix {engine.staffixVersion}</Typography.Text>}
         </Space>
@@ -86,30 +83,55 @@ function EngineCard({ engine }: { engine: Schemas['Engine'] }) {
         </Space>
       }
     >
-      {sessions.isPending && <Skeleton active paragraph={{ rows: 2 }} />}
-      {sessions.isError && <Alert type="error" title={sessions.error.message} />}
-      {sessions.isSuccess && groups.length === 0 && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No matching session" />}
-      <Flex vertical gap={12}>
-        {groups.map((group) => (
-          <div key={group.group}>
-            <Typography.Text type="secondary" strong>
-              {group.group}
-            </Typography.Text>
-            <Flex wrap gap={8} style={{ marginTop: 6 }}>
-              {group.sessions.map((session) => (
-                <SessionBox
-                  key={session.id}
-                  session={session}
-                  selected={selected.instanceId === engine.instanceId && selected.sessionId === session.id}
-                  onClick={() =>
-                    navigate({ pathname: `/engines/${engine.instanceId}/sessions/${session.id}`, search: location.search })
-                  }
-                />
-              ))}
-            </Flex>
-          </div>
+      {groups.isPending && <Skeleton active paragraph={{ rows: 2 }} />}
+      {groups.isError && <Alert type="error" title={groups.error.message} />}
+      {groups.isSuccess && shown.length === 0 && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No matching session" />}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 480px), 1fr))', gap: 12 }}>
+        {shown.map((group) => (
+          <GroupBox key={group.group} engineId={engine.engineId} group={group} />
         ))}
-      </Flex>
+      </div>
     </Card>
+  )
+}
+
+function GroupBox({ engineId, group }: { engineId: string; group: Schemas['SessionGroup'] }) {
+  const { token } = theme.useToken()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const selected = useParams()
+
+  return (
+    <section
+      aria-label={`Group ${group.group}`}
+      style={{
+        border: `1px dashed ${token.colorBorder}`,
+        borderRadius: token.borderRadiusLG,
+        padding: 12,
+        background: token.colorFillQuaternary,
+      }}
+    >
+      <Flex gap={6} align="baseline" style={{ marginBottom: 8 }}>
+        <Typography.Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          group
+        </Typography.Text>
+        <Typography.Text strong style={{ fontSize: 15 }}>
+          {group.group}
+        </Typography.Text>
+      </Flex>
+      <Flex wrap gap={8} align="flex-start">
+        {group.sessions.map((session) => {
+          const ref = { engineId, group: group.group, sessionId: session.id }
+          return (
+            <SessionBox
+              key={session.id}
+              session={session}
+              selected={selected.engineId === engineId && selected.group === group.group && selected.sessionId === session.id}
+              onClick={() => navigate({ pathname: sessionRoute(ref), search: location.search })}
+            />
+          )
+        })}
+      </Flex>
+    </section>
   )
 }

@@ -21,9 +21,14 @@ export function useSessionFilters() {
       { replace: true },
     )
 
+  const searchable = (session: Schemas['SessionSummary']) =>
+    [session.group, `${session.group}.${session.id}`, session.instanceId, session.fixSessionId, ...session.configIds]
+      .join(' ')
+      .toLowerCase()
+
   const matches = (session: Schemas['SessionSummary']) =>
     (healths.length === 0 || healths.includes(session.health)) &&
-    (text === '' || `${session.id} ${session.fixSessionId}`.toLowerCase().includes(text.toLowerCase()))
+    (text === '' || searchable(session).includes(text.toLowerCase()))
 
   return {
     text,

@@ -6,8 +6,6 @@ import org.lolaf.staffix.admin.metrics.MetricPoint;
 import org.lolaf.staffix.admin.metrics.MetricQuery;
 import org.lolaf.staffix.admin.metrics.MetricSeries;
 import org.lolaf.staffix.admin.metrics.MetricsSource;
-import org.lolaf.staffix.admin.server.engines.GatewayException;
-import org.lolaf.staffix.admin.server.sessions.SessionSummary;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -31,20 +29,17 @@ class SimulatedMetricsSource implements MetricsSource {
 
     @Override
     public List<MetricSeries> query(MetricQuery query) {
-        List<SessionSummary> sessions = SimulatedTelemetry.sessions(gateway, query.getInstanceId(), query.getSessionId());
-        if (query.getSessionId() != null && sessions.isEmpty()) {
-            throw GatewayException.unknownSession(query.getInstanceId(), query.getSessionId());
-        }
+        List<SimulatedSession> sessions = SimulatedTelemetry.runningConfigs(gateway, query.getEngineId(), query.getGroup(), query.getSessionId());
         List<MetricSeries> series = new ArrayList<>();
         if (query.getKind().isPerMessageType()) {
             MESSAGES_PER_SECOND.keySet().stream().sorted().forEach(type -> DIRECTIONS.forEach(direction ->
                     series.add(series(query, Map.of(MetricSeries.MESSAGE_TYPE, type, MetricSeries.DIRECTION, direction),
                             t -> sessions.stream()
-                                    .mapToDouble(s -> value(query, s.getId() + type + direction, type, t))
+                                    .mapToDouble(s -> value(query, SimulatedTelemetry.key(s) + type + direction, type, t))
                                     .reduce(0, query.getKind() == MetricKind.MESSAGE_RATE ? Double::sum : Math::max)))));
         } else {
-            sessions.forEach(s -> series.add(series(query, Map.of(MetricSeries.SESSION_ID, s.getId()),
-                    t -> value(query, s.getId(), null, t))));
+            sessions.forEach(s -> series.add(series(query, Map.of(MetricSeries.GROUP, s.group, MetricSeries.SESSION_ID, s.id),
+                    t -> value(query, SimulatedTelemetry.key(s), null, t))));
         }
         return series;
     }

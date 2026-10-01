@@ -11,6 +11,8 @@ import java.time.Instant;
 public class LogEntry {
     Instant timestamp;
     @Nullable
+    String group;
+    @Nullable
     String sessionId;
     @Nullable
     LogType type;

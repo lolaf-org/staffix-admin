@@ -47,8 +47,8 @@ class SimulationTicker implements SmartLifecycle {
 
     private void announce() {
         gateway.engines().forEach(engine -> registry.announce(EngineAnnouncement.builder()
-                .instanceId(engine.instanceId)
-                .baseUrl(URI.create("simulated://" + engine.instanceId))
+                .engineId(engine.engineId)
+                .baseUrl(URI.create("simulated://" + engine.engineId))
                 .token("simulated")
                 .staffixVersion(engine.staffixVersion)
                 .build()));

@@ -14,7 +14,7 @@ import java.time.Instant;
 @Value
 @Builder
 public class RegisteredEngine {
-    String instanceId;
+    String engineId;
     URI baseUrl;
     @ToString.Exclude
     String token;

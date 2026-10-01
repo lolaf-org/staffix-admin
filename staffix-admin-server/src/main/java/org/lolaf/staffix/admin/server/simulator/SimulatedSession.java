@@ -1,16 +1,15 @@
 package org.lolaf.staffix.admin.server.simulator;
 
 import lombok.Builder;
-import org.lolaf.staffix.admin.server.sessions.SessionHealth;
 import org.lolaf.staffix.admin.server.sessions.SessionState;
-import org.lolaf.staffix.admin.server.sessions.SessionSummary;
 import org.lolaf.staffix.admin.server.sessions.SessionType;
 import tools.jackson.databind.JsonNode;
 
 import java.util.Random;
 
 /**
- * Mutable state of one simulated session; guarded by its {@link SimulatedEngine}'s lock.
+ * Mutable state of one config of a simulated session (each keeps its own sequence numbers); guarded by its
+ * {@link SimulatedEngine}'s lock.
  */
 class SimulatedSession {
 
@@ -91,20 +90,6 @@ class SimulatedSession {
     void resetSeqNums(long next) {
         incomingSeqNum = next;
         outgoingSeqNum = next;
-    }
-
-    SessionSummary summary() {
-        return SessionSummary.builder()
-                .id(id)
-                .group(group)
-                .fixSessionId(fixSessionId)
-                .type(type)
-                .health(SessionHealth.of(loggedIn, withinSessionTime))
-                .loggedIn(loggedIn)
-                .connected(loggedIn)
-                .withinSessionTime(withinSessionTime)
-                .desiredState(desiredState)
-                .build();
     }
 
     private boolean shouldBeLoggedIn() {

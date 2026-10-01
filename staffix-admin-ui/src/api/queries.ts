@@ -26,48 +26,59 @@ export function useEngines() {
   })
 }
 
-export function useSessions(instanceId: string | undefined) {
+/**
+ * Session ids are unique within their group only, so a session is always named by both.
+ */
+export interface SessionRef {
+  engineId: string
+  group: string
+  sessionId: string
+}
+
+export function sessionPath(ref: SessionRef) {
+  return { params: { path: ref } }
+}
+
+export function sessionRoute(ref: SessionRef): string {
+  return `/engines/${encodeURIComponent(ref.engineId)}/groups/${encodeURIComponent(ref.group)}/sessions/${encodeURIComponent(ref.sessionId)}`
+}
+
+export function useGroups(engineId: string | undefined) {
   return useQuery({
-    queryKey: ['sessions', instanceId],
-    queryFn: () => call(api.GET('/api/engines/{instanceId}/sessions', { params: { path: { instanceId: instanceId! } } })),
+    queryKey: ['groups', engineId],
+    queryFn: () => call(api.GET('/api/engines/{engineId}/groups', { params: { path: { engineId: engineId! } } })),
     refetchInterval: POLL_INTERVAL_MS,
-    enabled: instanceId !== undefined,
+    enabled: engineId !== undefined,
   })
 }
 
-export function useSession(instanceId: string, sessionId: string) {
+export function useSession(ref: SessionRef) {
   return useQuery({
-    queryKey: ['sessions', instanceId, sessionId],
-    queryFn: () =>
-      call(api.GET('/api/engines/{instanceId}/sessions/{sessionId}', { params: { path: { instanceId, sessionId } } })),
+    queryKey: ['groups', ref.engineId, ref.group, ref.sessionId],
+    queryFn: () => call(api.GET('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}', sessionPath(ref))),
     refetchInterval: POLL_INTERVAL_MS,
     retry: false,
   })
 }
 
-export function useSessionSettings(instanceId: string, sessionId: string) {
+export function useSessionSettings(ref: SessionRef, runningConfigId: string) {
   return useQuery({
-    queryKey: ['settings', instanceId, sessionId],
-    queryFn: () =>
-      call(
-        api.GET('/api/engines/{instanceId}/sessions/{sessionId}/settings', {
-          params: { path: { instanceId, sessionId } },
-        }),
-      ),
+    queryKey: ['settings', ref.engineId, ref.group, ref.sessionId, runningConfigId],
+    queryFn: () => call(api.GET('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/settings', sessionPath(ref))),
   })
 }
 
 /**
  * A state-changing call on an engine: reports the outcome to the operator and refreshes that engine's sessions.
  */
-export function useEngineMutation<V>(instanceId: string, mutationFn: (variables: V) => Promise<unknown>, success: string) {
+export function useEngineMutation<V>(engineId: string, mutationFn: (variables: V) => Promise<unknown>, success: string) {
   const queryClient = useQueryClient()
   const { message } = App.useApp()
   return useMutation({
     mutationFn,
     onSuccess: () => {
       message.success(success)
-      return queryClient.invalidateQueries({ queryKey: ['sessions', instanceId] })
+      return queryClient.invalidateQueries({ queryKey: ['groups', engineId] })
     },
     onError: (error) => message.error(error.message),
   })
@@ -96,18 +107,21 @@ function window(minutes: number) {
   return { from: new Date(to.getTime() - minutes * 60_000).toISOString(), to: to.toISOString() }
 }
 
-export function useMetrics(instanceId: string, sessionId: string, kind: MetricKind, quantile: number, minutes: number) {
+export function useMetrics(ref: SessionRef, kind: MetricKind, quantile: number, minutes: number) {
   return useQuery({
-    queryKey: ['metrics', instanceId, sessionId, kind, quantile, minutes],
-    queryFn: () =>
-      call(api.GET('/api/metrics', { params: { query: { instanceId, sessionId, kind, quantile, ...window(minutes) } } })),
+    queryKey: ['metrics', ref, kind, quantile, minutes],
+    queryFn: () => call(api.GET('/api/metrics', { params: { query: { ...ref, kind, quantile, ...window(minutes) } } })),
     refetchInterval: 15_000,
     placeholderData: (previous) => previous,
   })
 }
 
 export interface LogSearch {
-  instanceId: string
+  engineId: string
+  group?: string
+  /**
+   * A config id; needs the group.
+   */
   sessionId?: string
   minutes: number
   text?: string
@@ -123,7 +137,8 @@ export function useLogs(search: LogSearch, enabled: boolean) {
         api.GET('/api/logs', {
           params: {
             query: {
-              instanceId: search.instanceId,
+              engineId: search.engineId,
+              group: search.group,
               sessionId: search.sessionId,
               text: search.text || undefined,
               types: search.types,

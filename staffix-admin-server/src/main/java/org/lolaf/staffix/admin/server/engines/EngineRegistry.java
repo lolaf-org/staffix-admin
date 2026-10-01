@@ -27,35 +27,35 @@ public class EngineRegistry {
 
     public void announce(EngineAnnouncement announcement) {
         RegisteredEngine engine = RegisteredEngine.builder()
-                .instanceId(announcement.getInstanceId())
+                .engineId(announcement.getEngineId())
                 .baseUrl(announcement.getBaseUrl())
                 .token(announcement.getToken())
                 .staffixVersion(announcement.getStaffixVersion())
                 .lastAnnouncedAt(clock.instant())
                 .build();
-        if (engines.put(engine.getInstanceId(), engine) == null) {
-            log.info("Engine {} registered at {}", engine.getInstanceId(), engine.getBaseUrl());
+        if (engines.put(engine.getEngineId(), engine) == null) {
+            log.info("Engine {} registered at {}", engine.getEngineId(), engine.getBaseUrl());
         }
     }
 
     public List<Engine> list() {
         return engines.values().stream()
-                .sorted(Comparator.comparing(RegisteredEngine::getInstanceId))
+                .sorted(Comparator.comparing(RegisteredEngine::getEngineId))
                 .map(this::toEngine)
                 .toList();
     }
 
-    public RegisteredEngine get(String instanceId) {
-        RegisteredEngine engine = engines.get(instanceId);
+    public RegisteredEngine get(String engineId) {
+        RegisteredEngine engine = engines.get(engineId);
         if (engine == null) {
-            throw GatewayException.unknownEngine(instanceId);
+            throw GatewayException.unknownEngine(engineId);
         }
         return engine;
     }
 
     private Engine toEngine(RegisteredEngine engine) {
         return Engine.builder()
-                .instanceId(engine.getInstanceId())
+                .engineId(engine.getEngineId())
                 .staffixVersion(engine.getStaffixVersion())
                 .reachable(isReachable(engine))
                 .lastAnnouncedAt(engine.getLastAnnouncedAt())

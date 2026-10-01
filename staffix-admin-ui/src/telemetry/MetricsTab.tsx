@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Alert, Empty, Flex, Segmented, Select, Skeleton } from 'antd'
 import { AreaChartOutlined, TableOutlined } from '@ant-design/icons'
-import { useMetrics, type MetricKind } from '../api/queries'
+import { useMetrics, type MetricKind, type SessionRef } from '../api/queries'
 import type { Schemas } from '../api/client'
 import { formatRateValue, formatSeconds } from './format'
 import { MetricChart, SeriesLegend, niceTicks, type ChartSeries } from './MetricChart'
@@ -31,12 +31,12 @@ interface Facet {
   series: ChartSeries[]
 }
 
-export function MetricsTab({ instanceId, sessionId }: { instanceId: string; sessionId: string }) {
+export function MetricsTab({ sessionRef }: { sessionRef: SessionRef }) {
   const [kind, setKind] = useState<MetricKind>('MESSAGE_RATE')
   const [quantile, setQuantile] = useState(0.99)
   const [minutes, setMinutes] = useState(60)
   const [view, setView] = useState<'chart' | 'table'>('chart')
-  const metrics = useMetrics(instanceId, sessionId, kind, quantile, minutes)
+  const metrics = useMetrics(sessionRef, kind, quantile, minutes)
   const format = kind === 'MESSAGE_RATE' ? formatRateValue : formatSeconds
   const selected = KINDS.find((k) => k.value === kind)!
   const title = LATENCIES.includes(kind) ? `${selected.title}, p${quantile * 100}` : selected.title

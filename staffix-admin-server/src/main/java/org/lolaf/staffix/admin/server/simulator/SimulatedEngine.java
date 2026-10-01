@@ -1,6 +1,7 @@
 package org.lolaf.staffix.admin.server.simulator;
 
 import org.lolaf.staffix.admin.server.engines.GatewayException;
+import org.lolaf.staffix.admin.server.engines.SessionRef;
 import org.lolaf.staffix.admin.server.sessions.ResetMode;
 import org.lolaf.staffix.admin.server.sessions.SessionDetail;
 import org.lolaf.staffix.admin.server.sessions.SessionGroup;
@@ -9,11 +10,9 @@ import org.lolaf.staffix.admin.server.sessions.SessionType;
 import tools.jackson.databind.JsonNode;
 
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Random;
 import java.util.TreeMap;
-import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -23,26 +22,23 @@ import java.util.stream.Stream;
  */
 class SimulatedEngine {
 
-    final String instanceId;
+    final String engineId;
     final String staffixVersion;
-    private final List<SimulatedSession> acceptorSessions;
-    private final List<SimulatedInitiator> initiators;
+    private final List<SimulatedConnection> connections;
 
-    SimulatedEngine(String instanceId, String staffixVersion, List<SimulatedSession> acceptorSessions,
-                    List<SimulatedInitiator> initiators) {
-        this.instanceId = instanceId;
+    SimulatedEngine(String engineId, String staffixVersion, List<SimulatedConnection> connections) {
+        this.engineId = engineId;
         this.staffixVersion = staffixVersion;
-        this.acceptorSessions = List.copyOf(acceptorSessions);
-        this.initiators = List.copyOf(initiators);
+        this.connections = List.copyOf(connections);
     }
 
     synchronized void tick(Random random) {
-        managedSessions().forEach(s -> s.tick(random));
+        connections.forEach(c -> c.running().tick(random));
     }
 
-    synchronized List<SessionGroup> listSessions() {
-        TreeMap<String, List<SessionSummary>> byGroup = managedSessions()
-                .map(SimulatedSession::summary)
+    synchronized List<SessionGroup> listGroups() {
+        TreeMap<String, List<SessionSummary>> byGroup = connections.stream()
+                .map(SimulatedConnection::summary)
                 .sorted(Comparator.comparing(SessionSummary::getId))
                 .collect(Collectors.groupingBy(SessionSummary::getGroup, TreeMap::new, Collectors.toList()));
         return byGroup.entrySet().stream()
@@ -50,33 +46,37 @@ class SimulatedEngine {
                 .toList();
     }
 
-    synchronized SessionDetail getSession(String sessionId) {
-        SimulatedSession session = managed(sessionId);
+    /**
+     * Only running configs exchange traffic, so they are what the simulated metrics and logs show.
+     */
+    synchronized List<SimulatedSession> runningConfigs() {
+        return connections.stream().map(SimulatedConnection::running).toList();
+    }
+
+    synchronized SessionDetail getSession(SessionRef ref) {
+        SimulatedConnection connection = connection(ref);
         return SessionDetail.builder()
-                .summary(session.summary())
-                .incomingSeqNum(session.incomingSeqNum)
-                .outgoingSeqNum(session.outgoingSeqNum)
-                .initiators(initiators.stream()
-                        .filter(i -> i.hasTarget(sessionId))
-                        .map(SimulatedInitiator::describe)
-                        .toList())
+                .summary(connection.summary())
+                .incomingSeqNum(connection.running().incomingSeqNum)
+                .outgoingSeqNum(connection.running().outgoingSeqNum)
+                .configs(connection.describeConfigs())
                 .build();
     }
 
-    synchronized JsonNode getSessionSettings(String sessionId) {
-        return managed(sessionId).settings;
+    synchronized JsonNode getSessionSettings(SessionRef ref) {
+        return connection(ref).running().settings;
     }
 
-    synchronized void logon(String sessionId) {
-        managed(sessionId).logon();
+    synchronized void logon(SessionRef ref) {
+        connection(ref).running().logon();
     }
 
-    synchronized void logout(String sessionId) {
-        managed(sessionId).logout();
+    synchronized void logout(SessionRef ref) {
+        connection(ref).running().logout();
     }
 
-    synchronized void reset(String sessionId, ResetMode mode) {
-        SimulatedSession session = managed(sessionId);
+    synchronized void reset(SessionRef ref, ResetMode mode) {
+        SimulatedSession session = connection(ref).running();
         switch (mode) {
             case LOGOUT_LOGON_REST_NUM_FLAG -> {
                 if (session.type != SessionType.INITIATOR) {
@@ -93,16 +93,16 @@ class SimulatedEngine {
         }
     }
 
-    synchronized void activateInitiatorTarget(String sessionId) {
-        List<SimulatedInitiator> owners = initiators.stream().filter(i -> i.hasTarget(sessionId)).toList();
-        if (owners.isEmpty()) {
-            throw GatewayException.unknownSession(instanceId, sessionId);
+    synchronized void activate(SessionRef ref, String configId) {
+        SimulatedConnection connection = connection(ref);
+        if (connection.type != SessionType.INITIATOR) {
+            throw GatewayException.rejected("Only an initiator session has backup configs to switch to");
         }
-        owners.forEach(i -> i.switchTo(i.target(sessionId).orElseThrow()));
+        connection.activate(configId);
     }
 
-    synchronized void setSeqNums(String sessionId, Long incoming, Long outgoing) {
-        SimulatedSession session = managed(sessionId);
+    synchronized void setSeqNums(SessionRef ref, Long incoming, Long outgoing) {
+        SimulatedSession session = connection(ref).running();
         if (incoming != null) {
             session.incomingSeqNum = incoming;
         }
@@ -111,8 +111,8 @@ class SimulatedEngine {
         }
     }
 
-    synchronized void sendMessage(String sessionId, String message, char separator, boolean possDup) {
-        SimulatedSession session = managed(sessionId);
+    synchronized void sendMessage(SessionRef ref, String message, char separator, boolean possDup) {
+        SimulatedSession session = connection(ref).running();
         requireLoggedIn(session, "Sending");
         List<String> tags = Stream.of(message.split(Pattern.quote(String.valueOf(separator))))
                 .map(field -> field.contains("=") ? field.substring(0, field.indexOf('=')) : "")
@@ -126,22 +126,16 @@ class SimulatedEngine {
         session.outgoingSeqNum++;
     }
 
-    private void requireLoggedIn(SimulatedSession session, String operation) {
+    private static void requireLoggedIn(SimulatedSession session, String operation) {
         if (!session.loggedIn) {
-            throw GatewayException.rejected(operation + " needs session '" + session.id + "' to be logged in");
+            throw GatewayException.rejected(operation + " needs session '" + session.group + "." + session.id + "' to be logged in");
         }
     }
 
-    private SimulatedSession managed(String sessionId) {
-        return managedSessions()
-                .filter(s -> s.id.equals(sessionId))
+    private SimulatedConnection connection(SessionRef ref) {
+        return connections.stream()
+                .filter(c -> c.group.equals(ref.getGroup()) && c.id.equals(ref.getSessionId()))
                 .findFirst()
-                .orElseThrow(() -> GatewayException.unknownSession(instanceId, sessionId));
-    }
-
-    private Stream<SimulatedSession> managedSessions() {
-        return Stream.concat(acceptorSessions.stream(), initiators.stream().map(SimulatedInitiator::active))
-                .collect(Collectors.toMap(s -> s.id, Function.identity(), (a, b) -> a, LinkedHashMap::new))
-                .values().stream();
+                .orElseThrow(() -> GatewayException.unknownSession(ref));
     }
 }

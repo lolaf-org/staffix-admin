@@ -10,9 +10,15 @@ import java.time.Instant;
 @Value
 @Builder
 public class MetricQuery {
-    String instanceId;
+    String engineId;
     /**
-     * Null for every session of the engine.
+     * Null for every group of the engine.
+     */
+    @Nullable
+    String group;
+    /**
+     * A config id within {@link #getGroup()}, which it requires (ids are unique per group only); null for every
+     * session of the group.
      */
     @Nullable
     String sessionId;

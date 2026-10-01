@@ -24,9 +24,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class SecurityTest {
 
-    private static final String LOGOUT_DROPCOPY = "/api/engines/paris-prod/sessions/DROPCOPY/logout";
+    private static final String LOGOUT_ACME_DROP_COPY = "/api/engines/paris-prod/groups/acme/sessions/drop-copy/logout";
     private static final String ANNOUNCEMENT = """
-            {"instanceId": "tokyo", "baseUrl": "https://tokyo:8443", "token": "secret"}""";
+            {"engineId": "tokyo", "baseUrl": "https://tokyo:8443", "token": "secret"}""";
 
     @Autowired
     private MockMvc mockMvc;
@@ -54,7 +54,7 @@ class SecurityTest {
         mockMvc.perform(get("/api/me").session(session))
                 .andExpect(jsonPath("$.username").value("writer"))
                 .andExpect(jsonPath("$.roles", contains("READER", "WRITER")));
-        mockMvc.perform(post(LOGOUT_DROPCOPY).session(session).with(csrf()))
+        mockMvc.perform(post(LOGOUT_ACME_DROP_COPY).session(session).with(csrf()))
                 .andExpect(status().isNoContent());
     }
 
@@ -63,13 +63,13 @@ class SecurityTest {
         MockHttpSession session = login("reader");
 
         mockMvc.perform(get("/api/engines").session(session)).andExpect(status().isOk());
-        mockMvc.perform(post(LOGOUT_DROPCOPY).session(session).with(csrf()))
+        mockMvc.perform(post(LOGOUT_ACME_DROP_COPY).session(session).with(csrf()))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     void requiresTheCsrfToken() throws Exception {
-        mockMvc.perform(post(LOGOUT_DROPCOPY).session(login("writer")))
+        mockMvc.perform(post(LOGOUT_ACME_DROP_COPY).session(login("writer")))
                 .andExpect(status().isForbidden());
     }
 

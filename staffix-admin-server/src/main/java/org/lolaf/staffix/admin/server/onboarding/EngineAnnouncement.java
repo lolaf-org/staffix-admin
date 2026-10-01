@@ -14,7 +14,7 @@ import java.net.URI;
 @Jacksonized
 public class EngineAnnouncement {
     @NotBlank
-    String instanceId;
+    String engineId;
     /**
      * Where the engine's HTTP admin connector listens.
      */

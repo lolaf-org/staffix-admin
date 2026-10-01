@@ -13,16 +13,20 @@ const TYPES: { value: LogType; label: string; icon: React.ReactNode }[] = [
 ]
 
 interface Props {
-  instanceId: string
+  engineId: string
+  group?: string
+  /**
+   * A config id of the group.
+   */
   sessionId?: string
 }
 
-export function LogsPanel({ instanceId, sessionId }: Props) {
+export function LogsPanel({ engineId, group, sessionId }: Props) {
   const [minutes, setMinutes] = useState(15)
   const [text, setText] = useState('')
   const [types, setTypes] = useState<LogType[]>([])
   const [limit, setLimit] = useState(500)
-  const logs = useLogs({ instanceId, sessionId, minutes, text, types, limit }, instanceId !== '')
+  const logs = useLogs({ engineId, group, sessionId, minutes, text, types, limit }, engineId !== '')
 
   return (
     <Flex vertical gap={12}>
@@ -52,7 +56,7 @@ export function LogsPanel({ instanceId, sessionId }: Props) {
         size="small"
         loading={logs.isFetching}
         dataSource={logs.data}
-        rowKey={(entry) => `${entry.timestamp}-${entry.sessionId}-${entry.line}`}
+        rowKey={(entry) => `${entry.timestamp}-${entry.group}-${entry.sessionId}-${entry.line}`}
         pagination={{ pageSize: 50, showSizeChanger: false, size: 'small' }}
         columns={[
           {
@@ -65,7 +69,16 @@ export function LogsPanel({ instanceId, sessionId }: Props) {
               </Tooltip>
             ),
           },
-          ...(sessionId ? [] : [{ title: 'Session', dataIndex: 'sessionId', width: 130 }]),
+          ...(sessionId
+            ? []
+            : [
+                {
+                  title: 'Session',
+                  key: 'session',
+                  width: 160,
+                  render: (_: unknown, entry: Schemas['LogEntry']) => (group ? entry.sessionId : `${entry.group}.${entry.sessionId}`),
+                },
+              ]),
           {
             title: 'Type',
             dataIndex: 'type',

@@ -16,7 +16,7 @@ export const router = createBrowserRouter([
       {
         path: '',
         element: <OverviewPage />,
-        children: [{ path: 'engines/:instanceId/sessions/:sessionId', element: <SessionDrawer /> }],
+        children: [{ path: 'engines/:engineId/groups/:group/sessions/:sessionId', element: <SessionDrawer /> }],
       },
       { path: 'logs', element: <LogsPage /> },
     ],

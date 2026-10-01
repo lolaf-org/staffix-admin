@@ -1,4 +1,4 @@
-import { Tooltip, Typography, theme } from 'antd'
+import { Flex, Tooltip, Typography, theme } from 'antd'
 import { PauseCircleOutlined } from '@ant-design/icons'
 import type { Schemas } from '../api/client'
 import { HEALTH_LABELS, HEALTH_STATUS } from './health'
@@ -11,13 +11,13 @@ interface Props {
 
 export function SessionBox({ session, selected, onClick }: Props) {
   const { token } = theme.useToken()
-  const status = HEALTH_STATUS[session.health]
   const colors = {
     success: { background: token.colorSuccessBg, border: token.colorSuccess },
     warning: { background: token.colorWarningBg, border: token.colorWarning },
     error: { background: token.colorErrorBg, border: token.colorError },
-  }[status]
+  }[HEALTH_STATUS[session.health]]
   const operatorLoggedOut = session.desiredState === 'LOGGED_OUT'
+  const mono = { fontFamily: token.fontFamilyCode, fontSize: 12 }
 
   return (
     <Tooltip
@@ -32,11 +32,15 @@ export function SessionBox({ session, selected, onClick }: Props) {
       <button
         type="button"
         onClick={onClick}
+        aria-label={`${session.group}.${session.id}, ${HEALTH_LABELS[session.health]}`}
         style={{
-          width: 148,
+          width: 220,
           padding: '8px 10px',
           textAlign: 'left',
           cursor: 'pointer',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
           background: colors.background,
           border: `1px solid ${colors.border}`,
           borderLeft: `6px solid ${colors.border}`,
@@ -45,12 +49,26 @@ export function SessionBox({ session, selected, onClick }: Props) {
           outlineOffset: 2,
         }}
       >
-        <Typography.Text strong ellipsis style={{ display: 'block' }}>
-          {session.id}
-        </Typography.Text>
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          {session.type === 'INITIATOR' ? 'initiator' : 'acceptor'}
-          {operatorLoggedOut && <PauseCircleOutlined style={{ marginLeft: 6 }} aria-label="Logged out by an operator" />}
+        <Flex justify="space-between" align="baseline" gap={8} style={{ width: '100%' }}>
+          <Typography.Text strong ellipsis style={{ fontFamily: token.fontFamilyCode }}>
+            {session.id}
+            {operatorLoggedOut && <PauseCircleOutlined style={{ marginLeft: 6 }} aria-label="Logged out by an operator" />}
+          </Typography.Text>
+          <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+            {session.type.toLowerCase()}
+          </Typography.Text>
+        </Flex>
+        {session.configIds.length > 1 &&
+          session.configIds.map((configId, index) => {
+            const running = configId === session.runningConfigId
+            return (
+              <Typography.Text key={configId} type={running ? undefined : 'secondary'} strong={running} style={mono}>
+                {running ? '●' : '○'} {configId} {index === 0 ? 'main' : 'backup'}
+              </Typography.Text>
+            )
+          })}
+        <Typography.Text type="secondary" ellipsis style={{ fontSize: 11 }}>
+          instance {session.instanceId}
         </Typography.Text>
       </button>
     </Tooltip>
