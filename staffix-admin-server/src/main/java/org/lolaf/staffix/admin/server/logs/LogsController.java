@@ -38,6 +38,7 @@ public class LogsController {
                                     @RequestParam Instant to,
                                     @RequestParam(required = false) @Nullable String text,
                                     @RequestParam(defaultValue = "") List<LogType> types,
+                                    @RequestParam(defaultValue = "") List<String> msgTypes,
                                     @RequestParam(defaultValue = "500") @Min(1) @Max(5000) int limit) {
         LogsSource source = logsSource.getIfAvailable();
         if (source == null) {
@@ -54,6 +55,7 @@ public class LogsController {
                     .to(range.getTo())
                     .text(text == null || text.isBlank() ? null : text)
                     .types(types)
+                    .msgTypes(msgTypes)
                     .limit(limit)
                     .build());
         } catch (LogsSourceException e) {

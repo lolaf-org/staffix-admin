@@ -35,5 +35,11 @@ public class LogQuery {
      */
     @Singular
     Set<LogType> types;
+    /**
+     * MsgType(35) values the message must have, e.g. {@code D} and {@code 8}; empty for any. Session events have
+     * no MsgType and never match a non-empty set.
+     */
+    @Singular
+    Set<String> msgTypes;
     int limit;
 }

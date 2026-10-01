@@ -13,6 +13,7 @@ import java.time.temporal.ChronoUnit;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -58,6 +59,14 @@ class TelemetryControllersTest {
                 .andExpect(jsonPath("$[*].type", everyItem(is("OUT"))))
                 .andExpect(jsonPath("$[*].group", everyItem(is("ubs"))))
                 .andExpect(jsonPath("$[*].sessionId", everyItem(is("trading"))));
+    }
+
+    @Test
+    void filtersLogsByMessageType() throws Exception {
+        mockMvc.perform(get("/api/logs?engineId=paris-prod&group=ubs&msgTypes=8&msgTypes=0&limit=30" + LAST_HOUR))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(30)))
+                .andExpect(jsonPath("$[*].line", everyItem(matchesPattern(".*\\|35=(8|0)\\|.*"))));
     }
 
     @Test

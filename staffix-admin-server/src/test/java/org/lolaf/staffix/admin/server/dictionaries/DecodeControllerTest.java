@@ -9,6 +9,8 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.hamcrest.Matchers.hasItem;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -33,6 +35,15 @@ class DecodeControllerTest {
                 .andExpect(jsonPath("$.dictionaryIds[0]").value("default-FIX.4.4"))
                 .andExpect(jsonPath("$.fields[2].name").value("OrdStatus"))
                 .andExpect(jsonPath("$.fields[2].meaning").value("FILLED"));
+    }
+
+    @Test
+    void listsTheMessageTypesOfTheDictionariesInScope() throws Exception {
+        mockMvc.perform(get("/api/messages/types?engineId=paris-prod&group=ubs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].name", hasItem("NewOrderSingle")))
+                .andExpect(jsonPath("$[?(@.msgType == 'D')].name").value("NewOrderSingle"))
+                .andExpect(jsonPath("$[0].name").value("AdjustedPositionReport"));
     }
 
     @Test

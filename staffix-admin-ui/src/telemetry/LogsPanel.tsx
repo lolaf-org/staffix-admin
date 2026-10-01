@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Alert, Checkbox, Flex, Input, Segmented, Select, Table, Tag, Tooltip, Typography } from 'antd'
 import { ArrowDownOutlined, ArrowUpOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import type { Schemas } from '../api/client'
-import { useLogs, type DecodeTarget, type LogType } from '../api/queries'
+import { useLogs, useMessageTypes, type DecodeTarget, type LogType } from '../api/queries'
 import { DecodedMessageModal } from './DecodedMessageModal'
 import { formatDateTime, formatLogTime } from './format'
 import { TIME_WINDOWS } from './timeWindows'
@@ -26,18 +26,34 @@ export function LogsPanel({ engineId, group, sessionId }: Props) {
   const [minutes, setMinutes] = useState(15)
   const [text, setText] = useState('')
   const [types, setTypes] = useState<LogType[]>([])
+  const [msgTypes, setMsgTypes] = useState<string[]>([])
+  const messageTypes = useMessageTypes({ engineId, group, sessionId })
   const [limit, setLimit] = useState(500)
   const [decoding, setDecoding] = useState<DecodeTarget>()
-  const logs = useLogs({ engineId, group, sessionId, minutes, text, types, limit }, engineId !== '')
+  const logs = useLogs({ engineId, group, sessionId, minutes, text, types, msgTypes, limit }, engineId !== '')
 
   return (
     <Flex vertical gap={12}>
       <Flex wrap gap={8} align="center">
         <Input.Search
-          placeholder="Text, e.g. 35=D or ORD-1234"
+          placeholder="Text, e.g. ORD-1234"
           allowClear
           onSearch={setText}
           style={{ width: 280, maxWidth: '100%' }}
+        />
+        <Select
+          mode="multiple"
+          allowClear
+          showSearch
+          placeholder="Any message type"
+          value={msgTypes}
+          onChange={setMsgTypes}
+          loading={messageTypes.isPending}
+          maxTagCount="responsive"
+          optionFilterProp="label"
+          options={messageTypes.data?.map((m) => ({ value: m.msgType, label: `${m.name} (${m.msgType})` }))}
+          style={{ width: 300, maxWidth: '100%' }}
+          aria-label="Message types"
         />
         <Checkbox.Group
           value={types}

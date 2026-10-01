@@ -135,6 +135,7 @@ export interface LogSearch {
   minutes: number
   text?: string
   types: LogType[]
+  msgTypes: string[]
   limit: number
 }
 
@@ -151,6 +152,7 @@ export function useLogs(search: LogSearch, enabled: boolean) {
               sessionId: search.sessionId,
               text: search.text || undefined,
               types: search.types,
+              msgTypes: search.msgTypes,
               limit: search.limit,
               ...window(search.minutes),
             },
@@ -175,5 +177,16 @@ export function useDecodedMessage(target: DecodeTarget | undefined) {
     enabled: target !== undefined,
     staleTime: Infinity,
     retry: false,
+  })
+}
+
+/**
+ * The message types the dictionaries of the sessions in scope define.
+ */
+export function useMessageTypes(scope: MetricScope) {
+  return useQuery({
+    queryKey: ['messageTypes', scope],
+    queryFn: () => call(api.GET('/api/messages/types', { params: { query: scope } })),
+    staleTime: 5 * 60_000,
   })
 }
