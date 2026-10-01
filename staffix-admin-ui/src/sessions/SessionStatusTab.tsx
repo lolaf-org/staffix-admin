@@ -3,6 +3,7 @@ import { Badge, Descriptions, Divider, Flex, InputNumber, Modal, Select, Table, 
 import { api, call, type Schemas } from '../api/client'
 import { sessionPath, useEngineMutation, type SessionRef } from '../api/queries'
 import { HEALTH_LABELS, HEALTH_STATUS } from './health'
+import { formatCompIds } from './identity'
 import { RESET_MODES } from './resetModes'
 import { WriteButton } from './WriteButton'
 
@@ -28,7 +29,10 @@ export function SessionStatusTab({ sessionRef, detail }: Props) {
           { label: 'Session', children: summary.id },
           { label: 'Instance', children: `${summary.type.toLowerCase()} ${summary.instanceId}` },
           { label: 'Selected config', children: summary.runningConfigId },
-          { label: 'FIX session id', children: <Typography.Text copyable>{summary.fixSessionId}</Typography.Text> },
+          { label: 'FIX version', children: summary.identity.fixVersion },
+          ...(summary.identity.defaultApplVerId ? [{ label: 'DefaultApplVerID', children: summary.identity.defaultApplVerId }] : []),
+          { label: 'Sender', children: <Typography.Text copyable>{formatCompIds(summary.identity.sender)}</Typography.Text> },
+          { label: 'Target', children: <Typography.Text copyable>{formatCompIds(summary.identity.target)}</Typography.Text> },
           { label: 'Connected', children: yesNo(summary.connected) },
           { label: 'Within session time', children: yesNo(summary.withinSessionTime) },
           {

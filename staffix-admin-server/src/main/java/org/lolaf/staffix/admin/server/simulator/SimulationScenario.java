@@ -1,6 +1,8 @@
 package org.lolaf.staffix.admin.server.simulator;
 
 import lombok.RequiredArgsConstructor;
+import org.lolaf.staffix.admin.server.sessions.CompIds;
+import org.lolaf.staffix.admin.server.sessions.FixIdentity;
 import org.lolaf.staffix.admin.server.sessions.SessionState;
 import org.lolaf.staffix.admin.server.sessions.SessionType;
 import tools.jackson.databind.json.JsonMapper;
@@ -109,7 +111,11 @@ class SimulationScenario {
             return SimulatedSession.builder()
                     .id(id)
                     .group(group)
-                    .fixSessionId(fixSessionId)
+                    .identity(FixIdentity.builder()
+                            .fixVersion("FIX.4.4")
+                            .sender(CompIds.builder().compId(compId).build())
+                            .target(CompIds.builder().compId(counterparty).build())
+                            .build())
                     .type(type)
                     .connectAddress(connectAddress)
                     .withinSessionTime(true)

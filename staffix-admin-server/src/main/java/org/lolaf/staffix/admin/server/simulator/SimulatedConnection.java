@@ -60,7 +60,7 @@ class SimulatedConnection {
                 .instanceId(instanceId)
                 .configIds(configs.stream().map(c -> c.id).toList())
                 .runningConfigId(running.id)
-                .fixSessionId(running.fixSessionId)
+                .identity(running.identity)
                 .health(SessionHealth.of(running.loggedIn, running.withinSessionTime))
                 .loggedIn(running.loggedIn)
                 .connected(running.loggedIn)

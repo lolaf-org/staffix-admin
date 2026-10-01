@@ -29,9 +29,9 @@ public class SessionSummary {
     List<String> configIds;
     String runningConfigId;
     /**
-     * Full staffix FixSessionId of the running config, e.g. {@code trading:FIX.4.4:SENDER->TARGET}.
+     * Of the selected config: a backup may connect with other comp ids.
      */
-    String fixSessionId;
+    FixIdentity identity;
     SessionHealth health;
     boolean loggedIn;
     boolean connected;

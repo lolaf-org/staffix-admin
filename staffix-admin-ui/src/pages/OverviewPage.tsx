@@ -1,4 +1,4 @@
-import { Alert, Badge, Card, Empty, Flex, Input, Select, Skeleton, Space, Tag, Typography, theme } from 'antd'
+import { Alert, Badge, Card, Empty, Flex, Input, Select, Skeleton, Space, Tag, Tooltip, Typography, theme } from 'antd'
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router'
 import type { Schemas } from '../api/client'
 import { sessionRoute, useEngines, useGroups } from '../api/queries'
@@ -19,7 +19,7 @@ export function OverviewPage() {
     <Flex vertical gap={16}>
       <Flex wrap gap={8}>
         <Input.Search
-          placeholder="Group, session, instance or FIX session id"
+          placeholder="Group, session, instance or comp id"
           allowClear
           defaultValue={filters.text}
           onChange={(e) => filters.setText(e.target.value)}
@@ -70,9 +70,13 @@ function EngineCard({ engine }: { engine: Schemas['Engine'] }) {
       size="small"
       title={
         <Space wrap>
-          <Typography.Text strong>{engine.engineId}</Typography.Text>
+          <span>
+            <Typography.Text type="secondary">Fix engine: </Typography.Text>
+            <Tooltip title={engine.staffixVersion ? `staffix ${engine.staffixVersion}` : 'staffix version unknown'}>
+              <Typography.Text strong>{engine.engineId}</Typography.Text>
+            </Tooltip>
+          </span>
           {engine.reachable ? <Tag color="success">reachable</Tag> : <Tag color="error">unreachable</Tag>}
-          {engine.staffixVersion && <Typography.Text type="secondary">staffix {engine.staffixVersion}</Typography.Text>}
         </Space>
       }
       extra={

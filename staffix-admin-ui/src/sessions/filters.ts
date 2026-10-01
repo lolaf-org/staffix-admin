@@ -1,6 +1,7 @@
 import { useSearchParams } from 'react-router'
 import type { Schemas } from '../api/client'
 import type { Health } from './health'
+import { formatIdentity } from './identity'
 
 /**
  * Kept in the URL, so a filtered view survives a reload and can be shared.
@@ -22,7 +23,7 @@ export function useSessionFilters() {
     )
 
   const searchable = (session: Schemas['SessionSummary']) =>
-    [session.group, `${session.group}.${session.id}`, session.instanceId, session.fixSessionId, ...session.configIds]
+    [session.group, `${session.group}.${session.id}`, session.instanceId, formatIdentity(session.identity), ...session.configIds]
       .join(' ')
       .toLowerCase()
 

@@ -4,6 +4,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.lolaf.staffix.admin.server.engines.GatewayException;
 import org.lolaf.staffix.admin.server.engines.SessionRef;
+import org.lolaf.staffix.admin.server.sessions.CompIds;
+import org.lolaf.staffix.admin.server.sessions.FixIdentity;
 import org.lolaf.staffix.admin.server.sessions.ResetMode;
 import org.lolaf.staffix.admin.server.sessions.SessionHealth;
 import org.lolaf.staffix.admin.server.sessions.SessionState;
@@ -83,7 +85,6 @@ class SimulatedEngineTest {
         SessionSummary summary = engine.getSession(LP_TRADING).getSummary();
         assertThat(summary.getId()).isEqualTo("trading");
         assertThat(summary.getRunningConfigId()).isEqualTo("trading-drp");
-        assertThat(summary.getFixSessionId()).startsWith("trading-drp:");
         assertThat(engine.getSession(LP_TRADING).getOutgoingSeqNum()).isEqualTo(1);
 
         engine.activate(LP_TRADING, "trading");
@@ -164,7 +165,11 @@ class SimulatedEngineTest {
         return SimulatedSession.builder()
                 .id(id)
                 .group(group)
-                .fixSessionId(id + ":FIX.4.4:US->" + group.toUpperCase())
+                .identity(FixIdentity.builder()
+                        .fixVersion("FIX.4.4")
+                        .sender(CompIds.builder().compId("US").build())
+                        .target(CompIds.builder().compId(group.toUpperCase()).build())
+                        .build())
                 .type(type)
                 .withinSessionTime(true)
                 .settings(JsonMapper.builder().build().createObjectNode());

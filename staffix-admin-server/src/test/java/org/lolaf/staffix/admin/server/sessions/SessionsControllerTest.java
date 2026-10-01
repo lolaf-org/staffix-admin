@@ -43,7 +43,8 @@ class SessionsControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[*].group", hasItem("ubs")))
                 .andExpect(jsonPath("$[0].sessions[0].health").exists())
-                .andExpect(jsonPath("$[0].sessions[0].instanceId").exists());
+                .andExpect(jsonPath("$[0].sessions[0].instanceId").exists())
+                .andExpect(jsonPath("$[0].sessions[0].identity.target.compId").exists());
     }
 
     @Test

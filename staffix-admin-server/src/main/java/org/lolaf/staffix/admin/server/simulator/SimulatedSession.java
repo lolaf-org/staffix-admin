@@ -1,6 +1,7 @@
 package org.lolaf.staffix.admin.server.simulator;
 
 import lombok.Builder;
+import org.lolaf.staffix.admin.server.sessions.FixIdentity;
 import org.lolaf.staffix.admin.server.sessions.SessionState;
 import org.lolaf.staffix.admin.server.sessions.SessionType;
 import tools.jackson.databind.JsonNode;
@@ -17,7 +18,7 @@ class SimulatedSession {
 
     final String id;
     final String group;
-    final String fixSessionId;
+    final FixIdentity identity;
     final SessionType type;
     final JsonNode settings;
     /**
@@ -42,13 +43,13 @@ class SimulatedSession {
     private int ticksInCycle;
 
     @Builder
-    private SimulatedSession(String id, String group, String fixSessionId, SessionType type, JsonNode settings,
+    private SimulatedSession(String id, String group, FixIdentity identity, SessionType type, JsonNode settings,
                              String connectAddress,
                              boolean flaky, int sessionTimeCycleTicks, boolean withinSessionTime,
                              SessionState desiredState) {
         this.id = id;
         this.group = group;
-        this.fixSessionId = fixSessionId;
+        this.identity = identity;
         this.type = type;
         this.settings = settings;
         this.connectAddress = connectAddress;

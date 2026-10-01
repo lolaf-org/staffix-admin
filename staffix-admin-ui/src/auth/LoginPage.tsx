@@ -36,7 +36,7 @@ export function LoginPage() {
     <Flex justify="center" align="center" style={{ minHeight: '100vh', padding: 16 }}>
       <Card style={{ width: 360, maxWidth: '100%' }}>
         <Typography.Title level={3} style={{ marginTop: 0 }}>
-          staffix admin
+          Staffix admin console
         </Typography.Title>
         <Form<Credentials> layout="vertical" onFinish={submit} requiredMark={false}>
           <Form.Item name="username" label="Username" rules={[{ required: true }]}>

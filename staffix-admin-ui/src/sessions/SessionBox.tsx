@@ -2,12 +2,18 @@ import { Flex, Tooltip, Typography, theme } from 'antd'
 import { PauseCircleOutlined } from '@ant-design/icons'
 import type { Schemas } from '../api/client'
 import { HEALTH_LABELS, HEALTH_STATUS } from './health'
+import { formatIdentity } from './identity'
 
 interface Props {
   session: Schemas['SessionSummary']
   selected: boolean
   onClick: () => void
 }
+
+/**
+ * 50% over Ant Design's 250 px, so a full FIX session id usually fits on one line.
+ */
+const TOOLTIP_MAX_WIDTH = 375
 
 export function SessionBox({ session, selected, onClick }: Props) {
   const { token } = theme.useToken()
@@ -21,9 +27,10 @@ export function SessionBox({ session, selected, onClick }: Props) {
 
   return (
     <Tooltip
+      styles={{ root: { maxWidth: TOOLTIP_MAX_WIDTH } }}
       title={
         <>
-          <div>{session.fixSessionId}</div>
+          <div>{formatIdentity(session.identity)}</div>
           <div>{HEALTH_LABELS[session.health]}</div>
           {operatorLoggedOut && <div>Logged out by an operator</div>}
         </>

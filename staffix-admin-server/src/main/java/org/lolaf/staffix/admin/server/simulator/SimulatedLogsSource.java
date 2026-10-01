@@ -58,7 +58,7 @@ class SimulatedLogsSource implements LogsSource {
         double random = noise(SimulatedTelemetry.key(session), second);
         List<LogEntry> entries = new ArrayList<>();
         Instant t = Instant.ofEpochSecond(second, (long) (random * 999_000_000));
-        String[] parties = session.fixSessionId.substring(session.fixSessionId.lastIndexOf(':') + 1).split("->");
+        String[] parties = {session.identity.getSender().getCompId(), session.identity.getTarget().getCompId()};
         boolean weSendOrders = session.type == SessionType.INITIATOR;
         if (random < 0.01) {
             entries.add(entry(session, t, LogType.EVENT, EVENTS.get((int) (random * 100 * EVENTS.size()) % EVENTS.size())));
