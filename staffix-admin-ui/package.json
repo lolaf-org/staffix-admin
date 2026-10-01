@@ -1,0 +1,31 @@
+{
+  "name": "staffix-admin-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "generate-api": "npm --prefix codegen exec -- openapi-typescript -o src/api/schema.d.ts ../staffix-admin-server/target/openapi/admin-api.json",
+    "generate-api:live": "npm --prefix codegen exec -- openapi-typescript -o src/api/schema.d.ts http://localhost:8080/v3/api-docs",
+    "predev": "npm run generate-api:live",
+    "dev": "vite",
+    "prebuild": "npm run generate-api",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^6.3.4",
+    "@tanstack/react-query": "^5.104.0",
+    "antd": "^6.6.5",
+    "openapi-fetch": "^0.17.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-router": "^8.4.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1"
+  }
+}

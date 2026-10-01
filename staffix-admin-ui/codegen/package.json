@@ -1,0 +1,9 @@
+{
+  "name": "staffix-admin-ui-codegen",
+  "private": true,
+  "description": "Isolated so the generator keeps the TypeScript 5 compiler API while the UI compiles with TypeScript 7",
+  "devDependencies": {
+    "openapi-typescript": "^7.13.0",
+    "typescript": "~5.9.3"
+  }
+}

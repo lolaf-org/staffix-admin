@@ -1,0 +1,18 @@
+target/
+
+### Frontend ###
+staffix-admin-ui/node/
+node_modules/
+staffix-admin-ui/src/api/schema.d.ts
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### VS Code ###
+.vscode/
+
+### Mac OS ###
+.DS_Store

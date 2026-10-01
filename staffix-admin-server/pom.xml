@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.lolaf</groupId>
+        <artifactId>staffix-admin-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>staffix-admin-server</artifactId>
+    <description>Spring Boot backend: REST API for the UI, engine proxy. Publishes its OpenAPI spec for the UI build</description>
+
+    <properties>
+        <openapi.generation.port>18090</openapi.generation.port>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.lolaf</groupId>
+            <artifactId>staffix-admin-metrics-spi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.lolaf</groupId>
+            <artifactId>staffix-admin-logs-spi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Starts the app so springdoc can fetch the spec the UI module generates its types from -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>start-for-openapi</id>
+                        <goals>
+                            <goal>start</goal>
+                        </goals>
+                        <configuration>
+                            <arguments>
+                                <argument>--server.port=${openapi.generation.port}</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>repackage</id>
+                        <phase>none</phase>
+                    </execution>
+                    <execution>
+                        <id>stop-after-openapi</id>
+                        <goals>
+                            <goal>stop</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-maven-plugin</artifactId>
+                <version>${springdoc-openapi-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>generate-openapi</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <apiDocsUrl>http://localhost:${openapi.generation.port}/v3/api-docs</apiDocsUrl>
+                    <outputDir>${project.build.directory}/openapi</outputDir>
+                    <outputFileName>admin-api.json</outputFileName>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

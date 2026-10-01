@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: staffix-admin
+  mvc:
+    problemdetails:
+      enabled: true
