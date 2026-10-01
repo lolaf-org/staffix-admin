@@ -1,6 +1,8 @@
-import { Alert, Checkbox, Flex, Form, Input, Radio, Typography } from 'antd'
+import { useState } from 'react'
+import { Alert, Button, Checkbox, Flex, Form, Input, Radio, Typography } from 'antd'
 import { api, call, type Schemas } from '../api/client'
-import { sessionPath, useEngineMutation, type SessionRef } from '../api/queries'
+import { sessionPath, useEngineMutation, type DecodeTarget, type SessionRef } from '../api/queries'
+import { DecodedMessageModal } from '../telemetry/DecodedMessageModal'
 import { WriteButton } from './WriteButton'
 
 const SOH = '\u0001'
@@ -13,6 +15,7 @@ interface MessageForm {
 
 export function SendMessageTab({ sessionRef, summary }: { sessionRef: SessionRef; summary: Schemas['SessionSummary'] }) {
   const [form] = Form.useForm<MessageForm>()
+  const [decoding, setDecoding] = useState<DecodeTarget>()
   const send = useEngineMutation(
     sessionRef.engineId,
     (body: MessageForm) => call(api.POST('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/messages', { ...sessionPath(sessionRef), body })),
@@ -41,7 +44,20 @@ export function SendMessageTab({ sessionRef, summary }: { sessionRef: SessionRef
       <Form.Item name="possDup" valuePropName="checked" extra="Sends it as a duplicate: its SendingTime(52) becomes OrigSendingTime(122).">
         <Checkbox>PossDup</Checkbox>
       </Form.Item>
-      <Flex>
+      <Flex gap={8}>
+        <Button
+          onClick={() =>
+            form.validateFields(['message']).then(() =>
+              setDecoding({
+                ref: { ...sessionRef, sessionId: summary.runningConfigId },
+                message: form.getFieldValue('message'),
+                separator: form.getFieldValue('separator'),
+              }),
+            )
+          }
+        >
+          Decode
+        </Button>
         <WriteButton
           type="primary"
           loading={send.isPending}
@@ -51,6 +67,7 @@ export function SendMessageTab({ sessionRef, summary }: { sessionRef: SessionRef
           Send
         </WriteButton>
       </Flex>
+      <DecodedMessageModal target={decoding} onClose={() => setDecoding(undefined)} />
     </Form>
   )
 }

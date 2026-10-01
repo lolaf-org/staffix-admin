@@ -151,3 +151,20 @@ export function useLogs(search: LogSearch, enabled: boolean) {
     enabled,
   })
 }
+
+export interface DecodeTarget {
+  ref: SessionRef
+  message: string
+  separator: string
+}
+
+export function useDecodedMessage(target: DecodeTarget | undefined) {
+  return useQuery({
+    queryKey: ['decode', target],
+    queryFn: () =>
+      call(api.POST('/api/messages/decode', { body: { ...target!.ref, message: target!.message, separator: target!.separator } })),
+    enabled: target !== undefined,
+    staleTime: Infinity,
+    retry: false,
+  })
+}

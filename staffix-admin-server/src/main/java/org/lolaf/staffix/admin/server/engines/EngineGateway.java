@@ -1,6 +1,7 @@
 package org.lolaf.staffix.admin.server.engines;
 
 import org.jspecify.annotations.Nullable;
+import org.lolaf.staffix.admin.server.dictionaries.DictionaryRef;
 import org.lolaf.staffix.admin.server.sessions.ResetMode;
 import org.lolaf.staffix.admin.server.sessions.SessionDetail;
 import org.lolaf.staffix.admin.server.sessions.SessionGroup;
@@ -37,4 +38,12 @@ public interface EngineGateway {
     void setSeqNums(SessionRef session, @Nullable Long incoming, @Nullable Long outgoing);
 
     void sendMessage(SessionRef session, String message, char separator, boolean possDup);
+
+    /**
+     * The dictionaries a config decodes with: one, or for FIXT the transport's then the application's. Unlike the
+     * other operations, {@code config} names a config (an initiator's backup included), not a session.
+     */
+    List<DictionaryRef> getDictionaries(SessionRef config);
+
+    byte[] getDictionaryXml(String engineId, String dictionaryId);
 }

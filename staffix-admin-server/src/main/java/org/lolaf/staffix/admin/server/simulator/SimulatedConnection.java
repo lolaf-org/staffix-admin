@@ -48,6 +48,10 @@ class SimulatedConnection {
         target.drop(2);
     }
 
+    boolean hasConfig(String configId) {
+        return configs.stream().anyMatch(c -> c.id.equals(configId));
+    }
+
     SessionSummary summary() {
         return SessionSummary.builder()
                 .group(group)

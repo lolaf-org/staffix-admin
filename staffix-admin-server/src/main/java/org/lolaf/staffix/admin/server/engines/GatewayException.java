@@ -22,6 +22,10 @@ public class GatewayException extends ErrorResponseException {
                 + session.getGroup() + "." + session.getSessionId() + "'", null);
     }
 
+    public static GatewayException unknownDictionary(String engineId, String dictionaryId) {
+        return new GatewayException(HttpStatus.NOT_FOUND, "Engine '" + engineId + "' has no dictionary '" + dictionaryId + "'", null);
+    }
+
     /**
      * The request itself is wrong, e.g. a malformed FIX message or a config the session does not have.
      */

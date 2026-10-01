@@ -1,6 +1,7 @@
 package org.lolaf.staffix.admin.server.simulator;
 
 import org.jspecify.annotations.Nullable;
+import org.lolaf.staffix.admin.server.dictionaries.DictionaryRef;
 import org.lolaf.staffix.admin.server.engines.EngineGateway;
 import org.lolaf.staffix.admin.server.engines.GatewayException;
 import org.lolaf.staffix.admin.server.engines.SessionRef;
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
 class SimulatedEngineGateway implements EngineGateway {
 
     private final Map<String, SimulatedEngine> engines;
+    private final SimulatedDictionary dictionary = new SimulatedDictionary();
 
     SimulatedEngineGateway(List<SimulatedEngine> engines) {
         this.engines = engines.stream().collect(Collectors.toUnmodifiableMap(e -> e.engineId, Function.identity()));
@@ -83,5 +85,22 @@ class SimulatedEngineGateway implements EngineGateway {
     @Override
     public void sendMessage(SessionRef session, String message, char separator, boolean possDup) {
         engine(session.getEngineId()).sendMessage(session, message, separator, possDup);
+    }
+
+    @Override
+    public List<DictionaryRef> getDictionaries(SessionRef config) {
+        if (!engine(config.getEngineId()).hasConfig(config.getGroup(), config.getSessionId())) {
+            throw GatewayException.unknownSession(config);
+        }
+        return List.of(dictionary.ref());
+    }
+
+    @Override
+    public byte[] getDictionaryXml(String engineId, String dictionaryId) {
+        engine(engineId);
+        if (!dictionaryId.equals(dictionary.ref().getId())) {
+            throw GatewayException.unknownDictionary(engineId, dictionaryId);
+        }
+        return dictionary.xml();
     }
 }

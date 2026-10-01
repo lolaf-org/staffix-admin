@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Alert, Checkbox, Flex, Input, Segmented, Select, Table, Tag, Tooltip, Typography } from 'antd'
 import { ArrowDownOutlined, ArrowUpOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import type { Schemas } from '../api/client'
-import { useLogs, type LogType } from '../api/queries'
+import { useLogs, type DecodeTarget, type LogType } from '../api/queries'
+import { DecodedMessageModal } from './DecodedMessageModal'
 import { formatDateTime, formatLogTime } from './format'
 import { TIME_WINDOWS } from './timeWindows'
 
@@ -26,6 +27,7 @@ export function LogsPanel({ engineId, group, sessionId }: Props) {
   const [text, setText] = useState('')
   const [types, setTypes] = useState<LogType[]>([])
   const [limit, setLimit] = useState(500)
+  const [decoding, setDecoding] = useState<DecodeTarget>()
   const logs = useLogs({ engineId, group, sessionId, minutes, text, types, limit }, engineId !== '')
 
   return (
@@ -52,12 +54,24 @@ export function LogsPanel({ engineId, group, sessionId }: Props) {
         />
       </Flex>
       {logs.isError && <Alert type="error" title={logs.error.message} />}
+      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        Click a message to decode it with its session's dictionary.
+      </Typography.Text>
       <Table<Schemas['LogEntry']>
         size="small"
         loading={logs.isFetching}
         dataSource={logs.data}
         rowKey={(entry) => `${entry.timestamp}-${entry.group}-${entry.sessionId}-${entry.line}`}
         pagination={{ pageSize: 50, showSizeChanger: false, size: 'small' }}
+        onRow={(entry) =>
+          decodable(entry)
+            ? {
+                onClick: () =>
+                  setDecoding({ ref: { engineId, group: entry.group!, sessionId: entry.sessionId! }, message: entry.line, separator: '|' }),
+                style: { cursor: 'pointer' },
+              }
+            : {}
+        }
         columns={[
           {
             title: 'Time',
@@ -97,6 +111,11 @@ export function LogsPanel({ engineId, group, sessionId }: Props) {
           },
         ]}
       />
+      <DecodedMessageModal target={decoding} onClose={() => setDecoding(undefined)} />
     </Flex>
   )
+}
+
+function decodable(entry: Schemas['LogEntry']): boolean {
+  return entry.type !== 'EVENT' && entry.group != null && entry.sessionId != null
 }

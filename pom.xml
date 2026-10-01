@@ -32,6 +32,7 @@
         <frontend-maven-plugin.version>2.0.2</frontend-maven-plugin.version>
         <springdoc.version>3.1.1</springdoc.version>
         <springdoc-openapi-maven-plugin.version>1.5</springdoc-openapi-maven-plugin.version>
+        <staffix.version>0.9.0</staffix.version>
     </properties>
 
     <dependencyManagement>
@@ -45,6 +46,11 @@
                 <groupId>org.lolaf</groupId>
                 <artifactId>staffix-admin-logs-spi</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.lolaf.staffix</groupId>
+                <artifactId>staffix-fix-44</artifactId>
+                <version>${staffix.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.springdoc</groupId>

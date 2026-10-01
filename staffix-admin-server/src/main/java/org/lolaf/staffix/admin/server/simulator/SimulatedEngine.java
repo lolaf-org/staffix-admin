@@ -126,6 +126,10 @@ class SimulatedEngine {
         session.outgoingSeqNum++;
     }
 
+    synchronized boolean hasConfig(String group, String configId) {
+        return connections.stream().anyMatch(c -> c.group.equals(group) && c.hasConfig(configId));
+    }
+
     private static void requireLoggedIn(SimulatedSession session, String operation) {
         if (!session.loggedIn) {
             throw GatewayException.rejected(operation + " needs session '" + session.group + "." + session.id + "' to be logged in");
