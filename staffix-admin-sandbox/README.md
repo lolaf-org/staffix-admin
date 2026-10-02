@@ -12,7 +12,9 @@ locally first (`./mvnw install` in the staffix repository).
 
 # 2. The console, with the development users (reader, writer, engine; password = name)
 ./mvnw install
-java -jar staffix-admin-app/target/staffix-admin.jar --staffix.admin.security.jaas-config=classpath:jaas/dev.conf
+java -jar staffix-admin-app/target/staffix-admin.jar --staffix.admin.security.jaas-config=classpath:jaas/dev.conf \
+  --staffix.admin.metrics.prometheus.url=http://localhost:9090 \
+  --staffix.admin.metrics.prometheus.timer-base-unit=microseconds
 
 # 3. The engines
 ./mvnw install -Psandbox -pl staffix-admin-sandbox

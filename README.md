@@ -11,6 +11,7 @@ serves a React UI and proxies the engines' HTTP admin connectors. The browser ne
 | `staffix-admin-ui` | React + Ant Design UI |
 | `staffix-admin-app` | The executable jar: the server with the UI inside |
 | `staffix-admin-metrics-spi` | SPI for metrics backends (Prometheus, ...) |
+| `staffix-admin-metrics-prometheus` | Metrics from Prometheus |
 | `staffix-admin-logs-spi` | SPI for logs backends (Loki, ...) |
 
 ## API contract
@@ -39,6 +40,21 @@ To try the console without engines, run it with `--spring.profiles.active=mock`:
 sessions drop, reconnect and follow session windows, with generated metrics and FIX logs, and development users
 (password = name) `reader`, `writer` and `engine` (announcement only). `classpath:jaas/dev.conf` gives the same
 users to a console talking to real engines.
+
+## Metrics
+
+Charts read the engines' micrometer meters from Prometheus, received through the OpenTelemetry collector with
+`translation_strategy: UnderscoreEscapingWithoutSuffixes` (as in `staffix-admin-sandbox/docker`). The engines must
+publish percentile histograms for the latency charts; RTT and clock offset need staffix's RTT measurement enabled.
+
+```yaml
+staffix:
+  admin:
+    metrics:
+      prometheus:
+        url: http://prometheus:9090
+        timer-base-unit: microseconds  # the engines' micrometer baseTimeUnit; OTLP's default is milliseconds
+```
 
 ## Security
 

@@ -113,6 +113,8 @@ final class SandboxEngine {
                         .resourceAttribute(FixMonitoringConstants.OTLP_SERVICE_INSTANCE_ID, engineId)
                         .step(Duration.ofSeconds(5))
                         .baseTimeUnit(TimeUnit.MICROSECONDS)
+                        .decodingLatencyEnabled(true)
+                        .encodingLatencyEnabled(true)
                         .rttLatencyEnabled(true)
                         .clockOffsetEnabled(true)
                         .build());
@@ -173,6 +175,9 @@ final class SandboxEngine {
                 .fixSessionType(type)
                 .fixApplicationInstanceId(session.fixSessionId().getQualifiedName())
                 .fixSessionPluginsInstanceId(FixSessionsMonitoringManager.class, METRICS)
+                .rttMeasurementSettings(FixSessionSettings.RttMeasurementSettings.builder()
+                        .probeInterval(Duration.ofSeconds(2))
+                        .build())
                 .resetSeqNumOnLogon(true);
         if (session.windowClosed()) {
             settings.sessionScheduleSettings(openOnlyTheFirstMinuteOfToday());
