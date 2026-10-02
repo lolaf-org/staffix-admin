@@ -19,7 +19,7 @@ class PrometheusMetricsAutoConfigurationTest {
 
     @Test
     void createsTheSourceOnlyWhenPrometheusIsConfigured() {
-        context.run(app -> assertThat(app).doesNotHaveBean(MetricsSource.class));
+        context.run(app -> assertThat(app).doesNotHaveBean(MetricsSource.class).hasSingleBean(PrometheusMetricsSourceFactory.class));
         context.withPropertyValues("staffix.admin.metrics.prometheus.url=http://localhost:9090",
                         "staffix.admin.metrics.prometheus.timer-base-unit=microseconds")
                 .run(app -> {

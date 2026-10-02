@@ -9,15 +9,20 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.web.client.RestClient;
 
 /**
- * Backs off when the application defines its own {@link LogsSource}, such as the simulator of the {@code mock}
- * profile.
+ * The single source configured by properties backs off when the application defines its own {@link LogsSource},
+ * such as the simulator of the {@code mock} profile.
  */
 @AutoConfiguration
-@ConditionalOnProperty("staffix.admin.logs.loki.url")
 @EnableConfigurationProperties(LokiProperties.class)
 public class LokiLogsAutoConfiguration {
 
     @Bean
+    LokiLogsSourceFactory lokiLogsSourceFactory(RestClient.Builder builder) {
+        return new LokiLogsSourceFactory(builder);
+    }
+
+    @Bean
+    @ConditionalOnProperty("staffix.admin.logs.loki.url")
     @ConditionalOnMissingBean(LogsSource.class)
     LokiLogsSource lokiLogsSource(LokiProperties properties, RestClient.Builder builder) {
         return new LokiLogsSource(properties, builder);

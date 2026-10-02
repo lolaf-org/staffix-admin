@@ -19,7 +19,7 @@ class LokiLogsAutoConfigurationTest {
 
     @Test
     void createsTheSourceOnlyWhenLokiIsConfigured() {
-        context.run(app -> assertThat(app).doesNotHaveBean(LogsSource.class));
+        context.run(app -> assertThat(app).doesNotHaveBean(LogsSource.class).hasSingleBean(LokiLogsSourceFactory.class));
         context.withPropertyValues("staffix.admin.logs.loki.url=http://localhost:3100", "staffix.admin.logs.loki.indexed-labels=fix_eid")
                 .run(app -> {
                     assertThat(app).hasSingleBean(LokiLogsSource.class);
