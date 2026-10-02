@@ -146,8 +146,8 @@ class LokiLogsSourceTest {
         return new LokiLogsSource(properties(url, indexedLabels, tenant), RestClient.builder());
     }
 
-    private static LokiProperties properties(URI url, Set<String> indexedLabels, String tenant) {
-        return new LokiProperties(url, Duration.ofSeconds(2), "{service_name=~\".+\"}", indexedLabels, tenant);
+    private static LokiSettings properties(URI url, Set<String> indexedLabels, String tenant) {
+        return new LokiSettings(url, Duration.ofSeconds(2), "{service_name=~\".+\"}", indexedLabels, tenant);
     }
 
     private static LogQuery.LogQueryBuilder query() {

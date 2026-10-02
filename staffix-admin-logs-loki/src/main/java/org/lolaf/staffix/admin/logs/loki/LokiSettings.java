@@ -2,7 +2,6 @@ package org.lolaf.staffix.admin.logs.loki;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 import java.net.URI;
@@ -10,10 +9,9 @@ import java.time.Duration;
 import java.util.Set;
 
 @Value
-@ConfigurationProperties("staffix.admin.logs.loki")
-public class LokiProperties {
+public class LokiSettings {
     /**
-     * The Loki server, e.g. {@code http://localhost:3100}; the source is only created when set.
+     * The Loki server, e.g. {@code http://localhost:3100}; required.
      */
     URI url;
     Duration timeout;
@@ -33,11 +31,11 @@ public class LokiProperties {
     @Nullable
     String tenant;
 
-    public LokiProperties(URI url,
-                          @DefaultValue("10s") Duration timeout,
-                          @DefaultValue("{service_name=~\".+\"}") String streamSelector,
-                          @DefaultValue Set<String> indexedLabels,
-                          @Nullable String tenant) {
+    public LokiSettings(URI url,
+                        @DefaultValue("10s") Duration timeout,
+                        @DefaultValue("{service_name=~\".+\"}") String streamSelector,
+                        @DefaultValue Set<String> indexedLabels,
+                        @Nullable String tenant) {
         this.url = url;
         this.timeout = timeout;
         this.streamSelector = streamSelector;

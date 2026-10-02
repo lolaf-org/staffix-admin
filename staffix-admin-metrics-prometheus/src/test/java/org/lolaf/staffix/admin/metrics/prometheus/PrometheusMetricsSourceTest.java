@@ -149,8 +149,8 @@ class PrometheusMetricsSourceTest {
         return new PrometheusMetricsSource(properties(url, timerBaseUnit), RestClient.builder(), JsonMapper.builder().build());
     }
 
-    private static PrometheusProperties properties(URI url, TimeUnit timerBaseUnit) {
-        return new PrometheusProperties(url, Duration.ofSeconds(2), timerBaseUnit, Duration.ofMinutes(1));
+    private static PrometheusSettings properties(URI url, TimeUnit timerBaseUnit) {
+        return new PrometheusSettings(url, Duration.ofSeconds(2), timerBaseUnit, Duration.ofMinutes(1));
     }
 
     private static MetricQuery query(MetricKind kind, Duration step) {

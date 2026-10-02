@@ -27,7 +27,7 @@ class LokiLogsSourceFactoryTest {
                 .hasMessage("url is required");
     }
 
-    private static LokiProperties settings(URI url) {
-        return new LokiProperties(url, Duration.ofSeconds(2), "{service_name=~\".+\"}", Set.of(), "alpha-tenant");
+    private static LokiSettings settings(URI url) {
+        return new LokiSettings(url, Duration.ofSeconds(2), "{service_name=~\".+\"}", Set.of(), "alpha-tenant");
     }
 }

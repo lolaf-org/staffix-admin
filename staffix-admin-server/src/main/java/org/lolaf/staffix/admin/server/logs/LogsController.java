@@ -9,9 +9,9 @@ import org.lolaf.staffix.admin.logs.LogQuery;
 import org.lolaf.staffix.admin.logs.LogType;
 import org.lolaf.staffix.admin.logs.LogsSource;
 import org.lolaf.staffix.admin.logs.LogsSourceException;
+import org.lolaf.staffix.admin.server.connectors.EngineTelemetry;
 import org.lolaf.staffix.admin.server.web.TelemetryProblems;
 import org.lolaf.staffix.admin.server.web.TimeRange;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -25,7 +25,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class LogsController {
 
-    private final ObjectProvider<LogsSource> logsSource;
+    private final EngineTelemetry engineTelemetry;
 
     /**
      * Matching entries, newest first.
@@ -40,11 +40,8 @@ public class LogsController {
                                     @RequestParam(defaultValue = "") List<LogType> types,
                                     @RequestParam(defaultValue = "") List<String> msgTypes,
                                     @RequestParam(defaultValue = "500") @Min(1) @Max(5000) int limit) {
-        LogsSource source = logsSource.getIfAvailable();
-        if (source == null) {
-            throw TelemetryProblems.notConfigured("logs");
-        }
         TelemetryProblems.requireGroupForSession(group, sessionId);
+        LogsSource source = source(engineId);
         TimeRange range = TimeRange.of(from, to);
         try {
             return source.query(LogQuery.builder()
@@ -60,6 +57,14 @@ public class LogsController {
                     .build());
         } catch (LogsSourceException e) {
             throw TelemetryProblems.backendFailed("logs", e);
+        }
+    }
+
+    private LogsSource source(String engineId) {
+        try {
+            return engineTelemetry.logs(engineId).orElseThrow(() -> TelemetryProblems.notCollected("logs", engineId));
+        } catch (IllegalArgumentException e) {
+            throw TelemetryProblems.connectorInvalid("logs", e);
         }
     }
 }

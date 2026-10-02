@@ -6,7 +6,7 @@ import org.lolaf.staffix.admin.logs.LogsSourceFactory;
 import org.springframework.web.client.RestClient;
 
 @RequiredArgsConstructor
-public class LokiLogsSourceFactory implements LogsSourceFactory<LokiProperties> {
+public class LokiLogsSourceFactory implements LogsSourceFactory<LokiSettings> {
 
     public static final String KIND = "loki";
 
@@ -18,12 +18,12 @@ public class LokiLogsSourceFactory implements LogsSourceFactory<LokiProperties> 
     }
 
     @Override
-    public Class<LokiProperties> getSettingsClass() {
-        return LokiProperties.class;
+    public Class<LokiSettings> getSettingsClass() {
+        return LokiSettings.class;
     }
 
     @Override
-    public LogsSource create(LokiProperties settings) {
+    public LogsSource create(LokiSettings settings) {
         if (settings.getUrl() == null) {
             throw new IllegalArgumentException("url is required");
         }

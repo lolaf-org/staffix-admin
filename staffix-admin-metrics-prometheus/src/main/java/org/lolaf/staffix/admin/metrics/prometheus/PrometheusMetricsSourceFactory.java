@@ -7,7 +7,7 @@ import org.springframework.web.client.RestClient;
 import tools.jackson.databind.json.JsonMapper;
 
 @RequiredArgsConstructor
-public class PrometheusMetricsSourceFactory implements MetricsSourceFactory<PrometheusProperties> {
+public class PrometheusMetricsSourceFactory implements MetricsSourceFactory<PrometheusSettings> {
 
     public static final String KIND = "prometheus";
 
@@ -20,12 +20,12 @@ public class PrometheusMetricsSourceFactory implements MetricsSourceFactory<Prom
     }
 
     @Override
-    public Class<PrometheusProperties> getSettingsClass() {
-        return PrometheusProperties.class;
+    public Class<PrometheusSettings> getSettingsClass() {
+        return PrometheusSettings.class;
     }
 
     @Override
-    public MetricsSource create(PrometheusProperties settings) {
+    public MetricsSource create(PrometheusSettings settings) {
         if (settings.getUrl() == null) {
             throw new IllegalArgumentException("url is required");
         }

@@ -8,9 +8,12 @@ import org.springframework.web.ErrorResponseException;
 @UtilityClass
 public class TelemetryProblems {
 
-    public static ErrorResponseException notConfigured(String what) {
-        return new ErrorResponseException(HttpStatus.SERVICE_UNAVAILABLE, ProblemDetail.forStatusAndDetail(
-                HttpStatus.SERVICE_UNAVAILABLE, "No " + what + " backend is configured"), null);
+    /**
+     * A 404, so the UI tells telemetry nobody collects apart from a failure.
+     */
+    public static ErrorResponseException notCollected(String what, String engineId) {
+        return new ErrorResponseException(HttpStatus.NOT_FOUND, ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND,
+                "The " + what + " of engine " + engineId + " are not collected: no " + what + " connector is assigned to it"), null);
     }
 
     /**
@@ -21,6 +24,11 @@ public class TelemetryProblems {
             throw new ErrorResponseException(HttpStatus.BAD_REQUEST, ProblemDetail.forStatusAndDetail(
                     HttpStatus.BAD_REQUEST, "'sessionId' needs its 'group'"), null);
         }
+    }
+
+    public static ErrorResponseException connectorInvalid(String what, IllegalArgumentException cause) {
+        return new ErrorResponseException(HttpStatus.BAD_GATEWAY, ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_GATEWAY, "The " + what + " connector is invalid: " + cause.getMessage()), cause);
     }
 
     public static ErrorResponseException backendFailed(String what, RuntimeException cause) {

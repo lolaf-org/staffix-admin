@@ -42,7 +42,7 @@ public class LokiLogsSource implements LogsSource {
     private final String streamSelectorMatchers;
     private final Set<String> indexedLabels;
 
-    public LokiLogsSource(LokiProperties properties, RestClient.Builder builder) {
+    public LokiLogsSource(LokiSettings properties, RestClient.Builder builder) {
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
                 .connectTimeout(properties.getTimeout())
                 .build());

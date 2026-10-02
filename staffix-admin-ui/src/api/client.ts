@@ -16,6 +16,13 @@ export function isUnauthorized(error: unknown): boolean {
   return error instanceof ApiError && error.status === 401
 }
 
+/**
+ * Metrics or logs of an engine no connector serves: a state to show, not a failure.
+ */
+export function isNotCollected(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 404
+}
+
 export function csrfHeader(): Record<string, string> {
   const token = document.cookie
     .split('; ')

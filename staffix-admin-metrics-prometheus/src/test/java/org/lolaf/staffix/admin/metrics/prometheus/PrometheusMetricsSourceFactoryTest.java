@@ -28,7 +28,7 @@ class PrometheusMetricsSourceFactoryTest {
                 .hasMessage("url is required");
     }
 
-    private static PrometheusProperties settings(URI url) {
-        return new PrometheusProperties(url, Duration.ofSeconds(2), TimeUnit.MILLISECONDS, Duration.ofMinutes(1));
+    private static PrometheusSettings settings(URI url) {
+        return new PrometheusSettings(url, Duration.ofSeconds(2), TimeUnit.MILLISECONDS, Duration.ofMinutes(1));
     }
 }

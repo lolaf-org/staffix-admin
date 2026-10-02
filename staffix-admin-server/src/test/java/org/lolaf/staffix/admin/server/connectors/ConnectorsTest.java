@@ -41,6 +41,32 @@ class ConnectorsTest {
     }
 
     @Test
+    void readsAnEngineFromItsOwnConnectorElseTheDefault() {
+        connectors.save(ConnectorsConfig.builder().connector(ALPHA_METRICS).connector(ALPHA_LOGS).connector(BETA_LOGS)
+                .defaults(EngineConnectors.builder().metrics("alpha-metrics").logs("alpha-logs").build())
+                .engine("beta", EngineConnectors.builder().logs("beta-logs").build())
+                .engine("gamma", EngineConnectors.builder().metrics(EngineConnectors.NONE).build())
+                .build());
+
+        assertThat(connectors.logs("alpha")).containsSame(connectors.logsSource("alpha-logs").orElseThrow());
+        assertThat(connectors.logs("beta")).containsSame(connectors.logsSource("beta-logs").orElseThrow());
+        assertThat(connectors.metrics("beta")).containsSame(connectors.metricsSource("alpha-metrics").orElseThrow());
+        assertThat(connectors.metrics("gamma")).isEmpty();
+        assertThat(connectors.logs("gamma")).containsSame(connectors.logsSource("alpha-logs").orElseThrow());
+    }
+
+    @Test
+    void collectsNothingWithoutADefault() {
+        connectors.save(ConnectorsConfig.builder().connector(ALPHA_LOGS)
+                .engine("beta", EngineConnectors.builder().logs("alpha-logs").build())
+                .build());
+
+        assertThat(connectors.logs("alpha")).isEmpty();
+        assertThat(connectors.metrics("beta")).isEmpty();
+        assertThat(connectors.logs("beta")).isPresent();
+    }
+
+    @Test
     void answersNothingForAnUnknownConnectorOrTheOtherRole() {
         connectors.save(ConnectorsConfig.builder().connector(ALPHA_METRICS).connector(ALPHA_LOGS).build());
 

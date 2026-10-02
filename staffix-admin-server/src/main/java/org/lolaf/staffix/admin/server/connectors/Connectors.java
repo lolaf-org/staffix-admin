@@ -22,11 +22,11 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * The connectors admins configured, each with a live source built by the factory of its kind. A source is kept while
- * its connector is unchanged and rebuilt when it changes; the store is read on every lookup, so a hand edit of the
- * stored connectors is picked up without a restart.
+ * The connectors admins configured, each with a live source built by the factory of its kind. An engine reads a role
+ * from its own connector, else from the default. A source is kept while its connector is unchanged and rebuilt when it
+ * changes; the store is read on every lookup, so a hand edit of the stored connectors is picked up without a restart.
  */
-public class Connectors {
+public class Connectors implements EngineTelemetry {
 
     private final ConnectorStore store;
     private final SettingsBinder binder;
@@ -67,16 +67,25 @@ public class Connectors {
         return saved;
     }
 
+    @Override
+    public Optional<MetricsSource> metrics(String engineId) {
+        ConnectorsConfig config = store.load();
+        return assigned(config, engineId, EngineConnectors::getMetrics).flatMap(connectorId -> metricsSource(config, connectorId));
+    }
+
+    @Override
+    public Optional<LogsSource> logs(String engineId) {
+        ConnectorsConfig config = store.load();
+        return assigned(config, engineId, EngineConnectors::getLogs).flatMap(connectorId -> logsSource(config, connectorId));
+    }
+
     /**
      * Empty when no such connector exists or it does not serve metrics.
      *
      * @throws IllegalArgumentException if its stored settings cannot make a source, e.g. after a hand edit
      */
     public Optional<MetricsSource> metricsSource(String connectorId) {
-        return connector(connectorId)
-                .filter(connector -> metricsFactories.containsKey(connector.getKind()))
-                .map(connector -> metricsSources.compute(connectorId, (id, built) -> built != null && built.connector().equals(connector)
-                        ? built : new Built<>(connector, createMetricsSource(connector))).source());
+        return metricsSource(store.load(), connectorId);
     }
 
     /**
@@ -85,14 +94,31 @@ public class Connectors {
      * @throws IllegalArgumentException if its stored settings cannot make a source, e.g. after a hand edit
      */
     public Optional<LogsSource> logsSource(String connectorId) {
-        return connector(connectorId)
+        return logsSource(store.load(), connectorId);
+    }
+
+    private Optional<MetricsSource> metricsSource(ConnectorsConfig config, String connectorId) {
+        return connector(config, connectorId)
+                .filter(connector -> metricsFactories.containsKey(connector.getKind()))
+                .map(connector -> metricsSources.compute(connectorId, (id, built) -> built != null && built.connector().equals(connector)
+                        ? built : new Built<>(connector, createMetricsSource(connector))).source());
+    }
+
+    private Optional<LogsSource> logsSource(ConnectorsConfig config, String connectorId) {
+        return connector(config, connectorId)
                 .filter(connector -> logsFactories.containsKey(connector.getKind()))
                 .map(connector -> logsSources.compute(connectorId, (id, built) -> built != null && built.connector().equals(connector)
                         ? built : new Built<>(connector, createLogsSource(connector))).source());
     }
 
-    private Optional<Connector> connector(String connectorId) {
-        return store.load().getConnectors().stream().filter(connector -> connector.getId().equals(connectorId)).findFirst();
+    private static Optional<String> assigned(ConnectorsConfig config, String engineId, Function<EngineConnectors, @Nullable String> role) {
+        EngineConnectors links = config.getEngines().get(engineId);
+        String connectorId = links != null && role.apply(links) != null ? role.apply(links) : role.apply(config.getDefaults());
+        return connectorId == null || connectorId.equals(EngineConnectors.NONE) ? Optional.empty() : Optional.of(connectorId);
+    }
+
+    private static Optional<Connector> connector(ConnectorsConfig config, String connectorId) {
+        return config.getConnectors().stream().filter(connector -> connectorId.equals(connector.getId())).findFirst();
     }
 
     private MetricsSource createMetricsSource(Connector connector) {

@@ -9,9 +9,9 @@ import org.lolaf.staffix.admin.metrics.MetricQuery;
 import org.lolaf.staffix.admin.metrics.MetricSeries;
 import org.lolaf.staffix.admin.metrics.MetricsSource;
 import org.lolaf.staffix.admin.metrics.MetricsSourceException;
+import org.lolaf.staffix.admin.server.connectors.EngineTelemetry;
 import org.lolaf.staffix.admin.server.web.TelemetryProblems;
 import org.lolaf.staffix.admin.server.web.TimeRange;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -25,7 +25,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class MetricsController {
 
-    private final ObjectProvider<MetricsSource> metricsSource;
+    private final EngineTelemetry engineTelemetry;
 
     /**
      * Per message type kinds give one series per type and direction, the others one series per session.
@@ -38,11 +38,8 @@ public class MetricsController {
                                            @RequestParam(defaultValue = "0.99") @DecimalMin("0") @DecimalMax("1") double quantile,
                                            @RequestParam Instant from,
                                            @RequestParam Instant to) {
-        MetricsSource source = metricsSource.getIfAvailable();
-        if (source == null) {
-            throw TelemetryProblems.notConfigured("metrics");
-        }
         TelemetryProblems.requireGroupForSession(group, sessionId);
+        MetricsSource source = source(engineId);
         TimeRange range = TimeRange.of(from, to);
         try {
             return source.query(MetricQuery.builder()
@@ -57,6 +54,14 @@ public class MetricsController {
                     .build());
         } catch (MetricsSourceException e) {
             throw TelemetryProblems.backendFailed("metrics", e);
+        }
+    }
+
+    private MetricsSource source(String engineId) {
+        try {
+            return engineTelemetry.metrics(engineId).orElseThrow(() -> TelemetryProblems.notCollected("metrics", engineId));
+        } catch (IllegalArgumentException e) {
+            throw TelemetryProblems.connectorInvalid("metrics", e);
         }
     }
 }

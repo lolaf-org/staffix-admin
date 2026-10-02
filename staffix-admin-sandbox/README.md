@@ -10,13 +10,11 @@ locally first (`./mvnw install` in the staffix repository).
 # 1. Prometheus, Loki and the OpenTelemetry collector (add --profile grafana for Grafana on :3000)
 (cd staffix-admin-sandbox/docker && docker compose up -d)
 
-# 2. The console, with the development users (reader, writer, engine; password = name)
+# 2. The console, with the development users (reader, writer, engine; password = name), reading the sandbox's
+#    Prometheus and Loki through the connectors in data/ (git ignores it, so editing them changes no tracked file)
 ./mvnw install
-java -jar staffix-admin-app/target/staffix-admin.jar --staffix.admin.security.jaas-config=classpath:jaas/dev.conf \
-  --staffix.admin.metrics.prometheus.url=http://localhost:9090 \
-  --staffix.admin.metrics.prometheus.timer-base-unit=microseconds \
-  --staffix.admin.logs.loki.url=http://localhost:3100 \
-  --staffix.admin.logs.loki.indexed-labels=fix_eid,fix_sg,fix_sn
+[ -f data/connectors.yaml ] || { mkdir -p data && cp staffix-admin-sandbox/connectors.yaml data/; }
+java -jar staffix-admin-app/target/staffix-admin.jar --staffix.admin.security.jaas-config=classpath:jaas/dev.conf
 
 # 3. The engines
 ./mvnw install -Psandbox -pl staffix-admin-sandbox

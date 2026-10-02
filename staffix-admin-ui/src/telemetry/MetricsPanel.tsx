@@ -3,7 +3,7 @@ import { Alert, Empty, Flex, Segmented, Select, Skeleton, Typography } from 'ant
 import { useEffect } from 'react'
 import { AreaChartOutlined, TableOutlined } from '@ant-design/icons'
 import { useMetrics, type MetricKind, type MetricScope } from '../api/queries'
-import type { Schemas } from '../api/client'
+import { isNotCollected, type Schemas } from '../api/client'
 import { formatRateValue, formatSeconds } from './format'
 import { MetricChart, SeriesLegend, niceTicks, type ChartSeries } from './MetricChart'
 import { MetricTable } from './MetricTable'
@@ -97,7 +97,9 @@ export function MetricsPanel({ scope, chartHeight }: Props) {
         </Typography.Text>
       )}
       {metrics.isPending && <Skeleton active />}
-      {metrics.isError && <Alert type="error" title={metrics.error.message} />}
+      {metrics.isError && (isNotCollected(metrics.error)
+        ? <Empty description={metrics.error.message} />
+        : <Alert type="error" title={metrics.error.message} />)}
       {metrics.isSuccess && metrics.data.length === 0 && <Empty description="No data for this period" />}
       {metrics.isSuccess && metrics.data.length > 0 && (() => {
         const facets = toFacets(metrics.data, title, colors)

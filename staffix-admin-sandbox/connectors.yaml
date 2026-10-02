@@ -1,0 +1,20 @@
+version: 0
+connectors:
+  - id: sandbox-prometheus
+    name: Sandbox Prometheus
+    kind: prometheus
+    settings:
+      timerBaseUnit: microseconds
+      url: http://localhost:9090
+  - id: sandbox-loki
+    name: Sandbox Loki
+    kind: loki
+    settings:
+      indexedLabels:
+        - fix_eid
+        - fix_sg
+        - fix_sn
+      url: http://localhost:3100
+defaults:
+  metrics: sandbox-prometheus
+  logs: sandbox-loki

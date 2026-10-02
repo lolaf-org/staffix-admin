@@ -45,7 +45,7 @@ public class PrometheusMetricsSource implements MetricsSource {
     private final Duration minRateWindow;
     private final JsonMapper jsonMapper;
 
-    public PrometheusMetricsSource(PrometheusProperties properties, RestClient.Builder builder, JsonMapper jsonMapper) {
+    public PrometheusMetricsSource(PrometheusSettings properties, RestClient.Builder builder, JsonMapper jsonMapper) {
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
                 .connectTimeout(properties.getTimeout())
                 .build());

@@ -1,7 +1,6 @@
 package org.lolaf.staffix.admin.metrics.prometheus;
 
 import lombok.Value;
-import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 import java.net.URI;
@@ -9,10 +8,9 @@ import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 @Value
-@ConfigurationProperties("staffix.admin.metrics.prometheus")
-public class PrometheusProperties {
+public class PrometheusSettings {
     /**
-     * The Prometheus server, e.g. {@code http://localhost:9090}; the source is only created when set.
+     * The Prometheus server, e.g. {@code http://localhost:9090}; required.
      */
     URI url;
     Duration timeout;
@@ -26,10 +24,10 @@ public class PrometheusProperties {
      */
     Duration minRateWindow;
 
-    public PrometheusProperties(URI url,
-                                @DefaultValue("10s") Duration timeout,
-                                @DefaultValue("milliseconds") TimeUnit timerBaseUnit,
-                                @DefaultValue("1m") Duration minRateWindow) {
+    public PrometheusSettings(URI url,
+                              @DefaultValue("10s") Duration timeout,
+                              @DefaultValue("milliseconds") TimeUnit timerBaseUnit,
+                              @DefaultValue("1m") Duration minRateWindow) {
         this.url = url;
         this.timeout = timeout;
         this.timerBaseUnit = timerBaseUnit;

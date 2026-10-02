@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Alert, Checkbox, Flex, Input, Segmented, Select, Table, Tag, Tooltip, Typography } from 'antd'
 import { ArrowDownOutlined, ArrowUpOutlined, InfoCircleOutlined } from '@ant-design/icons'
-import type { Schemas } from '../api/client'
+import { isNotCollected, type Schemas } from '../api/client'
 import { useLogs, useMessageTypes, type DecodeTarget, type LogType } from '../api/queries'
 import { DecodedMessageModal } from './DecodedMessageModal'
 import { formatDateTime, formatLogTime } from './format'
@@ -69,7 +69,7 @@ export function LogsPanel({ engineId, group, sessionId }: Props) {
           aria-label="Maximum lines"
         />
       </Flex>
-      {logs.isError && <Alert type="error" title={logs.error.message} />}
+      {logs.isError && <Alert type={isNotCollected(logs.error) ? 'info' : 'error'} title={logs.error.message} />}
       <Typography.Text type="secondary" style={{ fontSize: 12 }}>
         Click a message to decode it with its session's dictionary.
       </Typography.Text>
