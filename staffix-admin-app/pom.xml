@@ -26,6 +26,10 @@
             <groupId>org.lolaf</groupId>
             <artifactId>staffix-admin-metrics-prometheus</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.lolaf</groupId>
+            <artifactId>staffix-admin-logs-loki</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

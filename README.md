@@ -12,6 +12,7 @@ serves a React UI and proxies the engines' HTTP admin connectors. The browser ne
 | `staffix-admin-app` | The executable jar: the server with the UI inside |
 | `staffix-admin-metrics-spi` | SPI for metrics backends (Prometheus, ...) |
 | `staffix-admin-metrics-prometheus` | Metrics from Prometheus |
+| `staffix-admin-logs-loki` | FIX message logs from Loki |
 | `staffix-admin-logs-spi` | SPI for logs backends (Loki, ...) |
 
 ## API contract
@@ -54,6 +55,23 @@ staffix:
       prometheus:
         url: http://prometheus:9090
         timer-base-unit: microseconds  # the engines' micrometer baseTimeUnit; OTLP's default is milliseconds
+```
+
+## Logs
+
+The logs tab reads what staffix's OTLP messages logger sends to Loki: every message in and out, and session events.
+Loki keeps the `fix.*` attributes as structured metadata, so the console filters them after a stream selector that,
+by default, scans every stream of the time range. Narrow it, or promote `fix.eid` to an index label in Loki's
+`otlp_config`, if queries get slow.
+
+```yaml
+staffix:
+  admin:
+    logs:
+      loki:
+        url: http://loki:3100
+        stream-selector: '{service_name="fix-gateway"}'  # default {service_name=~".+"}
+        tenant: fix-ops                                   # X-Scope-OrgID, for a multi-tenant Loki
 ```
 
 ## Security
