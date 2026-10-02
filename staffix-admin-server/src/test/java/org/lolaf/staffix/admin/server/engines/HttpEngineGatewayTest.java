@@ -22,6 +22,7 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
@@ -87,7 +88,7 @@ class HttpEngineGatewayTest {
             exchange.close();
         });
         connector.start();
-        AdminProperties properties = new AdminProperties(Duration.ofSeconds(90), Duration.ofSeconds(2));
+        AdminProperties properties = new AdminProperties(Duration.ofSeconds(90), Duration.ofSeconds(2), Path.of("data"));
         registry = new EngineRegistry(properties, Clock.systemUTC());
         announce("alpha-token", connector.getAddress().getPort());
         gateway = new HttpEngineGateway(registry, properties, RestClient.builder(), JsonMapper.builder().build());
