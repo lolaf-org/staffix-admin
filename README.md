@@ -60,9 +60,10 @@ staffix:
 ## Logs
 
 The logs tab reads what staffix's OTLP messages logger sends to Loki: every message in and out, and session events.
-Loki keeps the `fix.*` attributes as structured metadata, so the console filters them after a stream selector that,
-by default, scans every stream of the time range. Narrow it, or promote `fix.eid` to an index label in Loki's
-`otlp_config`, if queries get slow.
+Loki keeps the `fix.*` attributes as structured metadata, so by default the console filters them after a stream
+selector that scans every stream of the time range. Promote `fix.eid`, `fix.sg` and `fix.sn` to index labels in
+Loki's `otlp_config` (as `staffix-admin-sandbox/docker/conf/loki.yaml` does) and list them in `indexed-labels`, so a
+query reads only the streams of its engine, group or session; narrowing the stream selector helps too.
 
 ```yaml
 staffix:
@@ -70,6 +71,7 @@ staffix:
     logs:
       loki:
         url: http://loki:3100
+        indexed-labels: fix_eid,fix_sg,fix_sn             # labels Loki indexes, matched in the stream selector
         stream-selector: '{service_name="fix-gateway"}'  # default {service_name=~".+"}
         tenant: fix-ops                                   # X-Scope-OrgID, for a multi-tenant Loki
 ```

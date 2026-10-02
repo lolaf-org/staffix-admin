@@ -20,10 +20,11 @@ class LokiLogsAutoConfigurationTest {
     @Test
     void createsTheSourceOnlyWhenLokiIsConfigured() {
         context.run(app -> assertThat(app).doesNotHaveBean(LogsSource.class));
-        context.withPropertyValues("staffix.admin.logs.loki.url=http://localhost:3100")
+        context.withPropertyValues("staffix.admin.logs.loki.url=http://localhost:3100", "staffix.admin.logs.loki.indexed-labels=fix_eid")
                 .run(app -> {
                     assertThat(app).hasSingleBean(LokiLogsSource.class);
                     assertThat(app.getBean(LokiProperties.class).getStreamSelector()).isEqualTo("{service_name=~\".+\"}");
+                    assertThat(app.getBean(LokiProperties.class).getIndexedLabels()).containsExactly("fix_eid");
                 });
     }
 

@@ -17,18 +17,20 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
  * Reads the FIX message logs staffix's OTLP logger sends to Loki. Its {@code fix.*} attributes arrive as structured
- * metadata unless a deployment promotes them to index labels, so they are filtered in the pipeline, which works
- * either way.
+ * metadata, filtered in the pipeline, unless the deployment promotes them to index labels, which are matched in the
+ * stream selector instead.
  */
 public class LokiLogsSource implements LogsSource {
 
@@ -37,7 +39,8 @@ public class LokiLogsSource implements LogsSource {
 
     private final RestClient client;
     private final URI queryRangeUrl;
-    private final String streamSelector;
+    private final String streamSelectorMatchers;
+    private final Set<String> indexedLabels;
 
     public LokiLogsSource(LokiProperties properties, RestClient.Builder builder) {
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
@@ -49,7 +52,9 @@ public class LokiLogsSource implements LogsSource {
         }
         this.client = builder.requestFactory(requestFactory).build();
         this.queryRangeUrl = URI.create(properties.getUrl().toString().replaceAll("/+$", "") + "/loki/api/v1/query_range");
-        this.streamSelector = properties.getStreamSelector();
+        String streamSelector = properties.getStreamSelector().strip();
+        this.streamSelectorMatchers = streamSelector.substring(1, streamSelector.length() - 1).strip();
+        this.indexedLabels = properties.getIndexedLabels();
     }
 
     @Override
@@ -78,24 +83,37 @@ public class LokiLogsSource implements LogsSource {
     }
 
     private String logQl(LogQuery query) {
-        StringBuilder logQl = new StringBuilder(streamSelector);
-        if (query.getText() != null) {
-            logQl.append(" |= ").append(quote(query.getText()));
+        List<String> selector = new ArrayList<>();
+        if (!streamSelectorMatchers.isEmpty()) {
+            selector.add(streamSelectorMatchers);
         }
-        logQl.append(" | fix_eid=").append(quote(query.getEngineId()));
+        StringBuilder pipeline = new StringBuilder();
+        if (query.getText() != null) {
+            pipeline.append(" |= ").append(quote(query.getText()));
+        }
+        match(selector, pipeline, "fix_eid", "=", query.getEngineId());
         if (query.getGroup() != null) {
-            logQl.append(" | fix_sg=").append(quote(query.getGroup()));
+            match(selector, pipeline, "fix_sg", "=", query.getGroup());
         }
         if (query.getSessionId() != null) {
-            logQl.append(" | fix_sn=").append(quote(query.getSessionId()));
+            match(selector, pipeline, "fix_sn", "=", query.getSessionId());
         }
         if (!query.getTypes().isEmpty()) {
-            logQl.append(" | fix_log_type=~").append(quote(anyOf(query.getTypes().stream().map(LOG_TYPES::get).toList())));
+            match(selector, pipeline, "fix_log_type", "=~", anyOf(query.getTypes().stream().map(LOG_TYPES::get).toList()));
         }
         if (!query.getMsgTypes().isEmpty()) {
-            logQl.append(" | fix_msg_type=~").append(quote(anyOf(query.getMsgTypes())));
+            match(selector, pipeline, "fix_msg_type", "=~", anyOf(query.getMsgTypes()));
         }
-        return logQl.toString();
+        return "{" + String.join(", ", selector) + "}" + pipeline;
+    }
+
+    private void match(List<String> selector, StringBuilder pipeline, String label, String operator, String value) {
+        String matcher = label + operator + quote(value);
+        if (indexedLabels.contains(label)) {
+            selector.add(matcher);
+        } else {
+            pipeline.append(" | ").append(matcher);
+        }
     }
 
     private static String anyOf(Collection<String> values) {

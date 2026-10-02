@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -91,6 +92,14 @@ class LokiLogsSourceTest {
     }
 
     @Test
+    void matchesIndexedLabelsInTheStreamSelector() {
+        source(Set.of("fix_eid", "fix_log_type"), null).query(query().type(LogType.IN).msgType("8").build());
+
+        assertThat(params.get("query")).isEqualTo("{service_name=~\".+\", fix_eid=\"alpha\", fix_log_type=~\"in\"}"
+                + " | fix_sg=\"beta\" | fix_sn=\"trading\" | fix_msg_type=~\"8\"");
+    }
+
+    @Test
     void escapesRegexMetacharactersInMessageTypes() {
         source(null).query(LogQuery.builder().engineId("alpha").from(FROM).to(FROM.plusSeconds(600)).msgType("A.B").limit(10).build());
 
@@ -121,7 +130,7 @@ class LokiLogsSourceTest {
             closedPort = socket.getLocalPort();
         }
 
-        LokiLogsSource unreachable = new LokiLogsSource(properties(URI.create("http://127.0.0.1:" + closedPort), null), RestClient.builder());
+        LokiLogsSource unreachable = new LokiLogsSource(properties(URI.create("http://127.0.0.1:" + closedPort), Set.of(), null), RestClient.builder());
 
         assertThatThrownBy(() -> unreachable.query(query().build()))
                 .isInstanceOf(LogsSourceException.class)
@@ -129,11 +138,16 @@ class LokiLogsSourceTest {
     }
 
     private LokiLogsSource source(String tenant) {
-        return new LokiLogsSource(properties(URI.create("http://127.0.0.1:" + loki.getAddress().getPort() + "/"), tenant), RestClient.builder());
+        return source(Set.of(), tenant);
     }
 
-    private static LokiProperties properties(URI url, String tenant) {
-        return new LokiProperties(url, Duration.ofSeconds(2), "{service_name=~\".+\"}", tenant);
+    private LokiLogsSource source(Set<String> indexedLabels, String tenant) {
+        URI url = URI.create("http://127.0.0.1:" + loki.getAddress().getPort() + "/");
+        return new LokiLogsSource(properties(url, indexedLabels, tenant), RestClient.builder());
+    }
+
+    private static LokiProperties properties(URI url, Set<String> indexedLabels, String tenant) {
+        return new LokiProperties(url, Duration.ofSeconds(2), "{service_name=~\".+\"}", indexedLabels, tenant);
     }
 
     private static LogQuery.LogQueryBuilder query() {
