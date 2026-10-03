@@ -46,8 +46,12 @@ users to a console talking to real engines.
 
 The console reads engines' metrics and FIX logs from backends described by connectors. A connector has an id, a
 name, a kind (`prometheus` for metrics, `loki` for logs) and that kind's settings; there can be several of a kind,
-e.g. one Loki per environment. Each engine reads a role from the connector assigned to it, else from the default;
-an engine with neither shows its metrics or logs as not collected. The console creates no connector itself.
+e.g. one Loki per environment. A session's logs go through one of its engine's messages loggers and its metrics
+through one of its monitoring plugins, as the engine reports; each of these emitters reads from the connector
+assigned to it, else from its engine's `defaults`, else from the global `defaults`. Telemetry with none, or `none`,
+shows as not collected, and so do the metrics of a session without a monitoring plugin. A view spanning several
+backends reads each and merges them; a latency quantile of a message type then shows the highest of the backends'.
+The console creates no connector itself.
 
 Connectors live in `connectors.yaml` under `staffix.admin.data-dir` (default `data`, relative to the working
 directory). Until the console's connectors tab exists, edit that file; changes apply without a restart, and a
@@ -77,6 +81,11 @@ engines:
   uat-gateway:
     defaults:
       metrics: none   # not collected
+  prod-gateway:
+    loggers:
+      clients-otlp: clients-loki   # by messages logger instance id
+    monitors:
+      clients-metrics: none        # by monitoring plugin instance id
 ```
 
 **Prometheus** charts read the engines' micrometer meters received through the OpenTelemetry collector with

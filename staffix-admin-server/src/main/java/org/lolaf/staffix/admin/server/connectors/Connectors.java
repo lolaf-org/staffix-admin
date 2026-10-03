@@ -12,6 +12,7 @@ import org.lolaf.staffix.admin.store.EngineConnectors;
 import org.lolaf.staffix.admin.store.EngineMapping;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +22,7 @@ import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * The connectors admins configured, each with a live source built by the factory of its kind. An engine reads a role
@@ -69,15 +71,44 @@ public class Connectors implements EngineTelemetry {
     }
 
     @Override
-    public Optional<MetricsSource> metrics(String engineId) {
+    public List<MetricsSource> metrics(String engineId, Collection<Emitters> emitters) {
         ConnectorsConfig config = store.load();
-        return assigned(config, engineId, EngineConnectors::getMetrics).flatMap(connectorId -> metricsSource(config, connectorId));
+        EngineMapping mapping = config.getEngines().get(engineId);
+        return emitters.stream()
+                .filter(session -> session.monitoring() != null)
+                .map(session -> assigned(config, mapping, monitorConnector(mapping, session.monitoring()), EngineConnectors::getMetrics))
+                .flatMap(Optional::stream)
+                .distinct()
+                .flatMap(connectorId -> metricsSource(config, connectorId).stream())
+                .toList();
     }
 
     @Override
-    public Optional<LogsSource> logs(String engineId) {
+    public List<LogsSource> logs(String engineId, Collection<Emitters> emitters) {
         ConnectorsConfig config = store.load();
-        return assigned(config, engineId, EngineConnectors::getLogs).flatMap(connectorId -> logsSource(config, connectorId));
+        EngineMapping mapping = config.getEngines().get(engineId);
+        return emitters.stream()
+                .map(session -> assigned(config, mapping, loggerConnector(mapping, session.messagesLogger()), EngineConnectors::getLogs))
+                .flatMap(Optional::stream)
+                .distinct()
+                .flatMap(connectorId -> logsSource(config, connectorId).stream())
+                .toList();
+    }
+
+    @Override
+    public List<MetricsSource> allMetrics(String engineId) {
+        ConnectorsConfig config = store.load();
+        return everyConnector(config, engineId, EngineMapping::getMonitors, EngineConnectors::getMetrics)
+                .flatMap(connectorId -> metricsSource(config, connectorId).stream())
+                .toList();
+    }
+
+    @Override
+    public List<LogsSource> allLogs(String engineId) {
+        ConnectorsConfig config = store.load();
+        return everyConnector(config, engineId, EngineMapping::getLoggers, EngineConnectors::getLogs)
+                .flatMap(connectorId -> logsSource(config, connectorId).stream())
+                .toList();
     }
 
     /**
@@ -112,11 +143,32 @@ public class Connectors implements EngineTelemetry {
                         ? built : new Built<>(connector, createLogsSource(connector))).source());
     }
 
-    private static Optional<String> assigned(ConnectorsConfig config, String engineId, Function<EngineConnectors, @Nullable String> role) {
-        EngineMapping mapping = config.getEngines().get(engineId);
-        String connectorId = mapping != null && role.apply(mapping.getDefaults()) != null
-                ? role.apply(mapping.getDefaults()) : role.apply(config.getDefaults());
+    private static @Nullable String monitorConnector(@Nullable EngineMapping mapping, String monitoring) {
+        return mapping == null ? null : mapping.getMonitors().get(monitoring);
+    }
+
+    private static @Nullable String loggerConnector(@Nullable EngineMapping mapping, String messagesLogger) {
+        return mapping == null ? null : mapping.getLoggers().get(messagesLogger);
+    }
+
+    private static Optional<String> assigned(ConnectorsConfig config, @Nullable EngineMapping mapping, @Nullable String emitterConnector,
+                                             Function<EngineConnectors, @Nullable String> role) {
+        String connectorId = emitterConnector;
+        if (connectorId == null && mapping != null) {
+            connectorId = role.apply(mapping.getDefaults());
+        }
+        if (connectorId == null) {
+            connectorId = role.apply(config.getDefaults());
+        }
         return connectorId == null || connectorId.equals(EngineConnectors.NONE) ? Optional.empty() : Optional.of(connectorId);
+    }
+
+    private static Stream<String> everyConnector(ConnectorsConfig config, String engineId, Function<EngineMapping, Map<String, String>> emitters,
+                                                 Function<EngineConnectors, @Nullable String> role) {
+        EngineMapping mapping = config.getEngines().get(engineId);
+        Stream<String> byEmitter = mapping == null ? Stream.empty() : emitters.apply(mapping).values().stream()
+                .filter(connectorId -> !connectorId.equals(EngineConnectors.NONE));
+        return Stream.concat(byEmitter, assigned(config, mapping, null, role).stream()).distinct();
     }
 
     private static Optional<Connector> connector(ConnectorsConfig config, String connectorId) {

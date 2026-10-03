@@ -5,11 +5,12 @@ import jakarta.validation.constraints.DecimalMin;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.lolaf.staffix.admin.metrics.MetricKind;
+import org.lolaf.staffix.admin.metrics.MetricPoint;
 import org.lolaf.staffix.admin.metrics.MetricQuery;
 import org.lolaf.staffix.admin.metrics.MetricSeries;
 import org.lolaf.staffix.admin.metrics.MetricsSource;
 import org.lolaf.staffix.admin.metrics.MetricsSourceException;
-import org.lolaf.staffix.admin.server.connectors.EngineTelemetry;
+import org.lolaf.staffix.admin.server.connectors.TelemetrySources;
 import org.lolaf.staffix.admin.server.web.TelemetryProblems;
 import org.lolaf.staffix.admin.server.web.TimeRange;
 import org.springframework.validation.annotation.Validated;
@@ -18,14 +19,18 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.function.DoubleBinaryOperator;
 
 @RestController
 @Validated
 @RequiredArgsConstructor
 public class MetricsController {
 
-    private final EngineTelemetry engineTelemetry;
+    private final TelemetrySources telemetrySources;
 
     /**
      * Per message type kinds give one series per type and direction, the others one series per session.
@@ -39,29 +44,57 @@ public class MetricsController {
                                            @RequestParam Instant from,
                                            @RequestParam Instant to) {
         TelemetryProblems.requireGroupForSession(group, sessionId);
-        MetricsSource source = source(engineId);
+        List<MetricsSource> sources = sources(engineId, group, sessionId);
         TimeRange range = TimeRange.of(from, to);
+        MetricQuery query = MetricQuery.builder()
+                .engineId(engineId)
+                .group(group)
+                .sessionId(sessionId)
+                .kind(kind)
+                .quantile(kind.isLatency() ? quantile : null)
+                .from(range.getFrom())
+                .to(range.getTo())
+                .step(range.chartStep())
+                .build();
         try {
-            return source.query(MetricQuery.builder()
-                    .engineId(engineId)
-                    .group(group)
-                    .sessionId(sessionId)
-                    .kind(kind)
-                    .quantile(kind.isLatency() ? quantile : null)
-                    .from(range.getFrom())
-                    .to(range.getTo())
-                    .step(range.chartStep())
-                    .build());
+            List<MetricSeries> series = sources.stream().flatMap(source -> source.query(query).stream()).toList();
+            return sources.size() == 1 ? series : combineSameLabels(series, kind);
         } catch (MetricsSourceException e) {
             throw TelemetryProblems.backendFailed("metrics", e);
         }
     }
 
-    private MetricsSource source(String engineId) {
+    /**
+     * Backends aggregate a per message type kind over their own sessions only. A rate adds up; a quantile cannot be
+     * combined, so the highest one is kept, an upper bound of the true one.
+     */
+    private static List<MetricSeries> combineSameLabels(List<MetricSeries> series, MetricKind kind) {
+        DoubleBinaryOperator combine = kind.isLatency() ? Math::max : Double::sum;
+        Map<Map<String, String>, Map<Instant, Double>> byLabels = new LinkedHashMap<>();
+        series.forEach(one -> {
+            Map<Instant, Double> points = byLabels.computeIfAbsent(one.getLabels(), labels -> new TreeMap<>());
+            one.getPoints().forEach(point -> points.merge(point.getTimestamp(), point.getValue(), combine::applyAsDouble));
+        });
+        return byLabels.entrySet().stream()
+                .map(entry -> MetricSeries.builder()
+                        .labels(entry.getKey())
+                        .points(entry.getValue().entrySet().stream()
+                                .map(point -> new MetricPoint(point.getKey(), point.getValue()))
+                                .toList())
+                        .build())
+                .toList();
+    }
+
+    private List<MetricsSource> sources(String engineId, @Nullable String group, @Nullable String sessionId) {
+        List<MetricsSource> sources;
         try {
-            return engineTelemetry.metrics(engineId).orElseThrow(() -> TelemetryProblems.notCollected("metrics", engineId));
+            sources = telemetrySources.metrics(engineId, group, sessionId);
         } catch (IllegalArgumentException e) {
             throw TelemetryProblems.connectorInvalid("metrics", e);
         }
+        if (sources.isEmpty()) {
+            throw TelemetryProblems.notCollected("metrics", engineId, group, sessionId);
+        }
+        return sources;
     }
 }

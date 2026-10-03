@@ -42,29 +42,74 @@ class ConnectorsTest {
     }
 
     @Test
-    void readsAnEngineFromItsOwnConnectorElseTheDefault() {
+    void readsAnEmitterFromItsOwnConnectorElseItsEngineDefaultElseTheDefault() {
         connectors.save(ConnectorsConfig.builder().connector(ALPHA_METRICS).connector(ALPHA_LOGS).connector(BETA_LOGS)
                 .defaults(EngineConnectors.builder().metrics("alpha-metrics").logs("alpha-logs").build())
-                .engine("beta", EngineMapping.builder().defaults(EngineConnectors.builder().logs("beta-logs").build()).build())
-                .engine("gamma", EngineMapping.builder().defaults(EngineConnectors.builder().metrics(EngineConnectors.NONE).build()).build())
+                .engine("beta", EngineMapping.builder()
+                        .defaults(EngineConnectors.builder().logs("beta-logs").build())
+                        .logger("clients", "alpha-logs")
+                        .monitor("unread", EngineConnectors.NONE)
+                        .build())
+                .build());
+        LogsSource alphaLogs = connectors.logsSource("alpha-logs").orElseThrow();
+        LogsSource betaLogs = connectors.logsSource("beta-logs").orElseThrow();
+        MetricsSource alphaMetrics = connectors.metricsSource("alpha-metrics").orElseThrow();
+
+        assertThat(connectors.logs("beta", List.of(new Emitters("clients", null)))).containsExactly(alphaLogs);
+        assertThat(connectors.logs("beta", List.of(new Emitters("otlp", null)))).containsExactly(betaLogs);
+        assertThat(connectors.logs("gamma", List.of(new Emitters("otlp", null)))).containsExactly(alphaLogs);
+        assertThat(connectors.metrics("beta", List.of(new Emitters("otlp", "metrics")))).containsExactly(alphaMetrics);
+        assertThat(connectors.metrics("beta", List.of(new Emitters("otlp", "unread")))).isEmpty();
+    }
+
+    @Test
+    void readsEachSourceOfTheEmittersOnce() {
+        connectors.save(ConnectorsConfig.builder().connector(ALPHA_LOGS).connector(BETA_LOGS)
+                .defaults(EngineConnectors.builder().logs("alpha-logs").build())
+                .engine("beta", EngineMapping.builder().logger("clients", "beta-logs").logger("audit", EngineConnectors.NONE).build())
                 .build());
 
-        assertThat(connectors.logs("alpha")).containsSame(connectors.logsSource("alpha-logs").orElseThrow());
-        assertThat(connectors.logs("beta")).containsSame(connectors.logsSource("beta-logs").orElseThrow());
-        assertThat(connectors.metrics("beta")).containsSame(connectors.metricsSource("alpha-metrics").orElseThrow());
-        assertThat(connectors.metrics("gamma")).isEmpty();
-        assertThat(connectors.logs("gamma")).containsSame(connectors.logsSource("alpha-logs").orElseThrow());
+        assertThat(connectors.logs("beta", List.of(new Emitters("otlp", null), new Emitters("clients", null),
+                new Emitters("slf4j", null), new Emitters("audit", null))))
+                .containsExactly(connectors.logsSource("alpha-logs").orElseThrow(), connectors.logsSource("beta-logs").orElseThrow());
+    }
+
+    @Test
+    void collectsNoMetricsOfAnUnmonitoredSession() {
+        connectors.save(ConnectorsConfig.builder().connector(ALPHA_METRICS)
+                .defaults(EngineConnectors.builder().metrics("alpha-metrics").build())
+                .build());
+
+        assertThat(connectors.metrics("beta", List.of(new Emitters("otlp", null)))).isEmpty();
     }
 
     @Test
     void collectsNothingWithoutADefault() {
         connectors.save(ConnectorsConfig.builder().connector(ALPHA_LOGS)
-                .engine("beta", EngineMapping.builder().defaults(EngineConnectors.builder().logs("alpha-logs").build()).build())
+                .engine("beta", EngineMapping.builder().logger("clients", "alpha-logs").build())
                 .build());
 
-        assertThat(connectors.logs("alpha")).isEmpty();
-        assertThat(connectors.metrics("beta")).isEmpty();
-        assertThat(connectors.logs("beta")).isPresent();
+        assertThat(connectors.logs("alpha", List.of(new Emitters("clients", null)))).isEmpty();
+        assertThat(connectors.logs("beta", List.of(new Emitters("otlp", null)))).isEmpty();
+        assertThat(connectors.logs("beta", List.of(new Emitters("clients", null)))).hasSize(1);
+    }
+
+    @Test
+    void readsEveryConnectorOfAnEngineWhoseEmittersAreUnknown() {
+        connectors.save(ConnectorsConfig.builder().connector(ALPHA_METRICS).connector(ALPHA_LOGS).connector(BETA_LOGS)
+                .defaults(EngineConnectors.builder().logs("alpha-logs").build())
+                .engine("beta", EngineMapping.builder()
+                        .logger("clients", "beta-logs")
+                        .logger("audit", EngineConnectors.NONE)
+                        .monitor("otlp-metrics", "alpha-metrics")
+                        .build())
+                .build());
+
+        assertThat(connectors.allLogs("beta"))
+                .containsExactlyInAnyOrder(connectors.logsSource("alpha-logs").orElseThrow(), connectors.logsSource("beta-logs").orElseThrow());
+        assertThat(connectors.allMetrics("beta")).containsExactly(connectors.metricsSource("alpha-metrics").orElseThrow());
+        assertThat(connectors.allLogs("gamma")).containsExactly(connectors.logsSource("alpha-logs").orElseThrow());
+        assertThat(connectors.allMetrics("gamma")).isEmpty();
     }
 
     @Test

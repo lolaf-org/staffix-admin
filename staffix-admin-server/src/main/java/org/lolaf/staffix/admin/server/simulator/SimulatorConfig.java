@@ -2,6 +2,7 @@ package org.lolaf.staffix.admin.server.simulator;
 
 import org.lolaf.staffix.admin.logs.LogsSource;
 import org.lolaf.staffix.admin.metrics.MetricsSource;
+import org.lolaf.staffix.admin.server.connectors.Emitters;
 import org.lolaf.staffix.admin.server.connectors.EngineTelemetry;
 import org.lolaf.staffix.admin.server.engines.EngineRegistry;
 import org.springframework.context.annotation.Bean;
@@ -10,7 +11,8 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.util.Optional;
+import java.util.Collection;
+import java.util.List;
 
 /**
  * Replaces real engines with simulated ones, for UI work and demos without a running staffix.
@@ -31,13 +33,23 @@ public class SimulatorConfig {
         LogsSource logs = new SimulatedLogsSource(gateway);
         return new EngineTelemetry() {
             @Override
-            public Optional<MetricsSource> metrics(String engineId) {
-                return Optional.of(metrics);
+            public List<MetricsSource> metrics(String engineId, Collection<Emitters> emitters) {
+                return List.of(metrics);
             }
 
             @Override
-            public Optional<LogsSource> logs(String engineId) {
-                return Optional.of(logs);
+            public List<LogsSource> logs(String engineId, Collection<Emitters> emitters) {
+                return List.of(logs);
+            }
+
+            @Override
+            public List<MetricsSource> allMetrics(String engineId) {
+                return List.of(metrics);
+            }
+
+            @Override
+            public List<LogsSource> allLogs(String engineId) {
+                return List.of(logs);
             }
         };
     }

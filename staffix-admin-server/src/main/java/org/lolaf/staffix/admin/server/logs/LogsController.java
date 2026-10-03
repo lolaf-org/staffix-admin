@@ -9,7 +9,7 @@ import org.lolaf.staffix.admin.logs.LogQuery;
 import org.lolaf.staffix.admin.logs.LogType;
 import org.lolaf.staffix.admin.logs.LogsSource;
 import org.lolaf.staffix.admin.logs.LogsSourceException;
-import org.lolaf.staffix.admin.server.connectors.EngineTelemetry;
+import org.lolaf.staffix.admin.server.connectors.TelemetrySources;
 import org.lolaf.staffix.admin.server.web.TelemetryProblems;
 import org.lolaf.staffix.admin.server.web.TimeRange;
 import org.springframework.validation.annotation.Validated;
@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 
 @RestController
@@ -25,7 +26,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class LogsController {
 
-    private final EngineTelemetry engineTelemetry;
+    private final TelemetrySources telemetrySources;
 
     /**
      * Matching entries, newest first.
@@ -41,30 +42,40 @@ public class LogsController {
                                     @RequestParam(defaultValue = "") List<String> msgTypes,
                                     @RequestParam(defaultValue = "500") @Min(1) @Max(5000) int limit) {
         TelemetryProblems.requireGroupForSession(group, sessionId);
-        LogsSource source = source(engineId);
+        List<LogsSource> sources = sources(engineId, group, sessionId);
         TimeRange range = TimeRange.of(from, to);
+        LogQuery query = LogQuery.builder()
+                .engineId(engineId)
+                .group(group)
+                .sessionId(sessionId)
+                .from(range.getFrom())
+                .to(range.getTo())
+                .text(text == null || text.isBlank() ? null : text)
+                .types(types)
+                .msgTypes(msgTypes)
+                .limit(limit)
+                .build();
         try {
-            return source.query(LogQuery.builder()
-                    .engineId(engineId)
-                    .group(group)
-                    .sessionId(sessionId)
-                    .from(range.getFrom())
-                    .to(range.getTo())
-                    .text(text == null || text.isBlank() ? null : text)
-                    .types(types)
-                    .msgTypes(msgTypes)
+            return sources.stream()
+                    .flatMap(source -> source.query(query).stream())
+                    .sorted(Comparator.comparing(LogEntry::getTimestamp).reversed())
                     .limit(limit)
-                    .build());
+                    .toList();
         } catch (LogsSourceException e) {
             throw TelemetryProblems.backendFailed("logs", e);
         }
     }
 
-    private LogsSource source(String engineId) {
+    private List<LogsSource> sources(String engineId, @Nullable String group, @Nullable String sessionId) {
+        List<LogsSource> sources;
         try {
-            return engineTelemetry.logs(engineId).orElseThrow(() -> TelemetryProblems.notCollected("logs", engineId));
+            sources = telemetrySources.logs(engineId, group, sessionId);
         } catch (IllegalArgumentException e) {
             throw TelemetryProblems.connectorInvalid("logs", e);
         }
+        if (sources.isEmpty()) {
+            throw TelemetryProblems.notCollected("logs", engineId, group, sessionId);
+        }
+        return sources;
     }
 }

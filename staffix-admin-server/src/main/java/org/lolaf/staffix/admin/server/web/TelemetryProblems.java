@@ -1,6 +1,7 @@
 package org.lolaf.staffix.admin.server.web;
 
 import lombok.experimental.UtilityClass;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.ErrorResponseException;
@@ -11,9 +12,12 @@ public class TelemetryProblems {
     /**
      * A 404, so the UI tells telemetry nobody collects apart from a failure.
      */
-    public static ErrorResponseException notCollected(String what, String engineId) {
+    public static ErrorResponseException notCollected(String what, String engineId, @Nullable String group, @Nullable String sessionId) {
+        String scope = sessionId != null ? "session " + group + "." + sessionId + " of engine " + engineId
+                : group != null ? "group " + group + " of engine " + engineId
+                : "engine " + engineId;
         return new ErrorResponseException(HttpStatus.NOT_FOUND, ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND,
-                "The " + what + " of engine " + engineId + " are not collected: no " + what + " connector is assigned to it"), null);
+                "The " + what + " of " + scope + " are not collected: no " + what + " connector is assigned to its emitters"), null);
     }
 
     /**
