@@ -2,6 +2,7 @@ package org.lolaf.staffix.admin.logs.loki;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.lolaf.staffix.admin.secrets.Secret;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 import java.net.URI;
@@ -29,6 +30,7 @@ public class LokiSettings {
      * Sent as {@code X-Scope-OrgID} to a multi-tenant Loki; null for none.
      */
     @Nullable
+    @Secret
     String tenant;
 
     public LokiSettings(URI url,

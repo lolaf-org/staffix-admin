@@ -17,8 +17,9 @@ public class Connector {
     String name;
     String kind;
     /**
-     * As the kind defines them. A string value may reference an environment variable as {@code ${env:NAME}}, so a
-     * credential is never stored itself; it is resolved when the connector is built, not here.
+     * As the kind defines them. A string value may be a reference such as {@code ${env:NAME}}, and a secret one is
+     * stored encrypted ({@code enc:v1:...}) unless it is a reference; both are resolved when the connector is built,
+     * not here.
      */
     @Singular
     Map<String, Object> settings;

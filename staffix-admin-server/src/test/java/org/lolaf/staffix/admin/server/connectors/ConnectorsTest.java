@@ -6,6 +6,9 @@ import org.lolaf.staffix.admin.logs.LogsSource;
 import org.lolaf.staffix.admin.logs.LogsSourceFactory;
 import org.lolaf.staffix.admin.metrics.MetricsSource;
 import org.lolaf.staffix.admin.metrics.MetricsSourceFactory;
+import org.lolaf.staffix.admin.secrets.Secret;
+import org.lolaf.staffix.admin.server.secrets.EnvSecretResolver;
+import org.lolaf.staffix.admin.server.secrets.SecretCipher;
 import org.lolaf.staffix.admin.store.Connector;
 import org.lolaf.staffix.admin.store.ConnectorStore;
 import org.lolaf.staffix.admin.store.ConnectorsConfig;
@@ -13,6 +16,8 @@ import org.lolaf.staffix.admin.store.EngineConnectors;
 import org.lolaf.staffix.admin.store.EngineMapping;
 import org.lolaf.staffix.admin.store.StaleConnectorsException;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
@@ -25,9 +30,16 @@ class ConnectorsTest {
     private static final Connector ALPHA_LOGS = connector("alpha-logs", "stub-logs", "http://alpha:3100");
     private static final Connector BETA_LOGS = connector("beta-logs", "stub-logs", "http://beta:3100");
 
+    private static final String KEY = Base64.getEncoder().encodeToString("alpha-master-key-of-32-bytes-abc".getBytes(StandardCharsets.UTF_8));
+    private static final String PREVIOUS_KEY = Base64.getEncoder().encodeToString("an-older-master-key-of-32-bytes!".getBytes(StandardCharsets.UTF_8));
+
     private final MemoryStore store = new MemoryStore();
-    private final Connectors connectors = new Connectors(store, new SettingsBinder(Map.of("BETA_URL", "http://beta-env:3100")::get),
-            List.of(new StubMetricsFactory()), List.of(new StubLogsFactory()));
+    private final Connectors connectors = connectors(new SecretCipher(KEY, List.of(PREVIOUS_KEY)));
+
+    private Connectors connectors(SecretCipher cipher) {
+        SettingsBinder binder = new SettingsBinder(List.of(new EnvSecretResolver(Map.of("BETA_URL", "http://beta-env:3100")::get)), cipher);
+        return new Connectors(store, binder, new ConnectorSecrets(cipher), List.of(new StubMetricsFactory()), List.of(new StubLogsFactory()));
+    }
 
     @Test
     void buildsOneSourcePerConnectorFromItsOwnSettings() {
@@ -181,8 +193,54 @@ class ConnectorsTest {
     }
 
     @Test
+    void storesATypedSecretEncryptedAndBuildsTheSourceWithIt() {
+        connectors.save(ConnectorsConfig.builder().connector(ALPHA_LOGS.toBuilder().setting("tenant", "alpha-tenant").build()).build());
+
+        assertThat((String) store.load().getConnectors().getFirst().getSettings().get("tenant")).startsWith(SecretCipher.PREFIX);
+        assertThat(connectors.logsSource("alpha-logs")).get().extracting(source -> ((StubLogsSource) source).getTenant())
+                .isEqualTo("alpha-tenant");
+    }
+
+    @Test
+    void keepsASecretReferenceAsWritten() {
+        connectors.save(ConnectorsConfig.builder().connector(ALPHA_LOGS.toBuilder().setting("tenant", "${env:BETA_URL}").build()).build());
+
+        assertThat(store.load().getConnectors().getFirst().getSettings()).containsEntry("tenant", "${env:BETA_URL}");
+    }
+
+    @Test
+    void refusesATypedSecretWithoutAMasterKey() {
+        Connectors withoutKey = connectors(new SecretCipher(null, List.of()));
+
+        assertThatThrownBy(() -> withoutKey.save(ConnectorsConfig.builder()
+                .connector(ALPHA_LOGS.toBuilder().setting("tenant", "alpha-tenant").build())
+                .build()))
+                .isInstanceOfSatisfying(InvalidConnectorsException.class, e -> assertThat(e.getProblems()).containsExactly(
+                        "connector alpha-logs: secret tenant must be a reference such as ${env:NAME}, no master key is configured to encrypt it"));
+    }
+
+    @Test
+    void encryptsASecretUnderAPreviousKeyAgainOnSave() {
+        String underPreviousKey = new SecretCipher(PREVIOUS_KEY, List.of()).encrypt("alpha-tenant");
+
+        connectors.save(ConnectorsConfig.builder().connector(ALPHA_LOGS.toBuilder().setting("tenant", underPreviousKey).build()).build());
+
+        String stored = (String) store.load().getConnectors().getFirst().getSettings().get("tenant");
+        assertThat(new SecretCipher(KEY, List.of()).decrypt(stored)).isEqualTo("alpha-tenant");
+    }
+
+    @Test
+    void showsSecretsAsSetUnlessTheyAreReferences() {
+        assertThat(connectors.redacted(ALPHA_LOGS.toBuilder().setting("tenant", "enc:v1:abc").build()).getSettings())
+                .containsEntry("tenant", "set").containsEntry("url", "http://alpha:3100");
+        assertThat(connectors.redacted(ALPHA_LOGS.toBuilder().setting("tenant", "${file:/run/secrets/tenant}").build()).getSettings())
+                .containsEntry("tenant", "${file:/run/secrets/tenant}");
+    }
+
+    @Test
     void refusesTwoFactoriesOfTheSameKindAcrossRoles() {
-        assertThatThrownBy(() -> new Connectors(store, new SettingsBinder(name -> null), List.of(new StubMetricsFactory()),
+        SecretCipher noKey = new SecretCipher(null, List.of());
+        assertThatThrownBy(() -> new Connectors(store, new SettingsBinder(List.of(), noKey), new ConnectorSecrets(noKey), List.of(new StubMetricsFactory()),
                 List.of(new StubLogsFactory() {
                     @Override
                     public String getKind() {
@@ -200,6 +258,7 @@ class ConnectorsTest {
     @Value
     public static class StubSettings {
         String url;
+        @Secret
         String tenant;
     }
 
@@ -216,6 +275,7 @@ class ConnectorsTest {
     @Value
     static class StubLogsSource implements LogsSource {
         String url;
+        String tenant;
 
         @Override
         public List<org.lolaf.staffix.admin.logs.LogEntry> query(org.lolaf.staffix.admin.logs.LogQuery query) {
@@ -261,7 +321,7 @@ class ConnectorsTest {
             if (settings.getUrl() == null) {
                 throw new IllegalArgumentException("url is required");
             }
-            return new StubLogsSource(settings.getUrl());
+            return new StubLogsSource(settings.getUrl(), settings.getTenant());
         }
     }
 

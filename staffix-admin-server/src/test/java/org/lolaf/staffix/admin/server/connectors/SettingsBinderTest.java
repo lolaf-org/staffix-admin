@@ -3,10 +3,19 @@ package org.lolaf.staffix.admin.server.connectors;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.lolaf.staffix.admin.server.secrets.EnvSecretResolver;
+import org.lolaf.staffix.admin.server.secrets.FileSecretResolver;
+import org.lolaf.staffix.admin.server.secrets.SecretCipher;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
+import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -17,7 +26,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SettingsBinderTest {
 
-    private final SettingsBinder binder = new SettingsBinder(Map.of("ALPHA_TENANT", "alpha-tenant")::get);
+    private static final SecretCipher CIPHER = new SecretCipher(
+            Base64.getEncoder().encodeToString("alpha-master-key-of-32-bytes-abc".getBytes(StandardCharsets.UTF_8)), List.of());
+
+    private final SettingsBinder binder = new SettingsBinder(
+            List.of(new EnvSecretResolver(Map.of("ALPHA_TENANT", "alpha-tenant")::get), new FileSecretResolver()), CIPHER);
+
+    @TempDir
+    Path dir;
 
     @Test
     void bindsLikeSpringProperties() {
@@ -47,6 +63,25 @@ class SettingsBinderTest {
         assertThatThrownBy(() -> binder.bind(Map.of("tenant", "${env:BETA_TENANT}"), AlphaSettings.class))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("environment variable BETA_TENANT is not set");
+    }
+
+    @Test
+    void resolvesFileReferencesWithoutTheTrailingNewline() throws IOException {
+        Path secret = Files.writeString(dir.resolve("tenant"), "beta-tenant\n");
+
+        assertThat(binder.bind(Map.of("tenant", "${file:" + secret + "}"), AlphaSettings.class).getTenant()).isEqualTo("beta-tenant");
+    }
+
+    @Test
+    void refusesAnUnknownReferenceScheme() {
+        assertThatThrownBy(() -> binder.bind(Map.of("tenant", "${vault:secret/loki}"), AlphaSettings.class))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("unknown reference scheme vault, known: env, file");
+    }
+
+    @Test
+    void decryptsEncryptedValues() {
+        assertThat(binder.bind(Map.of("tenant", CIPHER.encrypt("gamma-tenant")), AlphaSettings.class).getTenant()).isEqualTo("gamma-tenant");
     }
 
     @Test

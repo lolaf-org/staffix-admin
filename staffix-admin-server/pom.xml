@@ -20,6 +20,10 @@
     <dependencies>
         <dependency>
             <groupId>org.lolaf</groupId>
+            <artifactId>staffix-admin-secrets-spi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.lolaf</groupId>
             <artifactId>staffix-admin-metrics-spi</artifactId>
         </dependency>
         <dependency>

@@ -54,8 +54,17 @@ backends reads each and merges them; a latency quantile of a message type then s
 The console creates no connector itself.
 
 Connectors live in `connectors.yaml` under `staffix.admin.data-dir` (default `data`, relative to the working
-directory). Until the console's connectors tab exists, edit that file; changes apply without a restart, and a
-setting written `${env:NAME}` is read from the environment, so the file holds no secret.
+directory), readable by the console's user only. Until the console's connectors tab exists, edit that file; changes
+apply without a restart.
+
+A setting may be a reference resolved when the connector is built: `${env:NAME}` reads an environment variable,
+`${file:/run/secrets/name}` a mounted secret file (without its trailing newline). Credentials, such as Loki's
+`tenant`, are never shown by the console: give them as a reference, or let the console store them encrypted
+(`enc:v1:...`, AES-GCM) under a master key, base64 encoded 32 bytes (`openssl rand -base64 32`) given as
+`staffix.admin.secrets.master-key` (env `STAFFIX_ADMIN_SECRETS_MASTERKEY`) or `master-key-file`. Without a master
+key, the console refuses to save a credential that is not a reference. To rotate the key, set the new one and move the
+old one to `staffix.admin.secrets.previous-master-keys`; each save re-encrypts under the new key. A lost key means
+typing those credentials again.
 
 ```yaml
 version: 0

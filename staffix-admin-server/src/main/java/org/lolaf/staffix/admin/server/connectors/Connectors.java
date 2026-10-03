@@ -33,15 +33,17 @@ public class Connectors implements EngineTelemetry {
 
     private final ConnectorStore store;
     private final SettingsBinder binder;
+    private final ConnectorSecrets secrets;
     private final Map<String, MetricsSourceFactory<?>> metricsFactories;
     private final Map<String, LogsSourceFactory<?>> logsFactories;
     private final Map<String, Built<MetricsSource>> metricsSources = new ConcurrentHashMap<>();
     private final Map<String, Built<LogsSource>> logsSources = new ConcurrentHashMap<>();
 
-    Connectors(ConnectorStore store, SettingsBinder binder, List<MetricsSourceFactory<?>> metricsFactories,
+    Connectors(ConnectorStore store, SettingsBinder binder, ConnectorSecrets secrets, List<MetricsSourceFactory<?>> metricsFactories,
                List<LogsSourceFactory<?>> logsFactories) {
         this.store = store;
         this.binder = binder;
+        this.secrets = secrets;
         this.metricsFactories = byKind(metricsFactories, MetricsSourceFactory::getKind);
         this.logsFactories = byKind(logsFactories, LogsSourceFactory::getKind);
         Set<String> sharedKinds = new HashSet<>(this.metricsFactories.keySet());
@@ -56,18 +58,32 @@ public class Connectors implements EngineTelemetry {
     }
 
     /**
+     * Secrets typed as plain values are stored encrypted.
+     *
      * @throws InvalidConnectorsException listing every problem, before anything is stored
      */
     public ConnectorsConfig save(ConnectorsConfig config) {
-        List<String> problems = problems(config);
+        List<String> problems = new ArrayList<>();
+        ConnectorsConfig protectedConfig = config.toBuilder()
+                .clearConnectors()
+                .connectors(config.getConnectors().stream().map(connector -> protectSecrets(connector, problems)).toList())
+                .build();
+        problems.addAll(problems(protectedConfig));
         if (!problems.isEmpty()) {
             throw new InvalidConnectorsException(problems);
         }
-        ConnectorsConfig saved = store.save(config);
+        ConnectorsConfig saved = store.save(protectedConfig);
         Set<String> ids = saved.getConnectors().stream().map(Connector::getId).collect(Collectors.toSet());
         metricsSources.keySet().retainAll(ids);
         logsSources.keySet().retainAll(ids);
         return saved;
+    }
+
+    /**
+     * As the API and the audit show it: a secret that is not a reference reads {@value ConnectorSecrets#SET}.
+     */
+    public Connector redacted(Connector connector) {
+        return settingsClass(connector).map(settingsClass -> secrets.redact(connector, settingsClass)).orElse(connector);
     }
 
     @Override
@@ -169,6 +185,18 @@ public class Connectors implements EngineTelemetry {
         Stream<String> byEmitter = mapping == null ? Stream.empty() : emitters.apply(mapping).values().stream()
                 .filter(connectorId -> !connectorId.equals(EngineConnectors.NONE));
         return Stream.concat(byEmitter, assigned(config, mapping, null, role).stream()).distinct();
+    }
+
+    private Connector protectSecrets(Connector connector, List<String> problems) {
+        return settingsClass(connector).map(settingsClass -> secrets.protect(connector, settingsClass, problems)).orElse(connector);
+    }
+
+    private Optional<Class<?>> settingsClass(Connector connector) {
+        if (metricsFactories.containsKey(connector.getKind())) {
+            return Optional.of(metricsFactories.get(connector.getKind()).getSettingsClass());
+        }
+        LogsSourceFactory<?> logs = logsFactories.get(connector.getKind());
+        return logs == null ? Optional.empty() : Optional.of(logs.getSettingsClass());
     }
 
     private static Optional<Connector> connector(ConnectorsConfig config, String connectorId) {

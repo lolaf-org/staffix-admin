@@ -12,6 +12,7 @@ import org.lolaf.staffix.admin.store.StaleConnectorsException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -91,6 +92,14 @@ class YamlConnectorStoreTest {
                       logs: none
                 """);
         assertThat(dataDir.resolve("admin")).isDirectoryNotContaining("glob:**.tmp");
+    }
+
+    @Test
+    void writesAFileOnlyItsOwnerReads() throws IOException {
+        new YamlConnectorStore(dataDir).save(CONFIG);
+
+        assertThat(Files.getPosixFilePermissions(dataDir.resolve(YamlConnectorStore.FILE_NAME)))
+                .containsExactlyInAnyOrder(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE);
     }
 
     @Test
