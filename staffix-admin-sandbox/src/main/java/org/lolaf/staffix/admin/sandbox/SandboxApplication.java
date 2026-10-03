@@ -39,7 +39,7 @@ public final class SandboxApplication {
         SandboxEngine alphaBank = new SandboxEngine("alpha-bank", settings)
                 .initiator("venue-x-trading",
                         new Target(Session.of("venue-x", "trading", "ALPHA", "VENX", new Requester(traffic, quoteInterval)), VENUE_X_PORT),
-                        new Target(Session.of("venue-x", "trading-drp", "ALPHA", "VENX_DR", new Requester(traffic, quoteInterval)), VENUE_X_DRP_PORT))
+                        new Target(Session.backup("venue-x", "trading-drp", "ALPHA", "VENX_DR"), VENUE_X_DRP_PORT))
                 .initiator("venue-y-trading",
                         new Target(Session.of("venue-y", "trading", "ALPHA", "VENY", new Requester(traffic, quoteInterval)), VENUE_Y_PORT))
                 .initiator("venue-y-market-data",

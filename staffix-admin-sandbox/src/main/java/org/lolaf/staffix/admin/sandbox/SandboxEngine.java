@@ -54,6 +54,10 @@ final class SandboxEngine {
             return new Session(id(group, name, sender, target), application, false);
         }
 
+        static Session backup(String group, String name, String sender, String target) {
+            return new Session(id(group, name, sender, target), null, false);
+        }
+
         Session withWindowClosed() {
             return new Session(fixSessionId, application, true);
         }
@@ -64,6 +68,9 @@ final class SandboxEngine {
         }
     }
 
+    /**
+     * A backup's session only gives its id: it runs on its main target's settings and application.
+     */
     record Target(Session session, int port) {
     }
 
@@ -130,12 +137,9 @@ final class SandboxEngine {
         MemorySessionsSettingsStoreSettings.MemorySessionsSettingsStoreSettingsBuilder initiatorsStore =
                 MemorySessionsSettingsStoreSettings.builder().instanceId("initiators");
         initiators.forEach(initiator -> {
-            List<Target> targets = new ArrayList<>(initiator.backups());
-            targets.add(0, initiator.main());
-            targets.forEach(target -> {
-                applications.application(target.session().fixSessionId().getQualifiedName(), target.session().application());
-                initiatorsStore.fixSessionSetting(settings(target.session(), FixSessionType.INITIATOR));
-            });
+            Session main = initiator.main().session();
+            applications.application(main.fixSessionId().getQualifiedName(), main.application());
+            initiatorsStore.fixSessionSetting(settings(main, FixSessionType.INITIATOR));
         });
         builder.fixSessionsSettingsStore(initiatorsStore.build());
         builder.fixApplicationFactory(applications.build());
