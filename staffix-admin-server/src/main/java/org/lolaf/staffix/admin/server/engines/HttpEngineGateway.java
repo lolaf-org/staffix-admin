@@ -224,6 +224,8 @@ class HttpEngineGateway implements EngineGateway {
                 .connected(session.isConnected())
                 .withinSessionTime(session.isWithinSessionTime())
                 .desiredState(SessionState.valueOf(session.getDesiredState()))
+                .messagesLoggerInstanceId(session.getMessagesLoggerInstanceId())
+                .monitoringInstanceId(session.getMonitoringInstanceId())
                 .build();
     }
 

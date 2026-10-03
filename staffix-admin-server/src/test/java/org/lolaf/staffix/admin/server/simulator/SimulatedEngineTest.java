@@ -26,15 +26,18 @@ class SimulatedEngineTest {
     private static final SessionRef CLIENT_DROP_COPY = SessionRef.of("test", "client", "drop-copy");
     private static final SessionRef LP_TRADING = SessionRef.of("test", "lp", "trading");
 
+    private static final SimulatedConnection.Emitters CLIENTS = new SimulatedConnection.Emitters("clients-otlp", null);
+    private static final SimulatedConnection.Emitters LPS = new SimulatedConnection.Emitters("otlp", "otlp-metrics");
+
     private final Random random = new Random(42);
     private SimulatedEngine engine;
 
     @BeforeEach
     void setUp() {
         engine = new SimulatedEngine("test", "0.9.1", List.of(
-                new SimulatedConnection("clients-acceptor", List.of(config("client", "trading", SessionType.ACCEPTOR).build())),
-                new SimulatedConnection("clients-acceptor", List.of(config("client", "drop-copy", SessionType.ACCEPTOR).withinSessionTime(false).build())),
-                new SimulatedConnection("lp-trading", List.of(
+                new SimulatedConnection("clients-acceptor", CLIENTS, List.of(config("client", "trading", SessionType.ACCEPTOR).build())),
+                new SimulatedConnection("clients-acceptor", CLIENTS, List.of(config("client", "drop-copy", SessionType.ACCEPTOR).withinSessionTime(false).build())),
+                new SimulatedConnection("lp-trading", LPS, List.of(
                         config("lp", "trading", SessionType.INITIATOR).build(),
                         config("lp", "trading-drp", SessionType.INITIATOR).build()))));
         ticks(3);
@@ -55,6 +58,17 @@ class SimulatedEngineTest {
         assertThat(lpTrading.getInstanceId()).isEqualTo("lp-trading");
         assertThat(lpTrading.getConfigIds()).containsExactly("trading", "trading-drp");
         assertThat(lpTrading.getRunningConfigId()).isEqualTo("trading");
+    }
+
+    @Test
+    void reportsTheEmittersOfEachSession() {
+        SessionSummary clientTrading = engine.getSession(CLIENT_TRADING).getSummary();
+        SessionSummary lpTrading = engine.getSession(LP_TRADING).getSummary();
+
+        assertThat(clientTrading.getMessagesLoggerInstanceId()).isEqualTo("clients-otlp");
+        assertThat(clientTrading.getMonitoringInstanceId()).isNull();
+        assertThat(lpTrading.getMessagesLoggerInstanceId()).isEqualTo("otlp");
+        assertThat(lpTrading.getMonitoringInstanceId()).isEqualTo("otlp-metrics");
     }
 
     @Test

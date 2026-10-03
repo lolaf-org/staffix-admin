@@ -3,6 +3,7 @@ package org.lolaf.staffix.admin.server.sessions;
 import lombok.Builder;
 import lombok.Singular;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -37,4 +38,15 @@ public class SessionSummary {
     boolean connected;
     boolean withinSessionTime;
     SessionState desiredState;
+    /**
+     * The engine's messages logger instance the session's logs go through, the same for all its configs; it selects
+     * the connector they are read from.
+     */
+    String messagesLoggerInstanceId;
+    /**
+     * The engine's monitoring plugin instance the session's metrics go through, null when it is not monitored; it
+     * selects the connector they are read from.
+     */
+    @Nullable
+    String monitoringInstanceId;
 }

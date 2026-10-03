@@ -39,6 +39,9 @@ class ConnectorStatus {
         long outgoingSeqNum;
         @Singular
         List<Dictionary> dictionaries;
+        String messagesLoggerInstanceId;
+        @Nullable
+        String monitoringInstanceId;
     }
 
     @Value

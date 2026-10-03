@@ -1,6 +1,7 @@
 package org.lolaf.staffix.admin.server.simulator;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.lolaf.staffix.admin.server.sessions.CompIds;
 import org.lolaf.staffix.admin.server.sessions.FixIdentity;
 import org.lolaf.staffix.admin.server.sessions.SessionState;
@@ -33,6 +34,7 @@ class SimulationScenario {
         engine.initiator("jpm", "trading", "trading-drp");
         engine.initiator("jpm", "market-data").getFirst().sessionTimeCycleTicks(45);
         engine.initiator("citi", "trading", "trading-drp");
+        engine.emitters("clients-otlp", "clients-metrics");
         engine.acceptor("citi", "drop-copy", "dropcopy-acceptor");
         engine.acceptor("acme", "trading", "clients-acceptor");
         engine.acceptor("acme", "drop-copy", "clients-acceptor");
@@ -56,6 +58,7 @@ class SimulationScenario {
 
     private SimulatedEngine newYork() {
         EngineBuilder engine = new EngineBuilder("nyc-uat", "0.9.0", "STAFFIX-NYC", "America/New_York");
+        engine.emitters("slf4j", null);
         engine.acceptor("uat-client-1", "trading", "uat-acceptor");
         engine.acceptor("uat-client-2", "trading", "uat-acceptor").flaky(true);
         engine.acceptor("uat-client-3", "trading", "uat-acceptor").desiredState(SessionState.LOGGED_OUT);
@@ -69,6 +72,7 @@ class SimulationScenario {
         private final String compId;
         private final String timeZone;
         private final List<Connection> connections = new ArrayList<>();
+        private SimulatedConnection.Emitters emitters = new SimulatedConnection.Emitters("otlp", "otlp-metrics");
         private int nextPort = 9001;
 
         EngineBuilder(String engineId, String staffixVersion, String compId, String timeZone) {
@@ -78,9 +82,16 @@ class SimulationScenario {
             this.timeZone = timeZone;
         }
 
+        /**
+         * For the sessions declared next.
+         */
+        void emitters(String messagesLogger, @Nullable String monitoring) {
+            emitters = new SimulatedConnection.Emitters(messagesLogger, monitoring);
+        }
+
         SimulatedSession.SimulatedSessionBuilder acceptor(String group, String id, String instanceId) {
             SimulatedSession.SimulatedSessionBuilder config = config(group, id, SessionType.ACCEPTOR, null);
-            connections.add(new Connection(instanceId, List.of(config)));
+            connections.add(new Connection(instanceId, emitters, List.of(config)));
             return config;
         }
 
@@ -93,13 +104,13 @@ class SimulationScenario {
                 String host = "fix" + (configId.endsWith("-drp") ? "-dr" : "") + "." + group + ".example.com";
                 configs.add(config(group, configId, SessionType.INITIATOR, host + ":" + nextPort++));
             }
-            connections.add(new Connection(group + "-" + configIds[0], configs));
+            connections.add(new Connection(group + "-" + configIds[0], emitters, configs));
             return configs;
         }
 
         SimulatedEngine build() {
             return new SimulatedEngine(engineId, staffixVersion, connections.stream()
-                    .map(c -> new SimulatedConnection(c.instanceId(), c.configs().stream()
+                    .map(c -> new SimulatedConnection(c.instanceId(), c.emitters(), c.configs().stream()
                             .map(SimulatedSession.SimulatedSessionBuilder::build)
                             .toList()))
                     .toList());
@@ -140,6 +151,11 @@ class SimulationScenario {
             settings.put("logInOrOutResponseTimeout", "PT10S");
             settings.put("resendRequestResponseTimeout", "PT30S");
             settings.put("maxOutOfSequenceMessagesQueued", 10_000);
+            settings.put("fixMessageLoggerInstanceId", emitters.messagesLogger());
+            ObjectNode plugins = settings.putObject("fixSessionPluginsInstanceIds");
+            if (emitters.monitoring() != null) {
+                plugins.put("org.lolaf.staffix.api.monitoring.FixSessionsMonitoringManager", emitters.monitoring());
+            }
             ObjectNode schedule = settings.putObject("sessionScheduleSettings");
             schedule.put("timeZone", timeZone);
             ObjectNode window = schedule.putArray("sessionSchedules").addObject();
@@ -152,6 +168,7 @@ class SimulationScenario {
         }
     }
 
-    private record Connection(String instanceId, List<SimulatedSession.SimulatedSessionBuilder> configs) {
+    private record Connection(String instanceId, SimulatedConnection.Emitters emitters,
+                              List<SimulatedSession.SimulatedSessionBuilder> configs) {
     }
 }

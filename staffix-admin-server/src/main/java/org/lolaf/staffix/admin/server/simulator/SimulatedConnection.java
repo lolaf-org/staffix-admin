@@ -1,5 +1,6 @@
 package org.lolaf.staffix.admin.server.simulator;
 
+import org.jspecify.annotations.Nullable;
 import org.lolaf.staffix.admin.server.engines.GatewayException;
 import org.lolaf.staffix.admin.server.sessions.SessionConfig;
 import org.lolaf.staffix.admin.server.sessions.SessionHealth;
@@ -18,15 +19,17 @@ class SimulatedConnection {
     final String id;
     final SessionType type;
     final String instanceId;
+    private final Emitters emitters;
     private final List<SimulatedSession> configs;
     private SimulatedSession running;
 
-    SimulatedConnection(String instanceId, List<SimulatedSession> configs) {
+    SimulatedConnection(String instanceId, Emitters emitters, List<SimulatedSession> configs) {
         SimulatedSession main = configs.getFirst();
         this.group = main.group;
         this.id = main.id;
         this.type = main.type;
         this.instanceId = instanceId;
+        this.emitters = emitters;
         this.configs = List.copyOf(configs);
         this.running = main;
     }
@@ -66,6 +69,8 @@ class SimulatedConnection {
                 .connected(running.loggedIn)
                 .withinSessionTime(running.withinSessionTime)
                 .desiredState(running.desiredState)
+                .messagesLoggerInstanceId(emitters.messagesLogger())
+                .monitoringInstanceId(emitters.monitoring())
                 .build();
     }
 
@@ -76,5 +81,8 @@ class SimulatedConnection {
                         .connectAddresses(c.connectAddress == null ? List.of() : List.of(c.connectAddress))
                         .build())
                 .toList();
+    }
+
+    record Emitters(String messagesLogger, @Nullable String monitoring) {
     }
 }

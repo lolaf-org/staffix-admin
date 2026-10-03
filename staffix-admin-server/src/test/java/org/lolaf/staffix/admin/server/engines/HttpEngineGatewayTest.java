@@ -41,13 +41,15 @@ class HttpEngineGatewayTest {
               "configs":[{"name":"drop-copy","connectAddresses":[]}],"selectedConfig":"drop-copy",
               "identity":{"fixVersion":"FIXT.1.1","defaultApplVerId":"9","sender":{"compId":"US"},"target":{"compId":"BETA","locationId":"LDN"}},
               "loggedIn":false,"connected":false,"withinSessionTime":true,"desiredState":"LOGGED_OUT",
-              "incomingSeqNum":1,"outgoingSeqNum":1,"dictionaries":[{"id":"FIXT.1.1","hash":"aa"},{"id":"default-FIX.5.0-SP2","hash":"bb"}]},
+              "incomingSeqNum":1,"outgoingSeqNum":1,"dictionaries":[{"id":"FIXT.1.1","hash":"aa"},{"id":"default-FIX.5.0-SP2","hash":"bb"}],
+              "messagesLoggerInstanceId":"default","monitoringInstanceId":null},
              {"group":"alpha","name":"trading","type":"INITIATOR","instanceId":"alpha-initiator",
               "configs":[{"name":"trading","connectAddresses":["alpha.example.com:9001"]},{"name":"trading-drp","connectAddresses":["drp.example.com:9001"]}],
               "selectedConfig":"trading-drp",
               "identity":{"fixVersion":"FIX.4.4","sender":{"compId":"US","subId":"DR"},"target":{"compId":"ALPHA"}},
               "loggedIn":true,"connected":true,"withinSessionTime":true,"desiredState":"LOGGED_IN",
-              "incomingSeqNum":12,"outgoingSeqNum":34,"dictionaries":[{"id":"default-FIX.4.4","hash":"cc"}],"addedLater":true}]}
+              "incomingSeqNum":12,"outgoingSeqNum":34,"dictionaries":[{"id":"default-FIX.4.4","hash":"cc"}],
+              "messagesLoggerInstanceId":"otlp","monitoringInstanceId":"otlp-metrics","addedLater":true}]}
             """;
 
     private final List<String> requests = new CopyOnWriteArrayList<>();
@@ -127,6 +129,18 @@ class HttpEngineGatewayTest {
         assertThat(dropCopy.getHealth()).isEqualTo(SessionHealth.LOGGED_OUT_WITHIN_SESSION_TIME);
         assertThat(dropCopy.getDesiredState()).isEqualTo(SessionState.LOGGED_OUT);
         assertThat(dropCopy.getIdentity().getTarget().getLocationId()).isEqualTo("LDN");
+    }
+
+    @Test
+    void eachSessionCarriesItsEmitters() {
+        List<SessionGroup> groups = gateway.listGroups("alpha-engine");
+
+        SessionSummary trading = groups.get(0).getSessions().get(0);
+        assertThat(trading.getMessagesLoggerInstanceId()).isEqualTo("otlp");
+        assertThat(trading.getMonitoringInstanceId()).isEqualTo("otlp-metrics");
+        SessionSummary dropCopy = groups.get(1).getSessions().get(0);
+        assertThat(dropCopy.getMessagesLoggerInstanceId()).isEqualTo("default");
+        assertThat(dropCopy.getMonitoringInstanceId()).isNull();
     }
 
     @Test
