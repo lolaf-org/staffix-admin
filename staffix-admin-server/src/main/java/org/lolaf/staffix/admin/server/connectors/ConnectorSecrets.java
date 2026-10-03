@@ -2,7 +2,7 @@ package org.lolaf.staffix.admin.server.connectors;
 
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.lolaf.staffix.admin.secrets.Secret;
+import org.lolaf.staffix.admin.connector.Secret;
 import org.lolaf.staffix.admin.server.secrets.SecretCipher;
 import org.lolaf.staffix.admin.store.Connector;
 

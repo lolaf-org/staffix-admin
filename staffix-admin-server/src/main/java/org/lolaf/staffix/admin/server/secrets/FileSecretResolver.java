@@ -1,6 +1,6 @@
 package org.lolaf.staffix.admin.server.secrets;
 
-import org.lolaf.staffix.admin.secrets.SecretResolver;
+import org.lolaf.staffix.admin.connector.SecretResolver;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

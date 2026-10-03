@@ -4,13 +4,15 @@ import lombok.Builder;
 import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.lolaf.staffix.admin.secrets.Secret;
+import org.lolaf.staffix.admin.connector.Description;
+import org.lolaf.staffix.admin.connector.Secret;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
+import java.lang.reflect.ParameterizedType;
 import java.net.URI;
 import java.time.Duration;
 import java.util.Arrays;
@@ -57,6 +59,11 @@ public class ConnectorKind {
     @Builder
     public static class Setting {
         String name;
+        /**
+         * The setting's {@link Description}, null without one.
+         */
+        @Nullable
+        String description;
         SettingType type;
         /**
          * Neither nullable nor defaulted.
@@ -72,7 +79,8 @@ public class ConnectorKind {
         @Nullable
         String defaultValue;
         /**
-         * The accepted values of an {@link SettingType#ENUM}, as written in the settings.
+         * The accepted values of an {@link SettingType#ENUM}, or of each element of a {@link SettingType#LIST} of
+         * enums, as written in the settings; empty when any value goes.
          */
         @Singular
         List<String> values;
@@ -82,15 +90,26 @@ public class ConnectorKind {
             boolean nullable = field.getAnnotatedType().isAnnotationPresent(Nullable.class);
             SettingBuilder setting = Setting.builder()
                     .name(field.getName())
+                    .description(field.isAnnotationPresent(Description.class) ? field.getAnnotation(Description.class).value() : null)
                     .type(SettingType.of(field.getType()))
                     .required(!nullable && defaultValue == null)
                     .secret(field.isAnnotationPresent(Secret.class))
                     .defaultValue(defaultValue == null || defaultValue.value().length == 0 ? null : String.join(",", defaultValue.value()));
-            if (field.getType().isEnum()) {
-                Arrays.stream(field.getType().getEnumConstants())
+            Class<?> valueType = field.getType().isEnum() ? field.getType() : elementType(field);
+            if (valueType != null && valueType.isEnum()) {
+                Arrays.stream(valueType.getEnumConstants())
                         .forEach(constant -> setting.value(((Enum<?>) constant).name().toLowerCase(Locale.ROOT)));
             }
             return setting.build();
+        }
+
+        private static @Nullable Class<?> elementType(Field field) {
+            if (Collection.class.isAssignableFrom(field.getType())
+                    && field.getGenericType() instanceof ParameterizedType collection
+                    && collection.getActualTypeArguments()[0] instanceof Class<?> element) {
+                return element;
+            }
+            return null;
         }
     }
 

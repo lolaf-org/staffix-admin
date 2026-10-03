@@ -1,6 +1,7 @@
 package org.lolaf.staffix.admin.metrics.prometheus;
 
 import lombok.Value;
+import org.lolaf.staffix.admin.connector.Description;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 import java.net.URI;
@@ -9,19 +10,14 @@ import java.util.concurrent.TimeUnit;
 
 @Value
 public class PrometheusSettings {
-    /**
-     * The Prometheus server, e.g. {@code http://localhost:9090}; required.
-     */
+    @Description("The Prometheus server, e.g. http://localhost:9090.")
     URI url;
+    @Description("How long a query may take, connecting included, before the console reports Prometheus did not answer.")
     Duration timeout;
-    /**
-     * The engines' micrometer {@code baseTimeUnit}. The exported timers carry no unit Prometheus keeps, so it must
-     * match the engines' registry; micrometer's OTLP registry defaults to milliseconds.
-     */
+    @Description("The engines' micrometer baseTimeUnit. The exported timers carry no unit Prometheus keeps, so it must "
+            + "match the engines' registry; micrometer's OTLP registry defaults to milliseconds.")
     TimeUnit timerBaseUnit;
-    /**
-     * The shortest window a rate is computed over: a few scrape intervals, so every window holds enough samples.
-     */
+    @Description("The shortest window a rate is computed over: a few scrape intervals, so every window holds enough samples.")
     Duration minRateWindow;
 
     public PrometheusSettings(URI url,

@@ -1,6 +1,6 @@
 package org.lolaf.staffix.admin.server.secrets;
 
-import org.lolaf.staffix.admin.secrets.SecretResolver;
+import org.lolaf.staffix.admin.connector.SecretResolver;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 

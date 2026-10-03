@@ -1,4 +1,4 @@
-package org.lolaf.staffix.admin.secrets;
+package org.lolaf.staffix.admin.connector;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

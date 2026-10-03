@@ -103,6 +103,19 @@ class ConnectorsControllerTest {
     }
 
     @Test
+    void refusesALabelTheConsoleDoesNotQueryOn() throws Exception {
+        String config = """
+                {"version":%d,"connectors":[{"id":"alpha-loki","name":"Alpha Loki","kind":"loki",
+                 "settings":{"url":"http://127.0.0.1:1","indexedLabels":["fix_eid","service_name"]}}],"defaults":{},"engines":{}}
+                """.formatted(version());
+
+        mockMvc.perform(put("/api/connectors").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(config))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.problems[0]").value("connector alpha-loki: setting indexed-labels[1]: service_name is not one of "
+                        + "fix_eid, fix_sg, fix_sn, fix_log_type, fix_msg_type"));
+    }
+
+    @Test
     @WithMockUser(roles = "READER")
     void letsAReaderViewButNotSave() throws Exception {
         mockMvc.perform(get("/api/connectors")).andExpect(status().isOk());
@@ -117,8 +130,11 @@ class ConnectorsControllerTest {
                 .andExpect(jsonPath("$[0].kind").value("loki"))
                 .andExpect(jsonPath("$[0].role").value("LOGS"))
                 .andExpect(jsonPath("$[0].settings[?(@.name == 'tenant')].secret").value(hasItem(true)))
+                .andExpect(jsonPath("$[0].settings[?(@.name == 'tenant')].description")
+                        .value(hasItem("Sent as X-Scope-OrgID to a multi-tenant Loki; leave empty for a single-tenant one.")))
                 .andExpect(jsonPath("$[0].settings[?(@.name == 'url')].required").value(hasItem(true)))
                 .andExpect(jsonPath("$[0].settings[?(@.name == 'timeout')].defaultValue").value(hasItem("10s")))
+                .andExpect(jsonPath("$[0].settings[?(@.name == 'indexedLabels')].values[*]").value(hasItem("fix_eid")))
                 .andExpect(jsonPath("$[1].settings[?(@.name == 'timerBaseUnit')].values[*]").value(hasItem("microseconds")));
     }
 

@@ -2,7 +2,7 @@ package org.lolaf.staffix.admin.server.connectors;
 
 import org.lolaf.staffix.admin.logs.LogsSourceFactory;
 import org.lolaf.staffix.admin.metrics.MetricsSourceFactory;
-import org.lolaf.staffix.admin.secrets.SecretResolver;
+import org.lolaf.staffix.admin.connector.SecretResolver;
 import org.lolaf.staffix.admin.server.AdminProperties;
 import org.lolaf.staffix.admin.server.secrets.SecretCipher;
 import org.lolaf.staffix.admin.store.ConnectorStore;

@@ -1,4 +1,4 @@
-package org.lolaf.staffix.admin.secrets;
+package org.lolaf.staffix.admin.connector;
 
 /**
  * Resolves the {@code ${scheme:reference}} values of connector settings, e.g. {@code ${env:LOKI_TENANT}}.

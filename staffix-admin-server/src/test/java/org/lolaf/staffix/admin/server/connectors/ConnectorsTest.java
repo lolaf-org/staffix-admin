@@ -6,7 +6,7 @@ import org.lolaf.staffix.admin.logs.LogsSource;
 import org.lolaf.staffix.admin.logs.LogsSourceFactory;
 import org.lolaf.staffix.admin.metrics.MetricsSource;
 import org.lolaf.staffix.admin.metrics.MetricsSourceFactory;
-import org.lolaf.staffix.admin.secrets.Secret;
+import org.lolaf.staffix.admin.connector.Secret;
 import org.lolaf.staffix.admin.server.secrets.EnvSecretResolver;
 import org.lolaf.staffix.admin.server.secrets.SecretCipher;
 import org.lolaf.staffix.admin.store.Connector;

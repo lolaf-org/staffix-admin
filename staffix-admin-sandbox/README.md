@@ -1,8 +1,7 @@
 # staffix-admin sandbox
 
 Three staffix engines trading with each other, announced to a locally running console, with their metrics in
-Prometheus and their FIX logs in Loki. It builds against the staffix snapshot (`0.9.1-SNAPSHOT`), so install staffix
-locally first (`./mvnw install` in the staffix repository).
+Prometheus and their FIX logs in Loki. Like the console, it builds against the staffix snapshot (see the main README).
 
 ## Run
 

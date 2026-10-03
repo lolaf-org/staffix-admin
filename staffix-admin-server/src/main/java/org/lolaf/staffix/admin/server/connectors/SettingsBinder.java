@@ -1,8 +1,9 @@
 package org.lolaf.staffix.admin.server.connectors;
 
-import org.lolaf.staffix.admin.secrets.SecretResolver;
+import org.lolaf.staffix.admin.connector.SecretResolver;
 import org.lolaf.staffix.admin.server.secrets.SecretCipher;
 import org.springframework.boot.context.properties.bind.BindException;
+import org.springframework.core.convert.ConversionFailedException;
 import org.springframework.boot.context.properties.bind.BindHandler;
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
@@ -10,8 +11,10 @@ import org.springframework.boot.context.properties.bind.UnboundConfigurationProp
 import org.springframework.boot.context.properties.bind.handler.NoUnboundElementsBindHandler;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeSet;
 import java.util.function.Function;
@@ -96,7 +99,15 @@ class SettingsBinder {
                     .collect(Collectors.joining(", ", "unknown setting ", ""));
         }
         String setting = e.getProperty() != null ? e.getProperty().getName().toString().substring(ROOT.length() + 1) : null;
-        String reason = cause != null && cause.getMessage() != null ? cause.getMessage() : e.getMessage();
+        String reason = cause instanceof ConversionFailedException failed && failed.getTargetType().getType().isEnum()
+                ? notOneOf(failed)
+                : cause != null && cause.getMessage() != null ? cause.getMessage() : e.getMessage();
         return setting != null ? "setting " + setting + ": " + reason : reason;
+    }
+
+    private static String notOneOf(ConversionFailedException failed) {
+        return Arrays.stream(failed.getTargetType().getType().getEnumConstants())
+                .map(constant -> ((Enum<?>) constant).name().toLowerCase(Locale.ROOT))
+                .collect(Collectors.joining(", ", failed.getValue() + " is not one of ", ""));
     }
 }

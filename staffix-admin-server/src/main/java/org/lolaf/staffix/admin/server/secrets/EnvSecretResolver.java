@@ -1,7 +1,7 @@
 package org.lolaf.staffix.admin.server.secrets;
 
 import lombok.RequiredArgsConstructor;
-import org.lolaf.staffix.admin.secrets.SecretResolver;
+import org.lolaf.staffix.admin.connector.SecretResolver;
 
 import java.util.function.UnaryOperator;
 

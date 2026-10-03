@@ -190,3 +190,44 @@ export function useMessageTypes(scope: MetricScope) {
     staleTime: 5 * 60_000,
   })
 }
+
+export type ConnectorsConfig = Schemas['ConnectorsConfig']
+export type Connector = Schemas['Connector']
+export type ConnectorKind = Schemas['ConnectorKind']
+
+export function useConnectors() {
+  return useQuery({
+    queryKey: ['connectors'],
+    queryFn: () => call(api.GET('/api/connectors')),
+  })
+}
+
+export function useConnectorKinds() {
+  return useQuery({
+    queryKey: ['connectors', 'kinds'],
+    queryFn: () => call(api.GET('/api/connectors/kinds')),
+    staleTime: Infinity,
+  })
+}
+
+export function useConnectorEngines() {
+  return useQuery({
+    queryKey: ['connectors', 'engines'],
+    queryFn: () => call(api.GET('/api/connectors/engines')),
+    refetchInterval: 10_000,
+  })
+}
+
+export function useSaveConnectors() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (config: ConnectorsConfig) => call(api.PUT('/api/connectors', { body: config })),
+    onSuccess: (saved) => queryClient.setQueryData(['connectors'], saved),
+  })
+}
+
+export function useTestConnector() {
+  return useMutation({
+    mutationFn: (connector: Connector) => call(api.POST('/api/connectors/test', { body: connector })),
+  })
+}

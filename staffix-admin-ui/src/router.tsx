@@ -6,6 +6,7 @@ const LoginPage = lazy(() => import('./auth/LoginPage').then((m) => ({ default: 
 const OverviewPage = lazy(() => import('./pages/OverviewPage').then((m) => ({ default: m.OverviewPage })))
 const MetricsPage = lazy(() => import('./pages/MetricsPage').then((m) => ({ default: m.MetricsPage })))
 const LogsPage = lazy(() => import('./pages/LogsPage').then((m) => ({ default: m.LogsPage })))
+const ConnectorsPage = lazy(() => import('./connectors/ConnectorsPage').then((m) => ({ default: m.ConnectorsPage })))
 const SessionDrawer = lazy(() => import('./sessions/SessionDrawer').then((m) => ({ default: m.SessionDrawer })))
 
 export const router = createBrowserRouter([
@@ -21,6 +22,7 @@ export const router = createBrowserRouter([
       },
       { path: 'metrics', element: <MetricsPage /> },
       { path: 'logs', element: <LogsPage /> },
+      { path: 'connectors', element: <ConnectorsPage /> },
     ],
   },
 ])

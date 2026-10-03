@@ -100,7 +100,7 @@ class LokiLogsSourceTest {
 
     @Test
     void matchesIndexedLabelsInTheStreamSelector() {
-        source(Set.of("fix_eid", "fix_log_type"), null).query(query().type(LogType.IN).msgType("8").build());
+        source(Set.of(LokiLabel.FIX_EID, LokiLabel.FIX_LOG_TYPE), null).query(query().type(LogType.IN).msgType("8").build());
 
         assertThat(params.get("query")).isEqualTo("{service_name=~\".+\", fix_eid=\"alpha\", fix_log_type=~\"in\"}"
                 + " | fix_sg=\"beta\" | fix_sn=\"trading\" | fix_msg_type=~\"8\"");
@@ -164,12 +164,12 @@ class LokiLogsSourceTest {
         return source(Set.of(), tenant);
     }
 
-    private LokiLogsSource source(Set<String> indexedLabels, String tenant) {
+    private LokiLogsSource source(Set<LokiLabel> indexedLabels, String tenant) {
         URI url = URI.create("http://127.0.0.1:" + loki.getAddress().getPort() + "/");
         return new LokiLogsSource(properties(url, indexedLabels, tenant), RestClient.builder());
     }
 
-    private static LokiSettings properties(URI url, Set<String> indexedLabels, String tenant) {
+    private static LokiSettings properties(URI url, Set<LokiLabel> indexedLabels, String tenant) {
         return new LokiSettings(url, Duration.ofSeconds(2), "{service_name=~\".+\"}", indexedLabels, tenant);
     }
 

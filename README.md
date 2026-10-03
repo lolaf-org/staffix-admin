@@ -14,6 +14,8 @@ serves a React UI and proxies the engines' HTTP admin connectors. The browser ne
 | `staffix-admin-metrics-prometheus` | Metrics from Prometheus |
 | `staffix-admin-logs-loki` | FIX message logs from Loki |
 | `staffix-admin-logs-spi` | SPI for logs backends (Loki, ...) |
+| `staffix-admin-connector-spi` | What a backend plugin declares about its settings: descriptions, secrets, secret references |
+| `staffix-admin-store-spi` | SPI for where the connectors are stored (a YAML file by default) |
 
 ## API contract
 
@@ -25,6 +27,10 @@ The spec is never written by hand nor committed: the Maven build starts the serv
 `staffix-admin-server/target/openapi/admin-api.json`; a running server serves it at `/v3/api-docs`.
 
 ## Build and run
+
+The console builds against the staffix snapshot (`0.9.1-SNAPSHOT`, branch `http-admin-api`), whose HTTP admin API
+connector engines announce themselves with: install staffix locally first (`./mvnw install` in the staffix
+repository).
 
 ```shell
 ./mvnw install

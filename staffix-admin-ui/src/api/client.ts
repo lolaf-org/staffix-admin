@@ -5,10 +5,15 @@ export type Schemas = components['schemas']
 
 export class ApiError extends Error {
   readonly status: number
+  /**
+   * Every problem of a refused change, when the backend lists them.
+   */
+  readonly problems: string[]
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, problems: string[] = []) {
     super(message)
     this.status = status
+    this.problems = problems
   }
 }
 
@@ -51,9 +56,14 @@ type FetchResult<T> = Promise<{ data?: T; error?: unknown; response: Response }>
 export async function call<T>(request: FetchResult<T>): Promise<T> {
   const { data, error, response } = await request
   if (!response.ok) {
-    throw new ApiError(response.status, problemMessage(error, response))
+    throw new ApiError(response.status, problemMessage(error, response), problemList(error))
   }
   return data as T
+}
+
+function problemList(error: unknown): string[] {
+  const problems = error && typeof error === 'object' ? (error as { problems?: unknown }).problems : undefined
+  return Array.isArray(problems) ? problems.map(String) : []
 }
 
 function problemMessage(error: unknown, response: Response): string {

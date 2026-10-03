@@ -41,7 +41,7 @@ public class LokiLogsSource implements LogsSource {
     private final URI queryRangeUrl;
     private final URI labelsUrl;
     private final String streamSelectorMatchers;
-    private final Set<String> indexedLabels;
+    private final Set<LokiLabel> indexedLabels;
 
     public LokiLogsSource(LokiSettings properties, RestClient.Builder builder) {
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
@@ -113,24 +113,24 @@ public class LokiLogsSource implements LogsSource {
         if (query.getText() != null) {
             pipeline.append(" |= ").append(quote(query.getText()));
         }
-        match(selector, pipeline, "fix_eid", "=", query.getEngineId());
+        match(selector, pipeline, LokiLabel.FIX_EID, "=", query.getEngineId());
         if (query.getGroup() != null) {
-            match(selector, pipeline, "fix_sg", "=", query.getGroup());
+            match(selector, pipeline, LokiLabel.FIX_SG, "=", query.getGroup());
         }
         if (query.getSessionId() != null) {
-            match(selector, pipeline, "fix_sn", "=", query.getSessionId());
+            match(selector, pipeline, LokiLabel.FIX_SN, "=", query.getSessionId());
         }
         if (!query.getTypes().isEmpty()) {
-            match(selector, pipeline, "fix_log_type", "=~", anyOf(query.getTypes().stream().map(LOG_TYPES::get).toList()));
+            match(selector, pipeline, LokiLabel.FIX_LOG_TYPE, "=~", anyOf(query.getTypes().stream().map(LOG_TYPES::get).toList()));
         }
         if (!query.getMsgTypes().isEmpty()) {
-            match(selector, pipeline, "fix_msg_type", "=~", anyOf(query.getMsgTypes()));
+            match(selector, pipeline, LokiLabel.FIX_MSG_TYPE, "=~", anyOf(query.getMsgTypes()));
         }
         return "{" + String.join(", ", selector) + "}" + pipeline;
     }
 
-    private void match(List<String> selector, StringBuilder pipeline, String label, String operator, String value) {
-        String matcher = label + operator + quote(value);
+    private void match(List<String> selector, StringBuilder pipeline, LokiLabel label, String operator, String value) {
+        String matcher = label.label() + operator + quote(value);
         if (indexedLabels.contains(label)) {
             selector.add(matcher);
         } else {
