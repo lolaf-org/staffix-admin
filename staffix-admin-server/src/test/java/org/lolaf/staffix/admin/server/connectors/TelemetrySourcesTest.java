@@ -14,7 +14,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -27,7 +26,7 @@ class TelemetrySourcesTest {
 
     private static final Emitters INITIATORS = new Emitters("otlp", "otlp-metrics");
     private static final Emitters CLIENTS = new Emitters("clients-otlp", null);
-    private static final LogsSource EMITTERS_LOGS = query -> List.of();
+    private static final LogsSource INITIATORS_LOGS = query -> List.of();
     private static final LogsSource ALL_LOGS = query -> List.of();
 
     private final EngineGateway gateway = mock(EngineGateway.class);
@@ -38,6 +37,8 @@ class TelemetrySourcesTest {
     private static SessionSummary session(String id, Emitters emitters) {
         return SessionSummary.builder()
                 .id(id)
+                .configId(id)
+                .configId(id + "-drp")
                 .messagesLoggerInstanceId(emitters.messagesLogger())
                 .monitoringInstanceId(emitters.monitoring())
                 .build();
@@ -51,19 +52,24 @@ class TelemetrySourcesTest {
                         .session(session("drop-copy", CLIENTS))
                         .build(),
                 SessionGroup.builder().group("gamma").session(session("trading", INITIATORS)).build()));
-        when(telemetry.logs(any(), any())).thenReturn(List.of(EMITTERS_LOGS));
+        when(telemetry.logs("alpha", List.of(INITIATORS))).thenReturn(List.of(INITIATORS_LOGS));
+        when(telemetry.logs("alpha", List.of(CLIENTS))).thenReturn(List.of());
         when(telemetry.allLogs(any())).thenReturn(List.of(ALL_LOGS));
     }
 
     @Test
-    void resolvesTheEmittersOfTheScopesSessions() {
-        sources.logs("alpha", null, null);
-        sources.logs("alpha", "gamma", null);
-        sources.logs("alpha", "beta", "drop-copy");
+    void readsTheSourcesOfTheScopesEmittersAndNamesTheSessionsNoneCollects() {
+        assertThat(sources.logs("alpha", null, null))
+                .isEqualTo(new TelemetrySources.Resolved<>(List.of(INITIATORS_LOGS), List.of("beta.drop-copy")));
+        assertThat(sources.logs("alpha", "gamma", null))
+                .isEqualTo(new TelemetrySources.Resolved<>(List.of(INITIATORS_LOGS), List.of()));
+        assertThat(sources.logs("alpha", "beta", "drop-copy"))
+                .isEqualTo(new TelemetrySources.Resolved<>(List.of(), List.of("beta.drop-copy")));
+    }
 
-        verify(telemetry).logs("alpha", Set.of(INITIATORS, CLIENTS));
-        verify(telemetry).logs("alpha", Set.of(INITIATORS));
-        verify(telemetry).logs("alpha", Set.of(CLIENTS));
+    @Test
+    void readsABackupConfigAsItsSession() {
+        assertThat(sources.logs("alpha", "beta", "trading-drp").sources()).containsExactly(INITIATORS_LOGS);
     }
 
     @Test
@@ -83,20 +89,19 @@ class TelemetrySourcesTest {
         clock.step(Duration.ofMinutes(5));
         when(gateway.listGroups("alpha")).thenThrow(GatewayException.unknownEngine("alpha"));
 
-        assertThat(sources.logs("alpha", "beta", "drop-copy")).containsExactly(EMITTERS_LOGS);
-        verify(telemetry).logs("alpha", Set.of(CLIENTS));
+        assertThat(sources.logs("alpha", "beta", "drop-copy").notCollected()).containsExactly("beta.drop-copy");
     }
 
     @Test
     void readsEveryConnectorOfAnEngineNeverSeen() {
         when(gateway.listGroups("delta")).thenThrow(GatewayException.unknownEngine("delta"));
 
-        assertThat(sources.logs("delta", null, null)).containsExactly(ALL_LOGS);
+        assertThat(sources.logs("delta", null, null)).isEqualTo(new TelemetrySources.Resolved<>(List.of(ALL_LOGS), List.of()));
     }
 
     @Test
     void readsEveryConnectorOfTheEngineForASessionItNoLongerHas() {
-        assertThat(sources.logs("alpha", "beta", "removed")).containsExactly(ALL_LOGS);
+        assertThat(sources.logs("alpha", "beta", "removed").sources()).containsExactly(ALL_LOGS);
     }
 
     private static final class SteppingClock extends Clock {

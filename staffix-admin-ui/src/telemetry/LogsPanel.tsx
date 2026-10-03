@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Alert, Checkbox, Flex, Input, Segmented, Select, Table, Tag, Tooltip, Typography } from 'antd'
 import { ArrowDownOutlined, ArrowUpOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import { isNotCollected, type Schemas } from '../api/client'
+import { NotCollectedNotice } from './NotCollectedNotice'
 import { useLogs, useMessageTypes, type DecodeTarget, type LogType } from '../api/queries'
 import { DecodedMessageModal } from './DecodedMessageModal'
 import { formatDateTime, formatLogTime } from './format'
@@ -70,13 +71,14 @@ export function LogsPanel({ engineId, group, sessionId }: Props) {
         />
       </Flex>
       {logs.isError && <Alert type={isNotCollected(logs.error) ? 'info' : 'error'} title={logs.error.message} />}
+      {logs.isSuccess && <NotCollectedNotice what="logs" sessions={logs.data.notCollected} />}
       <Typography.Text type="secondary" style={{ fontSize: 12 }}>
         Click a message to decode it with its session's dictionary.
       </Typography.Text>
       <Table<Schemas['LogEntry']>
         size="small"
         loading={logs.isFetching}
-        dataSource={logs.data}
+        dataSource={logs.data?.entries}
         rowKey={(entry) => `${entry.timestamp}-${entry.group}-${entry.sessionId}-${entry.line}`}
         pagination={{ pageSize: 50, showSizeChanger: false, size: 'small' }}
         onRow={(entry) =>

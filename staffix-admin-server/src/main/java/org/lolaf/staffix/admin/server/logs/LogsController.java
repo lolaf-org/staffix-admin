@@ -32,7 +32,7 @@ public class LogsController {
      * Matching entries, newest first.
      */
     @GetMapping("/api/logs")
-    public List<LogEntry> queryLogs(@RequestParam String engineId,
+    public LogsResult queryLogs(@RequestParam String engineId,
                                     @RequestParam(required = false) @Nullable String group,
                                     @RequestParam(required = false) @Nullable String sessionId,
                                     @RequestParam Instant from,
@@ -42,7 +42,7 @@ public class LogsController {
                                     @RequestParam(defaultValue = "") List<String> msgTypes,
                                     @RequestParam(defaultValue = "500") @Min(1) @Max(5000) int limit) {
         TelemetryProblems.requireGroupForSession(group, sessionId);
-        List<LogsSource> sources = sources(engineId, group, sessionId);
+        TelemetrySources.Resolved<LogsSource> resolved = resolve(engineId, group, sessionId);
         TimeRange range = TimeRange.of(from, to);
         LogQuery query = LogQuery.builder()
                 .engineId(engineId)
@@ -56,26 +56,29 @@ public class LogsController {
                 .limit(limit)
                 .build();
         try {
-            return sources.stream()
-                    .flatMap(source -> source.query(query).stream())
-                    .sorted(Comparator.comparing(LogEntry::getTimestamp).reversed())
-                    .limit(limit)
-                    .toList();
+            return LogsResult.builder()
+                    .entries(resolved.sources().stream()
+                            .flatMap(source -> source.query(query).stream())
+                            .sorted(Comparator.comparing(LogEntry::getTimestamp).reversed())
+                            .limit(limit)
+                            .toList())
+                    .notCollected(resolved.notCollected())
+                    .build();
         } catch (LogsSourceException e) {
             throw TelemetryProblems.backendFailed("logs", e);
         }
     }
 
-    private List<LogsSource> sources(String engineId, @Nullable String group, @Nullable String sessionId) {
-        List<LogsSource> sources;
+    private TelemetrySources.Resolved<LogsSource> resolve(String engineId, @Nullable String group, @Nullable String sessionId) {
+        TelemetrySources.Resolved<LogsSource> resolved;
         try {
-            sources = telemetrySources.logs(engineId, group, sessionId);
+            resolved = telemetrySources.logs(engineId, group, sessionId);
         } catch (IllegalArgumentException e) {
             throw TelemetryProblems.connectorInvalid("logs", e);
         }
-        if (sources.isEmpty()) {
+        if (resolved.sources().isEmpty()) {
             throw TelemetryProblems.notCollected("logs", engineId, group, sessionId);
         }
-        return sources;
+        return resolved;
     }
 }

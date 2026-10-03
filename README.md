@@ -60,8 +60,9 @@ backends reads each and merges them; a latency quantile of a message type then s
 The console creates no connector itself.
 
 Connectors live in `connectors.yaml` under `staffix.admin.data-dir` (default `data`, relative to the working
-directory), readable by the console's user only. Until the console's connectors tab exists, edit that file; changes
-apply without a restart.
+directory), readable by the console's user only. Writers manage them in the Connectors tab: connectors with a form
+per kind and a connection test, the defaults, and each engine's emitters with the sessions using them. The file can
+also be edited by hand; changes apply without a restart.
 
 A setting may be a reference resolved when the connector is built: `${env:NAME}` reads an environment variable,
 `${file:/run/secrets/name}` a mounted secret file (without its trailing newline). Credentials, such as Loki's

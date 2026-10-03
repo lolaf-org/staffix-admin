@@ -43,8 +43,8 @@ class TelemetryResolutionTest {
 
     @Test
     void saysAScopeWithoutConnectorIsNotCollected() {
-        when(sources.metrics("alpha", null, null)).thenReturn(List.of());
-        when(sources.logs("alpha", "beta", "trading")).thenReturn(List.of());
+        when(sources.metrics("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(), List.of()));
+        when(sources.logs("alpha", "beta", "trading")).thenReturn(new TelemetrySources.Resolved<>(List.of(), List.of()));
 
         assertThatThrownBy(() -> metricsController.queryMetrics("alpha", null, null, MetricKind.MESSAGE_RATE, 0.99, FROM, TO))
                 .isInstanceOfSatisfying(ErrorResponseException.class, e -> {
@@ -57,6 +57,15 @@ class TelemetryResolutionTest {
                     assertThat(e.getStatusCode().value()).isEqualTo(404);
                     assertThat(e.getBody().getDetail()).startsWith("The logs of session beta.trading of engine alpha are not collected");
                 });
+    }
+
+    @Test
+    void namesTheSessionsOfTheScopeNoConnectorCollects() {
+        LogsSource initiators = query -> List.of(entry(10));
+        when(sources.logs("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(initiators), List.of("beta.drop-copy")));
+
+        assertThat(logsController.queryLogs("alpha", null, null, FROM, TO, null, List.of(), List.of(), 10).getNotCollected())
+                .containsExactly("beta.drop-copy");
     }
 
     @Test
@@ -74,9 +83,9 @@ class TelemetryResolutionTest {
     void mergesTheLogsOfEverySourceNewestFirstUpToTheLimit() {
         LogsSource initiators = query -> List.of(entry(10), entry(30), entry(50));
         LogsSource clients = query -> List.of(entry(20), entry(40));
-        when(sources.logs("alpha", null, null)).thenReturn(List.of(initiators, clients));
+        when(sources.logs("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(initiators, clients), List.of()));
 
-        assertThat(logsController.queryLogs("alpha", null, null, FROM, TO, null, List.of(), List.of(), 4))
+        assertThat(logsController.queryLogs("alpha", null, null, FROM, TO, null, List.of(), List.of(), 4).getEntries())
                 .extracting(LogEntry::getLine).containsExactly("line 10", "line 20", "line 30", "line 40");
     }
 
@@ -84,9 +93,9 @@ class TelemetryResolutionTest {
     void addsUpTheRatesOfTheSameMessageTypeAcrossSources() {
         MetricsSource initiators = query -> List.of(series("D", 1, 2), series("8", 5));
         MetricsSource clients = query -> List.of(series("D", 10, 20));
-        when(sources.metrics("alpha", null, null)).thenReturn(List.of(initiators, clients));
+        when(sources.metrics("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(initiators, clients), List.of()));
 
-        List<MetricSeries> merged = metricsController.queryMetrics("alpha", null, null, MetricKind.MESSAGE_RATE, 0.99, FROM, TO);
+        List<MetricSeries> merged = metricsController.queryMetrics("alpha", null, null, MetricKind.MESSAGE_RATE, 0.99, FROM, TO).getSeries();
 
         assertThat(merged).containsExactly(series("D", 11, 22), series("8", 5));
     }
@@ -95,9 +104,9 @@ class TelemetryResolutionTest {
     void keepsTheHighestQuantileOfTheSameMessageTypeAcrossSources() {
         MetricsSource initiators = query -> List.of(series("D", 0.002, 0.009));
         MetricsSource clients = query -> List.of(series("D", 0.005, 0.001));
-        when(sources.metrics("alpha", null, null)).thenReturn(List.of(initiators, clients));
+        when(sources.metrics("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(initiators, clients), List.of()));
 
-        assertThat(metricsController.queryMetrics("alpha", null, null, MetricKind.READ_LATENCY, 0.99, FROM, TO))
+        assertThat(metricsController.queryMetrics("alpha", null, null, MetricKind.READ_LATENCY, 0.99, FROM, TO).getSeries())
                 .containsExactly(series("D", 0.005, 0.009));
     }
 }

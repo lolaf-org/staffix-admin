@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { AreaChartOutlined, TableOutlined } from '@ant-design/icons'
 import { useMetrics, type MetricKind, type MetricScope } from '../api/queries'
 import { isNotCollected, type Schemas } from '../api/client'
+import { NotCollectedNotice } from './NotCollectedNotice'
 import { formatRateValue, formatSeconds } from './format'
 import { MetricChart, SeriesLegend, niceTicks, type ChartSeries } from './MetricChart'
 import { MetricTable } from './MetricTable'
@@ -100,9 +101,10 @@ export function MetricsPanel({ scope, chartHeight }: Props) {
       {metrics.isError && (isNotCollected(metrics.error)
         ? <Empty description={metrics.error.message} />
         : <Alert type="error" title={metrics.error.message} />)}
-      {metrics.isSuccess && metrics.data.length === 0 && <Empty description="No data for this period" />}
-      {metrics.isSuccess && metrics.data.length > 0 && (() => {
-        const facets = toFacets(metrics.data, title, colors)
+      {metrics.isSuccess && <NotCollectedNotice what="metrics" sessions={metrics.data.notCollected} />}
+      {metrics.isSuccess && metrics.data.series.length === 0 && <Empty description="No data for this period" />}
+      {metrics.isSuccess && metrics.data.series.length > 0 && (() => {
+        const facets = toFacets(metrics.data.series, title, colors)
         if (view === 'table') return <MetricTable facets={facets} format={format} />
         const perDirection = facets.length > 1
         const yTicks = perDirection ? niceTicks(Math.max(...facets.flatMap((f) => f.series.flatMap((s) => s.points.map((p) => p.value))))) : undefined

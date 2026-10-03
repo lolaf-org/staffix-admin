@@ -12,12 +12,16 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * The sources holding the telemetry of an engine, one of its groups, or one session, found through the emitters its
@@ -39,31 +43,43 @@ public class TelemetrySources {
     private final Map<String, Known> lastAnswers = new ConcurrentHashMap<>();
 
     /**
+     * @param sessionId a config id: an initiator's backup reads as its session
      * @throws IllegalArgumentException if a connector's stored settings cannot make a source
      */
-    public List<MetricsSource> metrics(String engineId, @Nullable String group, @Nullable String sessionId) {
-        return emitters(engineId, group, sessionId)
-                .map(emitters -> telemetry.metrics(engineId, emitters))
-                .orElseGet(() -> telemetry.allMetrics(engineId));
+    public Resolved<MetricsSource> metrics(String engineId, @Nullable String group, @Nullable String sessionId) {
+        return resolve(engineId, group, sessionId, emitters -> telemetry.metrics(engineId, emitters), () -> telemetry.allMetrics(engineId));
     }
 
     /**
+     * @param sessionId a config id: an initiator's backup reads as its session
      * @throws IllegalArgumentException if a connector's stored settings cannot make a source
      */
-    public List<LogsSource> logs(String engineId, @Nullable String group, @Nullable String sessionId) {
-        return emitters(engineId, group, sessionId)
-                .map(emitters -> telemetry.logs(engineId, emitters))
-                .orElseGet(() -> telemetry.allLogs(engineId));
+    public Resolved<LogsSource> logs(String engineId, @Nullable String group, @Nullable String sessionId) {
+        return resolve(engineId, group, sessionId, emitters -> telemetry.logs(engineId, emitters), () -> telemetry.allLogs(engineId));
     }
 
-    private Optional<Set<Emitters>> emitters(String engineId, @Nullable String group, @Nullable String sessionId) {
-        Set<Emitters> emitters = groups(engineId).stream()
+    private <S> Resolved<S> resolve(String engineId, @Nullable String group, @Nullable String sessionId,
+                                    Function<List<Emitters>, List<S>> sourcesOf, Supplier<List<S>> everySource) {
+        Map<Emitters, List<String>> sessionsByEmitters = new HashMap<>();
+        groups(engineId).stream()
                 .filter(sessions -> group == null || sessions.getGroup().equals(group))
-                .flatMap(sessions -> sessions.getSessions().stream())
-                .filter(session -> sessionId == null || session.getId().equals(sessionId))
-                .map(Emitters::of)
-                .collect(Collectors.toSet());
-        return emitters.isEmpty() ? Optional.empty() : Optional.of(emitters);
+                .forEach(sessions -> sessions.getSessions().stream()
+                        .filter(session -> sessionId == null || session.getId().equals(sessionId) || session.getConfigIds().contains(sessionId))
+                        .forEach(session -> sessionsByEmitters.computeIfAbsent(Emitters.of(session), emitters -> new ArrayList<>())
+                                .add(sessions.getGroup() + "." + session.getId())));
+        if (sessionsByEmitters.isEmpty()) {
+            return new Resolved<>(everySource.get(), List.of());
+        }
+        Set<S> sources = new LinkedHashSet<>();
+        Set<String> notCollected = new TreeSet<>();
+        sessionsByEmitters.forEach((emitters, sessions) -> {
+            List<S> found = sourcesOf.apply(List.of(emitters));
+            if (found.isEmpty()) {
+                notCollected.addAll(sessions);
+            }
+            sources.addAll(found);
+        });
+        return new Resolved<>(List.copyOf(sources), List.copyOf(notCollected));
     }
 
     private List<SessionGroup> groups(String engineId) {
@@ -79,6 +95,13 @@ public class TelemetrySources {
         } catch (GatewayException unreachable) {
             return last == null ? List.of() : last.groups();
         }
+    }
+
+    /**
+     * @param notCollected the sessions in scope, as {@code group.session}, no source holds the telemetry of; empty
+     *                     when their emitters are unknown
+     */
+    public record Resolved<S>(List<S> sources, List<String> notCollected) {
     }
 
     private record Known(Instant at, List<SessionGroup> groups) {

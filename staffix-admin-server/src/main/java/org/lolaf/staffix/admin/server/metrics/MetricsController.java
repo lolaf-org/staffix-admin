@@ -36,7 +36,7 @@ public class MetricsController {
      * Per message type kinds give one series per type and direction, the others one series per session.
      */
     @GetMapping("/api/metrics")
-    public List<MetricSeries> queryMetrics(@RequestParam String engineId,
+    public MetricsResult queryMetrics(@RequestParam String engineId,
                                            @RequestParam(required = false) @Nullable String group,
                                            @RequestParam(required = false) @Nullable String sessionId,
                                            @RequestParam MetricKind kind,
@@ -44,7 +44,7 @@ public class MetricsController {
                                            @RequestParam Instant from,
                                            @RequestParam Instant to) {
         TelemetryProblems.requireGroupForSession(group, sessionId);
-        List<MetricsSource> sources = sources(engineId, group, sessionId);
+        TelemetrySources.Resolved<MetricsSource> resolved = resolve(engineId, group, sessionId);
         TimeRange range = TimeRange.of(from, to);
         MetricQuery query = MetricQuery.builder()
                 .engineId(engineId)
@@ -57,8 +57,11 @@ public class MetricsController {
                 .step(range.chartStep())
                 .build();
         try {
-            List<MetricSeries> series = sources.stream().flatMap(source -> source.query(query).stream()).toList();
-            return sources.size() == 1 ? series : combineSameLabels(series, kind);
+            List<MetricSeries> series = resolved.sources().stream().flatMap(source -> source.query(query).stream()).toList();
+            return MetricsResult.builder()
+                    .series(resolved.sources().size() == 1 ? series : combineSameLabels(series, kind))
+                    .notCollected(resolved.notCollected())
+                    .build();
         } catch (MetricsSourceException e) {
             throw TelemetryProblems.backendFailed("metrics", e);
         }
@@ -85,16 +88,16 @@ public class MetricsController {
                 .toList();
     }
 
-    private List<MetricsSource> sources(String engineId, @Nullable String group, @Nullable String sessionId) {
-        List<MetricsSource> sources;
+    private TelemetrySources.Resolved<MetricsSource> resolve(String engineId, @Nullable String group, @Nullable String sessionId) {
+        TelemetrySources.Resolved<MetricsSource> resolved;
         try {
-            sources = telemetrySources.metrics(engineId, group, sessionId);
+            resolved = telemetrySources.metrics(engineId, group, sessionId);
         } catch (IllegalArgumentException e) {
             throw TelemetryProblems.connectorInvalid("metrics", e);
         }
-        if (sources.isEmpty()) {
+        if (resolved.sources().isEmpty()) {
             throw TelemetryProblems.notCollected("metrics", engineId, group, sessionId);
         }
-        return sources;
+        return resolved;
     }
 }
