@@ -9,9 +9,11 @@ Prometheus and their FIX logs in Loki. Like the console, it builds against the s
 # 1. Prometheus, Loki and the OpenTelemetry collector (add --profile grafana for Grafana on :3000)
 (cd staffix-admin-sandbox/docker && docker compose up -d)
 
-# 2. The console, with the development users (reader, writer, engine; password = name), reading the sandbox's
-#    Prometheus and Loki through the connectors in data/ (git ignores it, so editing them changes no tracked file)
+# 2. The console, with the sandbox users (reader, writer, engine; password = name), reading the sandbox's
+#    Prometheus and Loki through its connectors
 ./mvnw install
+(cd staffix-admin-sandbox/docker && docker compose --profile console up -d console)
+#    or from the working copy, with the connectors in data/ (git ignores it, so editing them changes no tracked file)
 [ -f data/connectors.yaml ] || { mkdir -p data && cp staffix-admin-sandbox/connectors.yaml data/; }
 java -jar staffix-admin-app/target/staffix-admin.jar --staffix.admin.security.jaas-config=classpath:jaas/dev.conf
 
@@ -20,7 +22,12 @@ java -jar staffix-admin-app/target/staffix-admin.jar --staffix.admin.security.ja
 ./mvnw exec:java -Psandbox -pl staffix-admin-sandbox
 ```
 
-Open http://localhost:8080 and log in as `writer`. Stop with `docker compose down` in `staffix-admin-sandbox/docker`.
+Open http://localhost:8080 and log in as `writer`. Stop with `docker compose --profile console down` in
+`staffix-admin-sandbox/docker`; add `-v` to also forget the connectors the containerized console stored.
+
+The containerized console runs the jar `./mvnw install` built, with the users of `docker/conf/console` and the
+connectors of `connectors.yaml` (copied into its volume on first start). It uses host networking, so it reaches the
+engines, Prometheus and Loki as the host does: Linux, or Docker Desktop with host networking enabled.
 
 ## What runs
 

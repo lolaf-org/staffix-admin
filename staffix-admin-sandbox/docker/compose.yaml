@@ -25,6 +25,25 @@ services:
     ports:
       - "3100:3100"
 
+  console:
+    image: eclipse-temurin:21-jre
+    profiles: [ console ]
+    # the engines advertise their host name and the connectors name localhost: the console sees what the host sees
+    network_mode: host
+    command:
+      - sh
+      - -c
+      - >-
+        [ -f /data/connectors.yaml ] || cp /etc/staffix-admin/connectors.yaml /data/;
+        exec java -jar /app/staffix-admin.jar --staffix.admin.data-dir=/data
+        --staffix.admin.security.jaas-config=file:/etc/staffix-admin/jaas.conf
+    volumes:
+      - ../../staffix-admin-app/target/staffix-admin.jar:/app/staffix-admin.jar:ro
+      - ./conf/console/jaas.conf:/etc/staffix-admin/jaas.conf:ro
+      - ./conf/console/users.properties:/etc/staffix-admin/users.properties:ro
+      - ../connectors.yaml:/etc/staffix-admin/connectors.yaml:ro
+      - console-data:/data
+
   grafana:
     image: grafana/grafana-enterprise:13.0.3
     profiles: [ grafana ]
@@ -35,3 +54,6 @@ services:
       - "3000:3000"
     volumes:
       - ./conf/grafana/provisioning:/etc/grafana/provisioning
+
+volumes:
+  console-data:
