@@ -13,7 +13,6 @@ import org.lolaf.staffix.admin.server.sessions.SessionHealth;
 import org.lolaf.staffix.admin.server.sessions.SessionState;
 import org.lolaf.staffix.admin.server.sessions.SessionSummary;
 import org.lolaf.staffix.admin.server.sessions.SessionType;
-import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
@@ -41,7 +40,6 @@ import java.util.function.Function;
  * config, while the connector addresses the config that runs, so each operation first reads the engine's status.
  */
 @Component
-@Profile("!mock")
 class HttpEngineGateway implements EngineGateway {
 
     private final EngineRegistry registry;

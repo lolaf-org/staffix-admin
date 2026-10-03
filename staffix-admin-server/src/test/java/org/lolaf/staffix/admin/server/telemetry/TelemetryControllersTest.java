@@ -55,17 +55,17 @@ class TelemetryControllersTest {
 
     @Test
     void filtersLogsByTypeAndText() throws Exception {
-        mockMvc.perform(get("/api/logs?engineId=paris-prod&group=ubs&sessionId=trading&types=OUT&text=35=D&limit=20" + LAST_HOUR))
+        mockMvc.perform(get("/api/logs?engineId=paris-prod&group=alpha&sessionId=trading&types=OUT&text=35=D&limit=20" + LAST_HOUR))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.entries", hasSize(20)))
                 .andExpect(jsonPath("$.entries[*].type", everyItem(is("OUT"))))
-                .andExpect(jsonPath("$.entries[*].group", everyItem(is("ubs"))))
+                .andExpect(jsonPath("$.entries[*].group", everyItem(is("alpha"))))
                 .andExpect(jsonPath("$.entries[*].sessionId", everyItem(is("trading"))));
     }
 
     @Test
     void filtersLogsByMessageType() throws Exception {
-        mockMvc.perform(get("/api/logs?engineId=paris-prod&group=ubs&msgTypes=8&msgTypes=0&limit=30" + LAST_HOUR))
+        mockMvc.perform(get("/api/logs?engineId=paris-prod&group=alpha&msgTypes=8&msgTypes=0&limit=30" + LAST_HOUR))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.entries", hasSize(30)))
                 .andExpect(jsonPath("$.entries[*].line", everyItem(matchesPattern(".*\\|35=(8|0)\\|.*"))));
@@ -79,7 +79,7 @@ class TelemetryControllersTest {
 
     @Test
     void reportsAnUnknownSession() throws Exception {
-        mockMvc.perform(get("/api/logs?engineId=paris-prod&group=ubs&sessionId=nope" + LAST_HOUR))
+        mockMvc.perform(get("/api/logs?engineId=paris-prod&group=alpha&sessionId=nope" + LAST_HOUR))
                 .andExpect(status().isNotFound());
     }
 }

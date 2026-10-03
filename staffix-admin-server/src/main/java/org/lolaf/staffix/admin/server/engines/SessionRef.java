@@ -3,7 +3,7 @@ package org.lolaf.staffix.admin.server.engines;
 import lombok.Value;
 
 /**
- * A connection of an engine. Its id is unique only within its group: {@code jpm.trading} and {@code ubs.trading}
+ * A connection of an engine. Its id is unique only within its group: {@code beta.trading} and {@code alpha.trading}
  * are two sessions.
  */
 @Value(staticConstructor = "of")

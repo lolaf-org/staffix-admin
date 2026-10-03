@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SessionsControllerTest {
 
     private static final String ACME_TRADING = "/api/engines/paris-prod/groups/acme/sessions/trading";
-    private static final String UBS_TRADING = "/api/engines/paris-prod/groups/ubs/sessions/trading";
+    private static final String ALPHA_TRADING = "/api/engines/paris-prod/groups/alpha/sessions/trading";
 
     @Autowired
     private MockMvc mockMvc;
@@ -43,7 +43,7 @@ class SessionsControllerTest {
     void groupsSessions() throws Exception {
         mockMvc.perform(get("/api/engines/paris-prod/groups"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].group", hasItem("ubs")))
+                .andExpect(jsonPath("$[*].group", hasItem("alpha")))
                 .andExpect(jsonPath("$[0].sessions[0].health").exists())
                 .andExpect(jsonPath("$[0].sessions[0].instanceId").exists())
                 .andExpect(jsonPath("$[0].sessions[0].identity.target.compId").exists());
@@ -90,14 +90,14 @@ class SessionsControllerTest {
 
     @Test
     void switchesAnInitiatorToABackup() throws Exception {
-        mockMvc.perform(post(UBS_TRADING + "/activate").with(csrf())
+        mockMvc.perform(post(ALPHA_TRADING + "/activate").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"configId\": \"trading-drp\"}"))
                 .andExpect(status().isNoContent());
-        mockMvc.perform(get(UBS_TRADING))
+        mockMvc.perform(get(ALPHA_TRADING))
                 .andExpect(jsonPath("$.summary.runningConfigId").value("trading-drp"))
                 .andExpect(jsonPath("$.configs[1].id").value("trading-drp"));
-        mockMvc.perform(post(UBS_TRADING + "/activate").with(csrf())
+        mockMvc.perform(post(ALPHA_TRADING + "/activate").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"configId\": \"trading\"}"))
                 .andExpect(status().isNoContent());

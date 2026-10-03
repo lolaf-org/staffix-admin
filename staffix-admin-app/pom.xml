@@ -30,6 +30,10 @@
             <groupId>org.lolaf</groupId>
             <artifactId>staffix-admin-logs-loki</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.lolaf</groupId>
+            <artifactId>staffix-admin-demo-connector</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

@@ -5,6 +5,7 @@ import org.jspecify.annotations.Nullable;
 import org.lolaf.staffix.admin.server.web.TelemetryProblems;
 import lombok.RequiredArgsConstructor;
 import org.lolaf.staffix.admin.server.engines.EngineGateway;
+import org.lolaf.staffix.admin.server.engines.GatewayException;
 import org.lolaf.staffix.admin.server.engines.SessionRef;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,6 +36,10 @@ public class DecodeController {
         List<FixDictionary> dictionaries = gateway.getDictionaries(config).stream()
                 .map(ref -> dictionaryCache.get(request.getEngineId(), ref))
                 .toList();
+        if (dictionaries.isEmpty()) {
+            throw GatewayException.notFound("Session '" + request.getGroup() + "." + request.getSessionId()
+                    + "' of engine '" + request.getEngineId() + "' serves no dictionary to decode with");
+        }
         return MessageDecoder.decode(request.getMessage(), request.getSeparator(), dictionaries);
     }
 

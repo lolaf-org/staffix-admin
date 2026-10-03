@@ -30,7 +30,7 @@ class DecodeControllerTest {
         mockMvc.perform(post("/api/messages/decode").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"engineId": "paris-prod", "group": "ubs", "sessionId": "trading-drp",
+                                {"engineId": "paris-prod", "group": "alpha", "sessionId": "trading-drp",
                                  "message": "8=FIX.4.4|35=8|39=2|10=000|"}"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.msgTypeName").value("ExecutionReport"))
@@ -41,7 +41,7 @@ class DecodeControllerTest {
 
     @Test
     void listsTheMessageTypesOfTheDictionariesInScope() throws Exception {
-        mockMvc.perform(get("/api/messages/types?engineId=paris-prod&group=ubs"))
+        mockMvc.perform(get("/api/messages/types?engineId=paris-prod&group=alpha"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[*].name", hasItem("NewOrderSingle")))
                 .andExpect(jsonPath("$[?(@.msgType == 'D')].name").value("NewOrderSingle"))
@@ -53,7 +53,7 @@ class DecodeControllerTest {
         mockMvc.perform(post("/api/messages/decode").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"engineId": "paris-prod", "group": "ubs", "sessionId": "nope", "message": "35=0|"}"""))
+                                {"engineId": "paris-prod", "group": "alpha", "sessionId": "nope", "message": "35=0|"}"""))
                 .andExpect(status().isNotFound());
     }
 }

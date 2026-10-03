@@ -28,14 +28,14 @@ class SimulationScenario {
 
     private SimulatedEngine paris() {
         EngineBuilder engine = new EngineBuilder("paris-prod", "0.9.1", "STAFFIX-PAR", "Europe/Paris");
-        engine.initiator("ubs", "trading", "trading-drp");
-        engine.initiator("ubs", "market-data", "market-data-drp").getFirst().flaky(true);
-        engine.initiator("ubs", "drop-copy");
-        engine.initiator("jpm", "trading", "trading-drp");
-        engine.initiator("jpm", "market-data").getFirst().sessionTimeCycleTicks(45);
-        engine.initiator("citi", "trading", "trading-drp");
+        engine.initiator("alpha", "trading", "trading-drp");
+        engine.initiator("alpha", "market-data", "market-data-drp").getFirst().flaky(true);
+        engine.initiator("alpha", "drop-copy");
+        engine.initiator("beta", "trading", "trading-drp");
+        engine.initiator("beta", "market-data").getFirst().sessionTimeCycleTicks(45);
+        engine.initiator("gamma", "trading", "trading-drp");
         engine.emitters("clients-otlp", "clients-metrics");
-        engine.acceptor("citi", "drop-copy", "dropcopy-acceptor");
+        engine.acceptor("gamma", "drop-copy", "dropcopy-acceptor");
         engine.acceptor("acme", "trading", "clients-acceptor");
         engine.acceptor("acme", "drop-copy", "clients-acceptor");
         engine.acceptor("globex", "trading", "clients-acceptor").desiredState(SessionState.LOGGED_OUT);
@@ -47,9 +47,9 @@ class SimulationScenario {
 
     private SimulatedEngine london() {
         EngineBuilder engine = new EngineBuilder("london-prod", "0.9.1", "STAFFIX-LDN", "Europe/London");
-        engine.initiator("barclays", "trading", "trading-drp");
-        engine.initiator("barclays", "market-data");
-        engine.initiator("ice", "trading", "trading-drp").getFirst().flaky(true);
+        engine.initiator("delta", "trading", "trading-drp");
+        engine.initiator("delta", "market-data");
+        engine.initiator("epsilon", "trading", "trading-drp").getFirst().flaky(true);
         engine.acceptor("fund-alpha", "trading", "clients-acceptor");
         engine.acceptor("fund-alpha", "drop-copy", "clients-acceptor");
         engine.acceptor("fund-beta", "trading", "clients-acceptor").sessionTimeCycleTicks(30);

@@ -22,6 +22,7 @@ import java.util.List;
 public class SimulatorConfig {
 
     @Bean
+    @Primary
     SimulatedEngineGateway engineGateway(JsonMapper jsonMapper) {
         return new SimulatedEngineGateway(new SimulationScenario(jsonMapper).engines());
     }

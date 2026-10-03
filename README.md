@@ -15,6 +15,8 @@ serves a React UI and proxies the engines' HTTP admin connectors. The browser ne
 | `staffix-admin-logs-loki` | FIX message logs from Loki |
 | `staffix-admin-logs-spi` | SPI for logs backends (Loki, ...) |
 | `staffix-admin-connector-spi` | What a backend plugin declares about its settings: descriptions, secrets, secret references |
+| `staffix-admin-simulator` | Simulated engines for demos and UI work, a separate process seen by the console as real engines |
+| `staffix-admin-demo-connector` | The `demo-metrics` and `demo-logs` connector kinds, reading the simulator's generated telemetry |
 | `staffix-admin-audit-spi` | SPI for where audit entries go (the log by default) |
 | `staffix-admin-store-spi` | SPI for where the connectors are stored (a YAML file by default) |
 
@@ -44,10 +46,16 @@ Engines appear once they announce themselves: add staffix's HTTP admin API conne
 (`staffix-admin-api-http-impl`, see staffix's runtime administration guide) with `announceUrl` pointing here and the
 credentials of a user with the `ENGINE` role. The console then calls each engine with the token it announced.
 
-To try the console without engines, run it with `--spring.profiles.active=mock`: three simulated engines whose
-sessions drop, reconnect and follow session windows, with generated metrics and FIX logs, and development users
-(password = name) `reader`, `writer` and `engine` (announcement only). `classpath:jaas/dev.conf` gives the same
-users to a console talking to real engines.
+To try the console without real engines, run it with the development users (`classpath:jaas/dev.conf`: `reader`,
+`writer` and `engine`, password = name) and start the simulator, a separate process whose three engines announce
+themselves through staffix's own HTTP admin API connector, with sessions that drop, reconnect and follow session
+windows, and serve generated metrics and FIX logs to the `demo-metrics` and `demo-logs` connectors:
+
+```shell
+[ -f data/connectors.yaml ] || { mkdir -p data && cp staffix-admin-simulator/connectors.yaml data/; }
+java -jar staffix-admin-app/target/staffix-admin.jar --staffix.admin.security.jaas-config=classpath:jaas/dev.conf
+./mvnw exec:java -pl staffix-admin-simulator
+```
 
 ## Metrics and logs
 
@@ -142,7 +150,8 @@ durable as your logging. To keep it elsewhere (a file of its own, a database, a 
 
 ## UI development with hot reload
 
-1. Run `StaffixAdminApplication` from the IDE (port 8080), with the `mock` profile for simulated engines.
+1. Run `StaffixAdminApplication` from the IDE (port 8080) with `--staffix.admin.security.jaas-config=classpath:jaas/dev.conf`,
+   and the simulator (`./mvnw exec:java -pl staffix-admin-simulator`) for engines.
 2. Start the UI dev server, which first regenerates the TypeScript types from the running backend:
 
    ```shell
