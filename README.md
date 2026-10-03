@@ -75,7 +75,8 @@ defaults:
   logs: prod-loki
 engines:
   uat-gateway:
-    metrics: none   # not collected
+    defaults:
+      metrics: none   # not collected
 ```
 
 **Prometheus** charts read the engines' micrometer meters received through the OpenTelemetry collector with

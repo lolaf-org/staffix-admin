@@ -5,8 +5,8 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The connector of each role for an engine: a connector id, {@link #NONE} when the engine's telemetry is not
- * collected, or null to fall back on the default.
+ * The connector of each role: a connector id, {@link #NONE} when that telemetry is not collected, or null to fall
+ * back on the next level.
  */
 @Value
 @Builder(toBuilder = true)

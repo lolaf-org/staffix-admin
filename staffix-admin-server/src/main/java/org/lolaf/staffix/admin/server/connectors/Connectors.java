@@ -9,6 +9,7 @@ import org.lolaf.staffix.admin.store.Connector;
 import org.lolaf.staffix.admin.store.ConnectorStore;
 import org.lolaf.staffix.admin.store.ConnectorsConfig;
 import org.lolaf.staffix.admin.store.EngineConnectors;
+import org.lolaf.staffix.admin.store.EngineMapping;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -112,8 +113,9 @@ public class Connectors implements EngineTelemetry {
     }
 
     private static Optional<String> assigned(ConnectorsConfig config, String engineId, Function<EngineConnectors, @Nullable String> role) {
-        EngineConnectors links = config.getEngines().get(engineId);
-        String connectorId = links != null && role.apply(links) != null ? role.apply(links) : role.apply(config.getDefaults());
+        EngineMapping mapping = config.getEngines().get(engineId);
+        String connectorId = mapping != null && role.apply(mapping.getDefaults()) != null
+                ? role.apply(mapping.getDefaults()) : role.apply(config.getDefaults());
         return connectorId == null || connectorId.equals(EngineConnectors.NONE) ? Optional.empty() : Optional.of(connectorId);
     }
 
@@ -169,7 +171,14 @@ public class Connectors implements EngineTelemetry {
             }
         }
         checkLinks("the defaults", config.getDefaults(), metricsIds, logsIds, problems);
-        config.getEngines().forEach((engineId, links) -> checkLinks("engine " + engineId, links, metricsIds, logsIds, problems));
+        config.getEngines().forEach((engineId, mapping) -> {
+            String owner = "engine " + engineId;
+            checkLinks(owner, mapping.getDefaults(), metricsIds, logsIds, problems);
+            mapping.getLoggers().forEach((logger, connectorId) ->
+                    checkLink(owner + " logger " + logger, "logs", connectorId, logsIds, problems));
+            mapping.getMonitors().forEach((monitor, connectorId) ->
+                    checkLink(owner + " monitor " + monitor, "metrics", connectorId, metricsIds, problems));
+        });
         return problems;
     }
 

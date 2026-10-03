@@ -28,5 +28,5 @@ public class ConnectorsConfig {
      * By engine id, kept for engines currently absent: the registry only knows engines that announced themselves.
      */
     @Singular
-    Map<String, EngineConnectors> engines;
+    Map<String, EngineMapping> engines;
 }

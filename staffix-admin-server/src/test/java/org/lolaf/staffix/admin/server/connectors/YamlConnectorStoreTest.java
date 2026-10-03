@@ -6,6 +6,7 @@ import org.lolaf.staffix.admin.store.Connector;
 import org.lolaf.staffix.admin.store.ConnectorStoreException;
 import org.lolaf.staffix.admin.store.ConnectorsConfig;
 import org.lolaf.staffix.admin.store.EngineConnectors;
+import org.lolaf.staffix.admin.store.EngineMapping;
 import org.lolaf.staffix.admin.store.StaleConnectorsException;
 
 import java.io.IOException;
@@ -35,8 +36,11 @@ class YamlConnectorStoreTest {
                     .setting("tenant", "${env:LOKI_TENANT}")
                     .build())
             .defaults(EngineConnectors.builder().metrics("alpha-prometheus").logs("alpha-loki").build())
-            .engine("gamma", EngineConnectors.builder().logs(EngineConnectors.NONE).build())
-            .engine("beta", EngineConnectors.builder().metrics(EngineConnectors.NONE).build())
+            .engine("gamma", EngineMapping.builder().defaults(EngineConnectors.builder().logs(EngineConnectors.NONE).build()).build())
+            .engine("beta", EngineMapping.builder()
+                    .logger("clients-otlp", EngineConnectors.NONE)
+                    .monitor("otlp-metrics", "alpha-prometheus")
+                    .build())
             .build();
 
     @TempDir
@@ -78,9 +82,13 @@ class YamlConnectorStoreTest {
                   logs: alpha-loki
                 engines:
                   beta:
-                    metrics: none
+                    loggers:
+                      clients-otlp: none
+                    monitors:
+                      otlp-metrics: alpha-prometheus
                   gamma:
-                    logs: none
+                    defaults:
+                      logs: none
                 """);
         assertThat(dataDir.resolve("admin")).isDirectoryNotContaining("glob:**.tmp");
     }

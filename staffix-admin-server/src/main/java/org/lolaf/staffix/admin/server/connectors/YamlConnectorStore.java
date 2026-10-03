@@ -6,6 +6,7 @@ import org.lolaf.staffix.admin.store.ConnectorStore;
 import org.lolaf.staffix.admin.store.ConnectorStoreException;
 import org.lolaf.staffix.admin.store.ConnectorsConfig;
 import org.lolaf.staffix.admin.store.EngineConnectors;
+import org.lolaf.staffix.admin.store.EngineMapping;
 import org.lolaf.staffix.admin.store.StaleConnectorsException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DeserializationFeature;
@@ -46,9 +47,11 @@ class YamlConnectorStore implements ConnectorStore {
                 .addMixIn(ConnectorsConfig.class, ConnectorsConfigMixIn.class)
                 .addMixIn(Connector.class, ConnectorMixIn.class)
                 .addMixIn(EngineConnectors.class, EngineConnectorsMixIn.class)
+                .addMixIn(EngineMapping.class, EngineMappingMixIn.class)
                 .addMixIn(ConnectorsConfig.ConnectorsConfigBuilder.class, BuilderMixIn.class)
                 .addMixIn(Connector.ConnectorBuilder.class, BuilderMixIn.class)
                 .addMixIn(EngineConnectors.EngineConnectorsBuilder.class, BuilderMixIn.class)
+                .addMixIn(EngineMapping.EngineMappingBuilder.class, BuilderMixIn.class)
                 .build();
     }
 
@@ -96,6 +99,22 @@ class YamlConnectorStore implements ConnectorStore {
 
     @JsonDeserialize(builder = EngineConnectors.EngineConnectorsBuilder.class)
     private interface EngineConnectorsMixIn {
+    }
+
+    @JsonDeserialize(builder = EngineMapping.EngineMappingBuilder.class)
+    private interface EngineMappingMixIn {
+        @JsonInclude(value = JsonInclude.Include.CUSTOM, valueFilter = NoConnectors.class)
+        EngineConnectors getDefaults();
+    }
+
+    @SuppressWarnings("EqualsHashCode")
+    private static final class NoConnectors {
+        private static final EngineConnectors UNSET = EngineConnectors.builder().build();
+
+        @Override
+        public boolean equals(Object value) {
+            return UNSET.equals(value);
+        }
     }
 
     @JsonPOJOBuilder(withPrefix = "")

@@ -10,6 +10,7 @@ import org.lolaf.staffix.admin.store.Connector;
 import org.lolaf.staffix.admin.store.ConnectorStore;
 import org.lolaf.staffix.admin.store.ConnectorsConfig;
 import org.lolaf.staffix.admin.store.EngineConnectors;
+import org.lolaf.staffix.admin.store.EngineMapping;
 import org.lolaf.staffix.admin.store.StaleConnectorsException;
 
 import java.util.List;
@@ -44,8 +45,8 @@ class ConnectorsTest {
     void readsAnEngineFromItsOwnConnectorElseTheDefault() {
         connectors.save(ConnectorsConfig.builder().connector(ALPHA_METRICS).connector(ALPHA_LOGS).connector(BETA_LOGS)
                 .defaults(EngineConnectors.builder().metrics("alpha-metrics").logs("alpha-logs").build())
-                .engine("beta", EngineConnectors.builder().logs("beta-logs").build())
-                .engine("gamma", EngineConnectors.builder().metrics(EngineConnectors.NONE).build())
+                .engine("beta", EngineMapping.builder().defaults(EngineConnectors.builder().logs("beta-logs").build()).build())
+                .engine("gamma", EngineMapping.builder().defaults(EngineConnectors.builder().metrics(EngineConnectors.NONE).build()).build())
                 .build());
 
         assertThat(connectors.logs("alpha")).containsSame(connectors.logsSource("alpha-logs").orElseThrow());
@@ -58,7 +59,7 @@ class ConnectorsTest {
     @Test
     void collectsNothingWithoutADefault() {
         connectors.save(ConnectorsConfig.builder().connector(ALPHA_LOGS)
-                .engine("beta", EngineConnectors.builder().logs("alpha-logs").build())
+                .engine("beta", EngineMapping.builder().defaults(EngineConnectors.builder().logs("alpha-logs").build()).build())
                 .build());
 
         assertThat(connectors.logs("alpha")).isEmpty();
@@ -101,7 +102,11 @@ class ConnectorsTest {
                 .connector(Connector.builder().id("delta").name("Delta").kind("stub-logs").build())
                 .connector(Connector.builder().name("No id").kind("stub-logs").build())
                 .defaults(EngineConnectors.builder().metrics("alpha-metrics").logs("alpha-metrics").build())
-                .engine("alpha", EngineConnectors.builder().metrics("missing").logs(EngineConnectors.NONE).build())
+                .engine("alpha", EngineMapping.builder().defaults(EngineConnectors.builder().metrics("missing").logs(EngineConnectors.NONE).build())
+                        .logger("clients-otlp", "alpha-metrics")
+                        .logger("otlp", EngineConnectors.NONE)
+                        .monitor("otlp-metrics", "missing")
+                        .build())
                 .build();
 
         assertThatThrownBy(() -> connectors.save(invalid))
@@ -113,7 +118,9 @@ class ConnectorsTest {
                         "connector delta: url is required",
                         "a connector has no id",
                         "the defaults: logs connector alpha-metrics is not a logs connector",
-                        "engine alpha: metrics connector missing is not a metrics connector"));
+                        "engine alpha: metrics connector missing is not a metrics connector",
+                        "engine alpha logger clients-otlp: logs connector alpha-metrics is not a logs connector",
+                        "engine alpha monitor otlp-metrics: metrics connector missing is not a metrics connector"));
         assertThat(store.load()).isEqualTo(ConnectorsConfig.EMPTY);
     }
 
