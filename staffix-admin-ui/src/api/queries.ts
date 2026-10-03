@@ -125,6 +125,17 @@ export function useMetrics(scope: MetricScope, kind: MetricKind, quantile: numbe
   })
 }
 
+/**
+ * The kinds the monitoring plugins of the scope's sessions measure.
+ */
+export function useMetricKinds(scope: MetricScope) {
+  return useQuery({
+    queryKey: ['metricKinds', scope],
+    queryFn: () => call(api.GET('/api/metrics/kinds', { params: { query: scope } })),
+    staleTime: 60_000,
+  })
+}
+
 export interface LogSearch {
   engineId: string
   group?: string

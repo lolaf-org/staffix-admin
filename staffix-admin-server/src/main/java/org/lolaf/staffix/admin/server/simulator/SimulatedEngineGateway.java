@@ -58,6 +58,11 @@ class SimulatedEngineGateway implements EngineGateway {
     }
 
     @Override
+    public JsonNode getEmitters(String engineId) {
+        return engine(engineId).getEmitters();
+    }
+
+    @Override
     public void logon(SessionRef session) {
         engine(session.getEngineId()).logon(session);
     }

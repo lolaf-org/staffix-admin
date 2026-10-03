@@ -3,6 +3,8 @@ package org.lolaf.staffix.admin.server.connectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.lolaf.staffix.admin.logs.LogsSource;
+import org.lolaf.staffix.admin.metrics.MetricsSource;
+import org.lolaf.staffix.admin.metrics.MetricKind;
 import org.lolaf.staffix.admin.server.engines.EngineGateway;
 import org.lolaf.staffix.admin.server.engines.GatewayException;
 import org.lolaf.staffix.admin.server.sessions.SessionGroup;
@@ -13,7 +15,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,8 +37,9 @@ class TelemetrySourcesTest {
 
     private final EngineGateway gateway = mock(EngineGateway.class);
     private final EngineTelemetry telemetry = mock(EngineTelemetry.class);
+    private final EngineEmitterSettings emitterSettings = mock(EngineEmitterSettings.class);
     private final SteppingClock clock = new SteppingClock();
-    private final TelemetrySources sources = new TelemetrySources(gateway, telemetry, clock);
+    private final TelemetrySources sources = new TelemetrySources(gateway, telemetry, emitterSettings, clock);
 
     private static SessionSummary session(String id, Emitters emitters) {
         return SessionSummary.builder()
@@ -60,11 +67,33 @@ class TelemetrySourcesTest {
     @Test
     void readsTheSourcesOfTheScopesEmittersAndNamesTheSessionsNoneCollects() {
         assertThat(sources.logs("alpha", null, null))
-                .isEqualTo(new TelemetrySources.Resolved<>(List.of(INITIATORS_LOGS), List.of("beta.drop-copy")));
+                .isEqualTo(new TelemetrySources.Resolved<>(List.of(INITIATORS_LOGS), List.of("beta.drop-copy"), Map.of()));
         assertThat(sources.logs("alpha", "gamma", null))
-                .isEqualTo(new TelemetrySources.Resolved<>(List.of(INITIATORS_LOGS), List.of()));
+                .isEqualTo(new TelemetrySources.Resolved<>(List.of(INITIATORS_LOGS), List.of(), Map.of()));
         assertThat(sources.logs("alpha", "beta", "drop-copy"))
-                .isEqualTo(new TelemetrySources.Resolved<>(List.of(), List.of("beta.drop-copy")));
+                .isEqualTo(new TelemetrySources.Resolved<>(List.of(), List.of("beta.drop-copy"), Map.of()));
+    }
+
+    @Test
+    void doesNotCollectTheLogsOfALoggerThatExportsNothingWhateverItsConnector() {
+        when(emitterSettings.logger("alpha", "otlp")).thenReturn(Optional.of(new EngineEmitterSettings.Logger(
+                List.of("Slf4jMessagesLoggerSettings"), null, false)));
+
+        assertThat(sources.logs("alpha", null, null))
+                .isEqualTo(new TelemetrySources.Resolved<>(List.of(), List.of("beta.drop-copy", "beta.trading", "gamma.trading"), Map.of()));
+    }
+
+    @Test
+    void readsMetricsInTheTimerUnitOfTheMonitoringPluginAndOffersOnlyItsKinds() {
+        MetricsSource metrics = query -> List.of();
+        when(telemetry.metrics("alpha", List.of(INITIATORS))).thenReturn(List.of(metrics));
+        when(emitterSettings.monitor("alpha", "otlp-metrics")).thenReturn(Optional.of(new EngineEmitterSettings.Monitor(
+                List.of("OtlpMicrometerMonitoringManagerSettings"), null, TimeUnit.MICROSECONDS, EnumSet.of(MetricKind.READ_LATENCY))));
+
+        assertThat(sources.metrics("alpha", "gamma", null).timerBaseUnits()).containsEntry(metrics, TimeUnit.MICROSECONDS);
+        assertThat(sources.metricKinds("alpha", null, null)).containsExactly(MetricKind.READ_LATENCY);
+        assertThat(sources.metricKinds("alpha", "beta", "drop-copy")).isEmpty();
+        assertThat(sources.metricKinds("delta", null, null)).containsExactlyInAnyOrder(MetricKind.values());
     }
 
     @Test
@@ -96,7 +125,7 @@ class TelemetrySourcesTest {
     void readsEveryConnectorOfAnEngineNeverSeen() {
         when(gateway.listGroups("delta")).thenThrow(GatewayException.unknownEngine("delta"));
 
-        assertThat(sources.logs("delta", null, null)).isEqualTo(new TelemetrySources.Resolved<>(List.of(ALL_LOGS), List.of()));
+        assertThat(sources.logs("delta", null, null)).isEqualTo(new TelemetrySources.Resolved<>(List.of(ALL_LOGS), List.of(), Map.of()));
     }
 
     @Test

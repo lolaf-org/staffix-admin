@@ -143,7 +143,10 @@ class ConnectorsControllerTest {
         mockMvc.perform(get("/api/connectors/engines"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.engineId == 'paris-prod')].loggers[*].instanceId").value(hasItem("clients-otlp")))
-                .andExpect(jsonPath("$[?(@.engineId == 'nyc-uat')].unmonitoredSessions[*]").value(hasItem("uat-client-1.trading")));
+                .andExpect(jsonPath("$[?(@.engineId == 'nyc-uat')].unmonitoredSessions[*]").value(hasItem("uat-client-1.trading")))
+                .andExpect(jsonPath("$[?(@.engineId == 'nyc-uat')].loggers[0].exports").value(hasItem(false)))
+                .andExpect(jsonPath("$[?(@.engineId == 'paris-prod')].loggers[?(@.instanceId == 'clients-otlp')].otlpEndpoint")
+                        .value(hasItem("http://otel-clients:4318")));
     }
 
     @Test

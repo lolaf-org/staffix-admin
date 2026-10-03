@@ -89,7 +89,7 @@ public class PrometheusMetricsSource implements MetricsSource {
             case DECODING_LATENCY -> latency(query, "messages_decoding_latency", "in", selector, window);
             case WRITE_LATENCY -> latency(query, "messages_write_latency", "out", selector, window);
             case ENCODING_LATENCY -> latency(query, "messages_encoding_latency", "out", selector, window);
-            case ROUND_TRIP_TIME -> queryRange(query, timerUnitsPerSecond,
+            case ROUND_TRIP_TIME -> queryRange(query, timerUnitsPerSecond(query),
                     "sum by (fix_sg, fix_sn) (rate(session_rtt_sum{%1$s}[%2$s]))"
                     + " / sum by (fix_sg, fix_sn) (rate(session_rtt_count{%1$s}[%2$s]))",
                     selector, window);
@@ -100,7 +100,7 @@ public class PrometheusMetricsSource implements MetricsSource {
 
     private List<MetricSeries> latency(MetricQuery query, String timer, String direction, String selector, String window) {
         double quantile = Objects.requireNonNullElse(query.getQuantile(), 0.5);
-        return queryRange(query, timerUnitsPerSecond,
+        return queryRange(query, timerUnitsPerSecond(query),
                 "histogram_quantile(" + quantile + ", sum by (le, fix_msg_type, fix_msg_dir) (rate(" + timer
                 + "_bucket{%1$s,fix_msg_dir=\"" + direction + "\"}[%2$s])))",
                 selector, window);
@@ -124,6 +124,10 @@ public class PrometheusMetricsSource implements MetricsSource {
     private String window(MetricQuery query) {
         Duration window = query.getStep().compareTo(minRateWindow) > 0 ? query.getStep() : minRateWindow;
         return window.toSeconds() + "s";
+    }
+
+    private double timerUnitsPerSecond(MetricQuery query) {
+        return query.getTimerBaseUnit() == null ? timerUnitsPerSecond : query.getTimerBaseUnit().convert(1, TimeUnit.SECONDS);
     }
 
     private List<MetricSeries> queryRange(MetricQuery query, double unitsPerSecond, String promQl, String selector, String window) {

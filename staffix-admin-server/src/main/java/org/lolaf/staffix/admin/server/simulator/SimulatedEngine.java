@@ -63,6 +63,10 @@ class SimulatedEngine {
                 .build();
     }
 
+    JsonNode getEmitters() {
+        return SimulatedEmitters.of(connections.stream().map(SimulatedConnection::emitters).toList());
+    }
+
     synchronized JsonNode getSessionSettings(SessionRef ref) {
         return connection(ref).running().settings;
     }

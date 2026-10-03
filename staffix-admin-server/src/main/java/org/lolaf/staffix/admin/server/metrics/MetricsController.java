@@ -35,6 +35,18 @@ public class MetricsController {
     /**
      * Per message type kinds give one series per type and direction, the others one series per session.
      */
+    /**
+     * The kinds the monitoring plugins of the scope's sessions measure, so a chart of a meter that is off is not
+     * offered; every kind when the engine does not say.
+     */
+    @GetMapping("/api/metrics/kinds")
+    public List<MetricKind> getMetricKinds(@RequestParam String engineId,
+                                           @RequestParam(required = false) @Nullable String group,
+                                           @RequestParam(required = false) @Nullable String sessionId) {
+        TelemetryProblems.requireGroupForSession(group, sessionId);
+        return List.copyOf(telemetrySources.metricKinds(engineId, group, sessionId));
+    }
+
     @GetMapping("/api/metrics")
     public MetricsResult queryMetrics(@RequestParam String engineId,
                                            @RequestParam(required = false) @Nullable String group,
@@ -57,7 +69,9 @@ public class MetricsController {
                 .step(range.chartStep())
                 .build();
         try {
-            List<MetricSeries> series = resolved.sources().stream().flatMap(source -> source.query(query).stream()).toList();
+            List<MetricSeries> series = resolved.sources().stream()
+                    .flatMap(source -> source.query(query.toBuilder().timerBaseUnit(resolved.timerBaseUnits().get(source)).build()).stream())
+                    .toList();
             return MetricsResult.builder()
                     .series(resolved.sources().size() == 1 ? series : combineSameLabels(series, kind))
                     .notCollected(resolved.notCollected())

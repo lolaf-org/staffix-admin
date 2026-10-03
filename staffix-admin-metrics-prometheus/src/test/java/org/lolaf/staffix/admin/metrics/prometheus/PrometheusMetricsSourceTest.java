@@ -97,6 +97,14 @@ class PrometheusMetricsSourceTest {
     }
 
     @Test
+    void prefersTheTimerUnitTheQueryKnowsFromTheEngine() {
+        List<MetricSeries> series = source(TimeUnit.MICROSECONDS).query(query(MetricKind.WRITE_LATENCY, Duration.ofMinutes(2))
+                .toBuilder().timerBaseUnit(TimeUnit.MILLISECONDS).build());
+
+        assertThat(series.getFirst().getPoints()).extracting(MetricPoint::getValue).containsExactly(0.25, 0.5);
+    }
+
+    @Test
     void readsClockOffsetInSecondsWhateverTheTimerUnit() {
         response = """
                 {"status":"success","data":{"resultType":"matrix","result":[

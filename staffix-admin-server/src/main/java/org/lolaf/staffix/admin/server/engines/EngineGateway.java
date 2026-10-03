@@ -24,6 +24,12 @@ public interface EngineGateway {
 
     JsonNode getSessionSettings(SessionRef session);
 
+    /**
+     * The engine's messages loggers and session plugins with their settings, as staffix's HTTP connector serves them
+     * ({@code GET emitters}); static for the engine's life.
+     */
+    JsonNode getEmitters(String engineId);
+
     void logon(SessionRef session);
 
     void logout(SessionRef session);

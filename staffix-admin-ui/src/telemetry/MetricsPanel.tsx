@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Alert, Empty, Flex, Segmented, Select, Skeleton, Typography } from 'antd'
 import { useEffect } from 'react'
 import { AreaChartOutlined, TableOutlined } from '@ant-design/icons'
-import { useMetrics, type MetricKind, type MetricScope } from '../api/queries'
+import { useMetricKinds, useMetrics, type MetricKind, type MetricScope } from '../api/queries'
 import { isNotCollected, type Schemas } from '../api/client'
 import { NotCollectedNotice } from './NotCollectedNotice'
 import { formatRateValue, formatSeconds } from './format'
@@ -49,12 +49,17 @@ export function MetricsPanel({ scope, chartHeight }: Props) {
   const [view, setView] = useState<'chart' | 'table'>('chart')
   const sessionScoped = scope.sessionId !== undefined
   const metrics = useMetrics(scope, kind, quantile, minutes)
+  const measured = useMetricKinds(scope).data
+  const isMeasured = (k: MetricKind) => measured === undefined || measured.includes(k)
   const colors = seriesColors(useThemeMode().dark)
   useEffect(() => {
     if (!sessionScoped && KINDS.find((k) => k.value === kind)?.perSession) {
       setKind('MESSAGE_RATE')
+    } else if (!isMeasured(kind)) {
+      const first = KINDS.find((k) => isMeasured(k.value) && (sessionScoped || !k.perSession))
+      if (first) setKind(first.value)
     }
-  }, [sessionScoped, kind])
+  }, [sessionScoped, kind, measured])
   const format = kind === 'MESSAGE_RATE' ? formatRateValue : formatSeconds
   const selected = KINDS.find((k) => k.value === kind)!
   const title = LATENCIES.includes(kind) ? `${selected.title}, p${quantile * 100}` : selected.title
@@ -65,8 +70,10 @@ export function MetricsPanel({ scope, chartHeight }: Props) {
         options={KINDS.map((k) => ({
           value: k.value,
           label: k.label,
-          disabled: k.perSession && !sessionScoped,
-          title: k.perSession && !sessionScoped ? 'Pick a session' : k.title,
+          disabled: (k.perSession && !sessionScoped) || !isMeasured(k.value),
+          title: !isMeasured(k.value)
+            ? "Not measured: this meter is off in the sessions' monitoring plugin"
+            : k.perSession && !sessionScoped ? 'Pick a session' : k.title,
         }))}
         value={kind}
         onChange={setKind}

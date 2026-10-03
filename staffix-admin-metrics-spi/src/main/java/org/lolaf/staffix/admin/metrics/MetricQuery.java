@@ -6,9 +6,10 @@ import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 
 @Value
-@Builder
+@Builder(toBuilder = true)
 public class MetricQuery {
     String engineId;
     /**
@@ -31,4 +32,10 @@ public class MetricQuery {
     Instant from;
     Instant to;
     Duration step;
+    /**
+     * The unit the engines' timers are exported in, when the console knows it from their monitoring plugin; null to
+     * use the source's own setting.
+     */
+    @Nullable
+    TimeUnit timerBaseUnit;
 }

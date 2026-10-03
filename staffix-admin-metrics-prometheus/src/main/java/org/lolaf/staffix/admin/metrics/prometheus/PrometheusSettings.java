@@ -14,8 +14,8 @@ public class PrometheusSettings {
     URI url;
     @Description("How long a query may take, connecting included, before the console reports Prometheus did not answer.")
     Duration timeout;
-    @Description("The engines' micrometer baseTimeUnit. The exported timers carry no unit Prometheus keeps, so it must "
-            + "match the engines' registry; micrometer's OTLP registry defaults to milliseconds.")
+    @Description("The engines' micrometer baseTimeUnit, for engines that do not report their monitoring plugin's: the "
+            + "exported timers carry no unit Prometheus keeps. Micrometer's OTLP registry defaults to milliseconds.")
     TimeUnit timerBaseUnit;
     @Description("The shortest window a rate is computed over: a few scrape intervals, so every window holds enough samples.")
     Duration minRateWindow;

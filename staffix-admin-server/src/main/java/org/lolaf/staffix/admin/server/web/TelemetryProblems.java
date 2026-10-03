@@ -17,7 +17,8 @@ public class TelemetryProblems {
                 : group != null ? "group " + group + " of engine " + engineId
                 : "engine " + engineId;
         return new ErrorResponseException(HttpStatus.NOT_FOUND, ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND,
-                "The " + what + " of " + scope + " are not collected: no " + what + " connector is assigned to its emitters"), null);
+                "The " + what + " of " + scope + " are not collected: no " + what + " connector is assigned to its emitters, or they "
+                        + "export nothing a backend reads"), null);
     }
 
     /**

@@ -5,6 +5,7 @@ import org.lolaf.staffix.admin.logs.LogEntry;
 import org.lolaf.staffix.admin.logs.LogsSource;
 import org.lolaf.staffix.admin.metrics.MetricKind;
 import org.lolaf.staffix.admin.metrics.MetricPoint;
+import org.lolaf.staffix.admin.metrics.MetricQuery;
 import org.lolaf.staffix.admin.metrics.MetricSeries;
 import org.lolaf.staffix.admin.metrics.MetricsSource;
 import org.lolaf.staffix.admin.server.connectors.TelemetrySources;
@@ -13,7 +14,10 @@ import org.lolaf.staffix.admin.server.metrics.MetricsController;
 import org.springframework.web.ErrorResponseException;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -43,14 +47,15 @@ class TelemetryResolutionTest {
 
     @Test
     void saysAScopeWithoutConnectorIsNotCollected() {
-        when(sources.metrics("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(), List.of()));
-        when(sources.logs("alpha", "beta", "trading")).thenReturn(new TelemetrySources.Resolved<>(List.of(), List.of()));
+        when(sources.metrics("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(), List.of(), Map.of()));
+        when(sources.logs("alpha", "beta", "trading")).thenReturn(new TelemetrySources.Resolved<>(List.of(), List.of(), Map.of()));
 
         assertThatThrownBy(() -> metricsController.queryMetrics("alpha", null, null, MetricKind.MESSAGE_RATE, 0.99, FROM, TO))
                 .isInstanceOfSatisfying(ErrorResponseException.class, e -> {
                     assertThat(e.getStatusCode().value()).isEqualTo(404);
                     assertThat(e.getBody().getDetail())
-                            .isEqualTo("The metrics of engine alpha are not collected: no metrics connector is assigned to its emitters");
+                            .isEqualTo("The metrics of engine alpha are not collected: no metrics connector is assigned to its emitters, "
+                                    + "or they export nothing a backend reads");
                 });
         assertThatThrownBy(() -> logsController.queryLogs("alpha", "beta", "trading", FROM, TO, null, List.of(), List.of(), 10))
                 .isInstanceOfSatisfying(ErrorResponseException.class, e -> {
@@ -62,7 +67,7 @@ class TelemetryResolutionTest {
     @Test
     void namesTheSessionsOfTheScopeNoConnectorCollects() {
         LogsSource initiators = query -> List.of(entry(10));
-        when(sources.logs("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(initiators), List.of("beta.drop-copy")));
+        when(sources.logs("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(initiators), List.of("beta.drop-copy"), Map.of()));
 
         assertThat(logsController.queryLogs("alpha", null, null, FROM, TO, null, List.of(), List.of(), 10).getNotCollected())
                 .containsExactly("beta.drop-copy");
@@ -83,17 +88,32 @@ class TelemetryResolutionTest {
     void mergesTheLogsOfEverySourceNewestFirstUpToTheLimit() {
         LogsSource initiators = query -> List.of(entry(10), entry(30), entry(50));
         LogsSource clients = query -> List.of(entry(20), entry(40));
-        when(sources.logs("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(initiators, clients), List.of()));
+        when(sources.logs("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(initiators, clients), List.of(), Map.of()));
 
         assertThat(logsController.queryLogs("alpha", null, null, FROM, TO, null, List.of(), List.of(), 4).getEntries())
                 .extracting(LogEntry::getLine).containsExactly("line 10", "line 20", "line 30", "line 40");
     }
 
     @Test
+    void queriesEachSourceInTheTimerUnitOfItsEngines() {
+        List<MetricQuery> queries = new ArrayList<>();
+        MetricsSource source = query -> {
+            queries.add(query);
+            return List.of();
+        };
+        when(sources.metrics("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(source), List.of(),
+                Map.of(source, TimeUnit.MICROSECONDS)));
+
+        metricsController.queryMetrics("alpha", null, null, MetricKind.READ_LATENCY, 0.99, FROM, TO);
+
+        assertThat(queries).singleElement().extracting(MetricQuery::getTimerBaseUnit).isEqualTo(TimeUnit.MICROSECONDS);
+    }
+
+    @Test
     void addsUpTheRatesOfTheSameMessageTypeAcrossSources() {
         MetricsSource initiators = query -> List.of(series("D", 1, 2), series("8", 5));
         MetricsSource clients = query -> List.of(series("D", 10, 20));
-        when(sources.metrics("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(initiators, clients), List.of()));
+        when(sources.metrics("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(initiators, clients), List.of(), Map.of()));
 
         List<MetricSeries> merged = metricsController.queryMetrics("alpha", null, null, MetricKind.MESSAGE_RATE, 0.99, FROM, TO).getSeries();
 
@@ -104,7 +124,7 @@ class TelemetryResolutionTest {
     void keepsTheHighestQuantileOfTheSameMessageTypeAcrossSources() {
         MetricsSource initiators = query -> List.of(series("D", 0.002, 0.009));
         MetricsSource clients = query -> List.of(series("D", 0.005, 0.001));
-        when(sources.metrics("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(initiators, clients), List.of()));
+        when(sources.metrics("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(initiators, clients), List.of(), Map.of()));
 
         assertThat(metricsController.queryMetrics("alpha", null, null, MetricKind.READ_LATENCY, 0.99, FROM, TO).getSeries())
                 .containsExactly(series("D", 0.005, 0.009));

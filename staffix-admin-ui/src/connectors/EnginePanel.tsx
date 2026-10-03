@@ -78,9 +78,10 @@ export function EnginePanel({ engineId, emitters, config, kinds, disabled, onCha
   )
 }
 
-interface EmitterRow {
-  instanceId: string
-  sessions: string[]
+type EmitterRow = Pick<Schemas['Emitter'], 'instanceId' | 'sessions'> & Partial<Pick<Schemas['Emitter'], 'types' | 'otlpEndpoint' | 'exports'>>
+
+function typeChain(types: string[]): string {
+  return types.map((type) => type.replace(/Settings$/, '')).join(' → ')
 }
 
 function EmitterTable({ title, used, assigned, options, disabled, onChange }: {
@@ -104,7 +105,21 @@ function EmitterTable({ title, used, assigned, options, disabled, onChange }: {
       dataSource={rows}
       locale={{ emptyText: 'None reported' }}
       columns={[
-        { title: 'Instance', dataIndex: 'instanceId', width: '30%' },
+        { title: 'Instance', dataIndex: 'instanceId', width: '20%' },
+        {
+          title: 'Exports',
+          render: (_, row) => (
+            <Flex vertical>
+              {row.types && row.types.length > 0 ? <Typography.Text>{typeChain(row.types)}</Typography.Text> : <Typography.Text type="secondary">unknown</Typography.Text>}
+              {row.otlpEndpoint && <Typography.Text type="secondary" style={{ fontSize: 12 }}>OTLP to {row.otlpEndpoint}</Typography.Text>}
+              {row.exports === false && (
+                <Tooltip title="Its sessions' logs reach no backend, whatever connector is assigned">
+                  <Tag color="warning" style={{ width: 'fit-content' }}>exports nothing</Tag>
+                </Tooltip>
+              )}
+            </Flex>
+          ),
+        },
         {
           title: 'Sessions',
           render: (_, row) =>

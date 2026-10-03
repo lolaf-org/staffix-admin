@@ -48,6 +48,7 @@ public class ConnectorsController {
     private final EngineRegistry registry;
     private final EngineGateway gateway;
     private final AuditLog auditLog;
+    private final EngineEmitterSettings emitterSettings;
 
     @GetMapping
     public ConnectorsConfig getConnectors() {
@@ -132,8 +133,21 @@ public class ConnectorsController {
                 byMonitor.computeIfAbsent(session.getMonitoringInstanceId(), monitor -> new ArrayList<>()).add(name);
             }
         }));
-        byLogger.forEach((logger, sessions) -> emitters.logger(EngineEmitters.Emitter.builder().instanceId(logger).sessions(sessions).build()));
-        byMonitor.forEach((monitor, sessions) -> emitters.monitor(EngineEmitters.Emitter.builder().instanceId(monitor).sessions(sessions).build()));
+        byLogger.forEach((logger, sessions) -> {
+            EngineEmitters.Emitter.EmitterBuilder emitter = EngineEmitters.Emitter.builder().instanceId(logger).sessions(sessions).exports(true);
+            emitterSettings.logger(engineId, logger).ifPresent(settings -> emitter
+                    .types(settings.types())
+                    .otlpEndpoint(settings.otlpEndpoint())
+                    .exports(settings.exports()));
+            emitters.logger(emitter.build());
+        });
+        byMonitor.forEach((monitor, sessions) -> {
+            EngineEmitters.Emitter.EmitterBuilder emitter = EngineEmitters.Emitter.builder().instanceId(monitor).sessions(sessions).exports(true);
+            emitterSettings.monitor(engineId, monitor).ifPresent(settings -> emitter
+                    .types(settings.types())
+                    .otlpEndpoint(settings.otlpEndpoint()));
+            emitters.monitor(emitter.build());
+        });
         return emitters.reachable(announced).build();
     }
 }

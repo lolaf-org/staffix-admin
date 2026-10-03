@@ -3,6 +3,7 @@ package org.lolaf.staffix.admin.server.connectors;
 import lombok.Builder;
 import lombok.Singular;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -38,5 +39,20 @@ public class EngineEmitters {
         String instanceId;
         @Singular
         List<String> sessions;
+        /**
+         * Its staffix settings types, wrapper first; empty when the engine did not say.
+         */
+        @Singular
+        List<String> types;
+        /**
+         * Where it sends over OTLP, null when it does not or the engine did not say.
+         */
+        @Nullable
+        String otlpEndpoint;
+        /**
+         * False for a logger known to export nothing a backend reads (slf4j, file): its sessions' logs are not
+         * collected whatever connector it is assigned.
+         */
+        boolean exports;
     }
 }

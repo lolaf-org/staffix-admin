@@ -34,6 +34,10 @@ class SimulatedConnection {
         this.running = main;
     }
 
+    Emitters emitters() {
+        return emitters;
+    }
+
     SimulatedSession running() {
         return running;
     }

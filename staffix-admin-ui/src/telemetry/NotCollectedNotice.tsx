@@ -11,7 +11,7 @@ export function NotCollectedNotice({ what, sessions }: { what: 'metrics' | 'logs
       type="info"
       showIcon
       title={`The ${what} of ${sessions.length === 1 ? 'one session are' : `${sessions.length} sessions are`} not collected`}
-      description={`${sessions.join(', ')}: no connector is assigned to their ${what === 'metrics' ? 'monitoring plugin' : 'messages logger'}.`}
+      description={`${sessions.join(', ')}: no connector is assigned to their ${what === 'metrics' ? 'monitoring plugin' : 'messages logger'}, or it exports nothing a backend reads.`}
     />
   )
 }

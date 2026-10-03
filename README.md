@@ -81,7 +81,7 @@ connectors:
     kind: prometheus
     settings:
       url: http://prometheus:9090
-      timerBaseUnit: microseconds   # the engines' micrometer baseTimeUnit; OTLP's default is milliseconds
+      timerBaseUnit: microseconds   # for engines that do not report their micrometer baseTimeUnit
   - id: prod-loki
     name: Production Loki
     kind: loki
@@ -103,6 +103,10 @@ engines:
     monitors:
       clients-metrics: none        # by monitoring plugin instance id
 ```
+
+The console also reads how each engine emits (staffix's `GET emitters`): the timer unit of its monitoring plugin,
+the meters it has on (charts of the others are not offered), and whether a messages logger exports anything a
+backend reads (a slf4j or file logger does not, so its sessions' logs show as not collected).
 
 **Prometheus** charts read the engines' micrometer meters received through the OpenTelemetry collector with
 `translation_strategy: UnderscoreEscapingWithoutSuffixes` (as in `staffix-admin-sandbox/docker`). The engines must

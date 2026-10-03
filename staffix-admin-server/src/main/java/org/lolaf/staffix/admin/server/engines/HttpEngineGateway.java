@@ -88,6 +88,11 @@ class HttpEngineGateway implements EngineGateway {
     }
 
     @Override
+    public JsonNode getEmitters(String engineId) {
+        return call(engineId, HttpMethod.GET, List.of("emitters"), null, JsonNode.class);
+    }
+
+    @Override
     public void logon(SessionRef session) {
         call(session.getEngineId(), HttpMethod.POST, runningConfig(session, "logon"), null, Void.class);
     }
