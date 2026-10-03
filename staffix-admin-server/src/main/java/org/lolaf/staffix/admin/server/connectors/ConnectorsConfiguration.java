@@ -19,8 +19,11 @@ class ConnectorsConfiguration {
     }
 
     @Bean
-    Connectors connectors(ConnectorStore store, ObjectProvider<SecretResolver> resolvers, SecretCipher cipher,
+    Connectors connectors(ObjectProvider<ConnectorStore> stores, ObjectProvider<SecretResolver> resolvers, SecretCipher cipher,
                           ObjectProvider<MetricsSourceFactory<?>> metricsFactories, ObjectProvider<LogsSourceFactory<?>> logsFactories) {
+        ConnectorStore store = stores.getIfAvailable(() -> {
+            throw new IllegalStateException("No connector store: put a ConnectorStore plugin, such as staffix-admin-store-yaml, in plugins/");
+        });
         return new Connectors(store, new SettingsBinder(resolvers.orderedStream().toList(), cipher), new ConnectorSecrets(cipher),
                 metricsFactories.orderedStream().toList(), logsFactories.orderedStream().toList());
     }

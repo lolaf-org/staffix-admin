@@ -18,8 +18,8 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
- * Records every change an operator makes, or tries to make, to each {@link AuditSink} bean, or to a
- * {@link LoggerAuditSink} when there is none.
+ * Records every change an operator makes, or tries to make, to each {@link AuditSink} bean. The console refuses to
+ * start without one: changes would go unrecorded.
  */
 @Slf4j
 @Component
@@ -29,8 +29,10 @@ public class AuditLog {
     private final Clock clock;
 
     AuditLog(ObjectProvider<AuditSink> sinks, Clock clock) {
-        List<AuditSink> defined = sinks.orderedStream().toList();
-        this.sinks = defined.isEmpty() ? List.of(new LoggerAuditSink()) : defined;
+        this.sinks = sinks.orderedStream().toList();
+        if (this.sinks.isEmpty()) {
+            throw new IllegalStateException("No audit sink: put an AuditSink plugin, such as staffix-admin-audit-log, in plugins/");
+        }
         this.clock = clock;
     }
 

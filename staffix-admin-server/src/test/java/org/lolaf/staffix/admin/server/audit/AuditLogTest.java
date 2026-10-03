@@ -46,6 +46,13 @@ class AuditLogTest {
     }
 
     @Test
+    void refusesToStartWithoutASink() {
+        assertThatThrownBy(this::auditLog)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No audit sink");
+    }
+
+    @Test
     void recordsWhoDidWhatToWhichSession() {
         auditLog(recorded::add).record(SessionRef.of("alpha", "beta", "trading"), "logon", () -> { });
 

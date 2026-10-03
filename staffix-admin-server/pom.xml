@@ -39,10 +39,6 @@
             <artifactId>staffix-admin-store-spi</artifactId>
         </dependency>
         <dependency>
-            <groupId>tools.jackson.dataformat</groupId>
-            <artifactId>jackson-dataformat-yaml</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
@@ -81,6 +77,21 @@
         <dependency>
             <groupId>org.lolaf</groupId>
             <artifactId>staffix-admin-logs-loki</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.lolaf</groupId>
+            <artifactId>staffix-admin-store-yaml</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>tools.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.lolaf</groupId>
+            <artifactId>staffix-admin-audit-log</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -133,6 +144,8 @@
                             <goal>start</goal>
                         </goals>
                         <configuration>
+                            <!-- the console starts only with a store and an audit sink plugin, test dependencies here -->
+                            <useTestClasspath>true</useTestClasspath>
                             <arguments>
                                 <argument>--server.port=${openapi.generation.port}</argument>
                             </arguments>

@@ -23,6 +23,8 @@
                 <include>org.lolaf:staffix-admin-metrics-prometheus</include>
                 <include>org.lolaf:staffix-admin-logs-loki</include>
                 <include>org.lolaf:staffix-admin-demo-connector</include>
+                <include>org.lolaf:staffix-admin-store-yaml</include>
+                <include>org.lolaf:staffix-admin-audit-log</include>
             </includes>
             <useTransitiveDependencies>false</useTransitiveDependencies>
         </dependencySet>

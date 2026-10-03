@@ -10,15 +10,14 @@ serves a React UI and proxies the engines' HTTP admin connectors. The browser ne
 | `staffix-admin-server` | Spring Boot backend: REST API for the UI, engine proxy. Its controllers are the API contract |
 | `staffix-admin-ui` | React + Ant Design UI |
 | `staffix-admin-app` | The executable jar: the server with the UI inside |
-| `staffix-admin-metrics-spi` | SPI for metrics backends (Prometheus, ...) |
-| `staffix-admin-metrics-prometheus` | Metrics from Prometheus |
-| `staffix-admin-logs-loki` | FIX message logs from Loki |
-| `staffix-admin-logs-spi` | SPI for logs backends (Loki, ...) |
+| `staffix-admin-metrics` | `staffix-admin-metrics-spi`, the SPI for metrics backends; `staffix-admin-metrics-prometheus`, metrics from Prometheus |
+| `staffix-admin-logs` | `staffix-admin-logs-spi`, the SPI for logs backends; `staffix-admin-logs-loki`, FIX message logs from Loki |
+| `staffix-admin-store` | `staffix-admin-store-spi`, where the connectors are kept; `staffix-admin-store-yaml`, a YAML file |
+| `staffix-admin-audit` | `staffix-admin-audit-spi`, where audit entries go; `staffix-admin-audit-log`, log lines |
 | `staffix-admin-connector-spi` | What a backend plugin declares about its settings: descriptions, secrets, secret references |
-| `staffix-admin-simulator` | Simulated engines for demos and UI work, a separate process seen by the console as real engines |
 | `staffix-admin-demo-connector` | The `demo-metrics` and `demo-logs` connector kinds, reading the simulator's generated telemetry |
-| `staffix-admin-audit-spi` | SPI for where audit entries go (the log by default) |
-| `staffix-admin-store-spi` | SPI for where the connectors are stored (a YAML file by default) |
+| `staffix-admin-simulator` | Simulated engines for demos and UI work, a separate process seen by the console as real engines |
+| `staffix-admin-dist` | The distribution: the console's jar, its plugins and an example configuration |
 
 ## API contract
 
@@ -146,12 +145,13 @@ names its auto-configuration, which registers beans of the console's SPIs:
 |---|---|
 | `MetricsSourceFactory` (`staffix-admin-metrics-spi`), `LogsSourceFactory` (`staffix-admin-logs-spi`) | adds a connector kind, with its settings class (`@Description`, `@Secret` from `staffix-admin-connector-spi`) |
 | `SecretResolver` (`staffix-admin-connector-spi`) | adds a reference scheme, e.g. `${vault:...}`; a scheme already taken fails at startup |
-| `AuditSink` (`staffix-admin-audit-spi`) | receives the audit entries instead of the log; define a `LoggerAuditSink` bean too to keep the log lines |
-| `ConnectorStore` (`staffix-admin-store-spi`) | replaces the YAML file; its auto-configuration declares `before = ConnectorStoreAutoConfiguration.class` |
+| `AuditSink` (`staffix-admin-audit-spi`) | receives every audit entry, as `staffix-admin-audit-log` does (lines of the `staffix.admin.audit` logger); at least one is required |
+| `ConnectorStore` (`staffix-admin-store-spi`) | keeps the connectors, as `staffix-admin-store-yaml` does (`connectors.yaml` of the data directory); exactly one is required |
 
 The console provides Spring Boot (web, RestClient), Jackson, the SPIs above and `staffix-api`: a plugin depends on
-them as `provided`, as `staffix-admin-logs-loki/pom.xml` does. Anything else it needs, it shades into its jar or ships as more jars in `plugins/`. The
-distribution's own `plugins/` holds the Prometheus, Loki and demo connectors; remove those you do not use.
+them as `provided`, as `staffix-admin-logs/staffix-admin-logs-loki/pom.xml` does. Anything else it needs, it shades into its jar or ships as more jars in `plugins/`. The
+distribution's own `plugins/` holds the YAML store, the audit log and the Prometheus, Loki and demo connectors; the
+console refuses to start without a store and an audit sink, and the connectors you do not use can go.
 
 ## Security
 

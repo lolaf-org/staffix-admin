@@ -32,6 +32,14 @@
             <groupId>org.lolaf</groupId>
             <artifactId>staffix-admin-demo-connector</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.lolaf</groupId>
+            <artifactId>staffix-admin-store-yaml</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.lolaf</groupId>
+            <artifactId>staffix-admin-audit-log</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
