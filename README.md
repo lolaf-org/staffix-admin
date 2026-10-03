@@ -15,6 +15,7 @@ serves a React UI and proxies the engines' HTTP admin connectors. The browser ne
 | `staffix-admin-logs-loki` | FIX message logs from Loki |
 | `staffix-admin-logs-spi` | SPI for logs backends (Loki, ...) |
 | `staffix-admin-connector-spi` | What a backend plugin declares about its settings: descriptions, secrets, secret references |
+| `staffix-admin-audit-spi` | SPI for where audit entries go (the log by default) |
 | `staffix-admin-store-spi` | SPI for where the connectors are stored (a YAML file by default) |
 
 ## API contract
@@ -134,7 +135,10 @@ staffix:
         fix-support: [READER]
 ```
 
-Every state-changing action is logged on the `staffix.admin.audit` logger.
+Every state-changing action, and every refused one, is an audit entry: who, what, the session when it is one, the
+outcome and why it failed. By default entries are logged on the `staffix.admin.audit` logger, so the trail is as
+durable as your logging. To keep it elsewhere (a file of its own, a database, a SIEM), define a bean implementing
+`AuditSink` from `staffix-admin-audit-spi`; define a `LoggerAuditSink` bean too to keep the log lines.
 
 ## UI development with hot reload
 

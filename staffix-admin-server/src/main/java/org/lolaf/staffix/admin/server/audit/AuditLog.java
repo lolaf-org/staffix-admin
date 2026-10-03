@@ -1,50 +1,80 @@
 package org.lolaf.staffix.admin.server.audit;
 
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
+import org.lolaf.staffix.admin.audit.AuditEntry;
+import org.lolaf.staffix.admin.audit.AuditOutcome;
+import org.lolaf.staffix.admin.audit.AuditSink;
 import org.lolaf.staffix.admin.server.engines.SessionRef;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.ErrorResponse;
 
+import java.time.Clock;
+import java.util.List;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
- * Records every state-changing operation with its operator and outcome, on its own logger so it can be routed to a
- * dedicated, retained file.
+ * Records every change an operator makes, or tries to make, to each {@link AuditSink} bean, or to a
+ * {@link LoggerAuditSink} when there is none.
  */
-@Slf4j(topic = "staffix.admin.audit")
+@Slf4j
 @Component
 public class AuditLog {
 
+    private final List<AuditSink> sinks;
+    private final Clock clock;
+
+    AuditLog(ObjectProvider<AuditSink> sinks, Clock clock) {
+        List<AuditSink> defined = sinks.orderedStream().toList();
+        this.sinks = defined.isEmpty() ? List.of(new LoggerAuditSink()) : defined;
+        this.clock = clock;
+    }
+
     public void record(SessionRef session, String operation, Runnable action) {
-        String user = currentUser();
+        AuditEntry.AuditEntryBuilder entry = entry(operation)
+                .engineId(session.getEngineId())
+                .group(session.getGroup())
+                .sessionId(session.getSessionId());
         try {
             action.run();
-            log.info("user={} engine={} group={} session={} operation=[{}] outcome=OK",
-                    user, session.getEngineId(), session.getGroup(), session.getSessionId(), operation);
         } catch (RuntimeException e) {
-            log.warn("user={} engine={} group={} session={} operation=[{}] outcome=FAILED reason=[{}]",
-                    user, session.getEngineId(), session.getGroup(), session.getSessionId(), operation, reason(e));
+            write(entry.outcome(AuditOutcome.FAILED).reason(reason(e)).build());
             throw e;
         }
+        write(entry.outcome(AuditOutcome.OK).build());
     }
 
     /**
      * For an action whose outcome describes it, such as what a save changed; {@code attempted} describes a failure.
      */
     public <T> T record(String attempted, Supplier<T> action, Function<T, String> done) {
-        String user = currentUser();
         T result;
         try {
             result = action.get();
         } catch (RuntimeException e) {
-            log.warn("user={} operation=[{}] outcome=FAILED reason=[{}]", user, attempted, reason(e));
+            write(entry(attempted).outcome(AuditOutcome.FAILED).reason(reason(e)).build());
             throw e;
         }
-        log.info("user={} operation=[{}] outcome=OK", user, done.apply(result));
+        write(entry(done.apply(result)).outcome(AuditOutcome.OK).build());
         return result;
+    }
+
+    private AuditEntry.AuditEntryBuilder entry(String operation) {
+        return AuditEntry.builder().at(clock.instant()).user(currentUser()).operation(operation);
+    }
+
+    private void write(AuditEntry entry) {
+        for (AuditSink sink : sinks) {
+            try {
+                sink.record(entry);
+            } catch (RuntimeException e) {
+                log.error("Audit sink {} lost the entry of {} by {}", sink.getClass().getName(), entry.getOperation(), entry.getUser(), e);
+            }
+        }
     }
 
     private static String currentUser() {
@@ -52,7 +82,7 @@ public class AuditLog {
         return authentication == null ? "?" : authentication.getName();
     }
 
-    private static String reason(RuntimeException e) {
+    private static @Nullable String reason(RuntimeException e) {
         if (e instanceof ErrorResponse errorResponse && errorResponse.getBody().getDetail() != null) {
             return errorResponse.getBody().getDetail();
         }
