@@ -23,16 +23,12 @@
             <artifactId>staffix-admin-ui</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.lolaf</groupId>
-            <artifactId>staffix-admin-metrics-prometheus</artifactId>
+            <groupId>org.lolaf.staffix</groupId>
+            <artifactId>staffix-api</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.lolaf</groupId>
-            <artifactId>staffix-admin-logs-loki</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.lolaf</groupId>
-            <artifactId>staffix-admin-demo-connector</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-restclient</artifactId>
         </dependency>
     </dependencies>
 
@@ -45,6 +41,11 @@
                 <artifactId>maven-jar-plugin</artifactId>
                 <configuration>
                     <forceCreation>true</forceCreation>
+                    <archive>
+                        <manifestEntries>
+                            <Loader-Path>plugins</Loader-Path>
+                        </manifestEntries>
+                    </archive>
                 </configuration>
             </plugin>
             <plugin>
@@ -52,6 +53,8 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
                     <mainClass>org.lolaf.staffix.admin.server.StaffixAdminApplication</mainClass>
+                    <!-- PropertiesLauncher, so the jars of plugins/ (Loader-Path) join the class path -->
+                    <layout>ZIP</layout>
                 </configuration>
                 <executions>
                     <execution>

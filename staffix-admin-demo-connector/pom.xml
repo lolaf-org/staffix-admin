@@ -13,22 +13,27 @@
     <artifactId>staffix-admin-demo-connector</artifactId>
     <description>Metrics and logs of the staffix-admin simulator, for demos</description>
 
+    <!-- provided: what staffix-admin.jar gives every plugin in plugins/ -->
     <dependencies>
         <dependency>
             <groupId>org.lolaf</groupId>
             <artifactId>staffix-admin-connector-spi</artifactId>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.lolaf</groupId>
             <artifactId>staffix-admin-logs-spi</artifactId>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.lolaf</groupId>
             <artifactId>staffix-admin-metrics-spi</artifactId>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-restclient</artifactId>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -135,7 +135,6 @@
                         <configuration>
                             <arguments>
                                 <argument>--server.port=${openapi.generation.port}</argument>
-                                <argument>--spring.profiles.active=mock</argument>
                             </arguments>
                         </configuration>
                     </execution>

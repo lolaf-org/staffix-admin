@@ -37,8 +37,16 @@ repository).
 
 ```shell
 ./mvnw install
-java -jar staffix-admin-app/target/staffix-admin.jar --staffix.admin.security.jaas-config=file:/etc/staffix-admin/jaas.conf
+cd staffix-admin-dist/target/staffix-admin/staffix-admin
+java -Dloader.main=org.lolaf.staffix.admin.server.security.jaas.PasswordHasher -jar staffix-admin.jar 'secret'
+# add a user with that hash to config/users.properties, e.g. alice = {bcrypt}..., WRITER
+java -jar staffix-admin.jar
 ```
+
+The build produces the distribution `staffix-admin-dist/target/staffix-admin.zip` (and `.tar.gz`, and unpacked under
+`staffix-admin-dist/target/staffix-admin/`): `staffix-admin.jar`, `plugins/` with the Prometheus, Loki and demo
+connectors, and `config/`, read from the directory the console starts in: `application.yml`, `jaas.conf` and
+`users.properties`, which defines no user until you add one, so a fresh install lets nobody in.
 
 Open http://localhost:8080. The build downloads its own Node into `staffix-admin-ui/node/`; no system Node needed.
 
@@ -46,14 +54,15 @@ Engines appear once they announce themselves: add staffix's HTTP admin API conne
 (`staffix-admin-api-http-impl`, see staffix's runtime administration guide) with `announceUrl` pointing here and the
 credentials of a user with the `ENGINE` role. The console then calls each engine with the token it announced.
 
-To try the console without real engines, run it with the development users (`classpath:jaas/dev.conf`: `reader`,
+To try the console without real engines, run it with the development users (`dev/console`: `reader`,
 `writer` and `engine`, password = name) and start the simulator, a separate process whose three engines announce
 themselves through staffix's own HTTP admin API connector, with sessions that drop, reconnect and follow session
 windows, and serve generated metrics and FIX logs to the `demo-metrics` and `demo-logs` connectors:
 
 ```shell
+DIST=staffix-admin-dist/target/staffix-admin/staffix-admin
 [ -f data/connectors.yaml ] || { mkdir -p data && cp staffix-admin-simulator/connectors.yaml data/; }
-java -jar staffix-admin-app/target/staffix-admin.jar --staffix.admin.security.jaas-config=classpath:jaas/dev.conf
+java -Dloader.path=$DIST/plugins -jar $DIST/staffix-admin.jar --staffix.admin.security.jaas-config=file:dev/console/jaas.conf
 ./mvnw exec:java -pl staffix-admin-simulator
 ```
 
@@ -127,6 +136,23 @@ scans every stream of the time range. Promote `fix.eid`, `fix.sg` and `fix.sn` t
 `otlp_config` (as `staffix-admin-sandbox/docker/conf/loki.yaml` does) and list them in `indexedLabels`, so a query
 reads only the streams of its engine, group or session.
 
+## Plugins
+
+Every jar in `plugins/` (next to `staffix-admin.jar`; `-Dloader.path=...` names another directory) joins the
+console's class path at startup. A plugin is a jar whose `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`
+names its auto-configuration, which registers beans of the console's SPIs:
+
+| SPI (module) | What a plugin's bean does |
+|---|---|
+| `MetricsSourceFactory` (`staffix-admin-metrics-spi`), `LogsSourceFactory` (`staffix-admin-logs-spi`) | adds a connector kind, with its settings class (`@Description`, `@Secret` from `staffix-admin-connector-spi`) |
+| `SecretResolver` (`staffix-admin-connector-spi`) | adds a reference scheme, e.g. `${vault:...}`; a scheme already taken fails at startup |
+| `AuditSink` (`staffix-admin-audit-spi`) | receives the audit entries instead of the log; define a `LoggerAuditSink` bean too to keep the log lines |
+| `ConnectorStore` (`staffix-admin-store-spi`) | replaces the YAML file; its auto-configuration declares `before = ConnectorStoreAutoConfiguration.class` |
+
+The console provides Spring Boot (web, RestClient), Jackson, the SPIs above and `staffix-api`: a plugin depends on
+them as `provided`, as `staffix-admin-logs-loki/pom.xml` does. Anything else it needs, it shades into its jar or ships as more jars in `plugins/`. The
+distribution's own `plugins/` holds the Prometheus, Loki and demo connectors; remove those you do not use.
+
 ## Security
 
 Operators log in against JAAS. Point `staffix.admin.security.jaas-config` at a JAAS configuration whose login
@@ -150,7 +176,8 @@ durable as your logging. To keep it elsewhere (a file of its own, a database, a 
 
 ## UI development with hot reload
 
-1. Run `StaffixAdminApplication` from the IDE (port 8080) with `--staffix.admin.security.jaas-config=classpath:jaas/dev.conf`,
+1. Run `StaffixAdminApplication` from the IDE (port 8080), in the repository root, with
+   `--staffix.admin.security.jaas-config=file:dev/console/jaas.conf`,
    and the simulator (`./mvnw exec:java -pl staffix-admin-simulator`) for engines.
 2. Start the UI dev server, which first regenerates the TypeScript types from the running backend:
 

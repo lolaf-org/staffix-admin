@@ -35,10 +35,10 @@ services:
       - -c
       - >-
         [ -f /data/connectors.yaml ] || cp /etc/staffix-admin/connectors.yaml /data/;
-        exec java -jar /app/staffix-admin.jar --staffix.admin.data-dir=/data
+        exec java -Dloader.path=/app/plugins -jar /app/staffix-admin.jar --staffix.admin.data-dir=/data
         --staffix.admin.security.jaas-config=file:/etc/staffix-admin/jaas.conf
     volumes:
-      - ../../staffix-admin-app/target/staffix-admin.jar:/app/staffix-admin.jar:ro
+      - ../../staffix-admin-dist/target/staffix-admin/staffix-admin:/app:ro
       - ./conf/console/jaas.conf:/etc/staffix-admin/jaas.conf:ro
       - ./conf/console/users.properties:/etc/staffix-admin/users.properties:ro
       - ../connectors.yaml:/etc/staffix-admin/connectors.yaml:ro

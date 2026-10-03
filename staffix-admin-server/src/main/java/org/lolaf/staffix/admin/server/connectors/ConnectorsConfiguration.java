@@ -3,7 +3,6 @@ package org.lolaf.staffix.admin.server.connectors;
 import org.lolaf.staffix.admin.logs.LogsSourceFactory;
 import org.lolaf.staffix.admin.metrics.MetricsSourceFactory;
 import org.lolaf.staffix.admin.connector.SecretResolver;
-import org.lolaf.staffix.admin.server.AdminProperties;
 import org.lolaf.staffix.admin.server.secrets.SecretCipher;
 import org.lolaf.staffix.admin.store.ConnectorStore;
 import org.springframework.beans.factory.ObjectProvider;
@@ -13,11 +12,6 @@ import tools.jackson.databind.JacksonModule;
 
 @Configuration
 class ConnectorsConfiguration {
-
-    @Bean
-    ConnectorStore connectorStore(AdminProperties properties) {
-        return new YamlConnectorStore(properties.getDataDir());
-    }
 
     @Bean
     JacksonModule connectorsJacksonModule() {

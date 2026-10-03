@@ -1,0 +1,7 @@
+# Read from config/ of the directory the console starts in; see the README for every setting.
+staffix:
+  admin:
+    data-dir: data
+    security:
+      # login context staffix-admin; replace the users file module by your own JAAS module (LDAP, ...) there
+      jaas-config: file:config/jaas.conf
