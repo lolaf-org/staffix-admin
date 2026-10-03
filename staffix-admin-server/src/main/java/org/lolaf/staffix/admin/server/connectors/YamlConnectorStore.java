@@ -1,7 +1,6 @@
 package org.lolaf.staffix.admin.server.connectors;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import org.lolaf.staffix.admin.store.Connector;
 import org.lolaf.staffix.admin.store.ConnectorStore;
 import org.lolaf.staffix.admin.store.ConnectorStoreException;
 import org.lolaf.staffix.admin.store.ConnectorsConfig;
@@ -13,7 +12,6 @@ import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.MapperFeature;
 import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.annotation.JsonDeserialize;
-import tools.jackson.databind.annotation.JsonPOJOBuilder;
 import tools.jackson.dataformat.yaml.YAMLMapper;
 import tools.jackson.dataformat.yaml.YAMLWriteFeature;
 
@@ -44,14 +42,7 @@ class YamlConnectorStore implements ConnectorStore {
                 .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
                 .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .changeDefaultPropertyInclusion(inclusion -> inclusion.withValueInclusion(JsonInclude.Include.NON_EMPTY))
-                .addMixIn(ConnectorsConfig.class, ConnectorsConfigMixIn.class)
-                .addMixIn(Connector.class, ConnectorMixIn.class)
-                .addMixIn(EngineConnectors.class, EngineConnectorsMixIn.class)
-                .addMixIn(EngineMapping.class, EngineMappingMixIn.class)
-                .addMixIn(ConnectorsConfig.ConnectorsConfigBuilder.class, BuilderMixIn.class)
-                .addMixIn(Connector.ConnectorBuilder.class, BuilderMixIn.class)
-                .addMixIn(EngineConnectors.EngineConnectorsBuilder.class, BuilderMixIn.class)
-                .addMixIn(EngineMapping.EngineMappingBuilder.class, BuilderMixIn.class)
+                .addModule(ConnectorsJackson.module().setMixInAnnotation(EngineMapping.class, EngineMappingMixIn.class))
                 .build();
     }
 
@@ -89,18 +80,6 @@ class YamlConnectorStore implements ConnectorStore {
         return saved;
     }
 
-    @JsonDeserialize(builder = ConnectorsConfig.ConnectorsConfigBuilder.class)
-    private interface ConnectorsConfigMixIn {
-    }
-
-    @JsonDeserialize(builder = Connector.ConnectorBuilder.class)
-    private interface ConnectorMixIn {
-    }
-
-    @JsonDeserialize(builder = EngineConnectors.EngineConnectorsBuilder.class)
-    private interface EngineConnectorsMixIn {
-    }
-
     @JsonDeserialize(builder = EngineMapping.EngineMappingBuilder.class)
     private interface EngineMappingMixIn {
         @JsonInclude(value = JsonInclude.Include.CUSTOM, valueFilter = NoConnectors.class)
@@ -115,9 +94,5 @@ class YamlConnectorStore implements ConnectorStore {
         public boolean equals(Object value) {
             return UNSET.equals(value);
         }
-    }
-
-    @JsonPOJOBuilder(withPrefix = "")
-    private interface BuilderMixIn {
     }
 }

@@ -73,6 +73,16 @@
             <artifactId>spring-boot-starter-security-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.lolaf</groupId>
+            <artifactId>staffix-admin-logs-loki</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.lolaf</groupId>
+            <artifactId>staffix-admin-metrics-prometheus</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

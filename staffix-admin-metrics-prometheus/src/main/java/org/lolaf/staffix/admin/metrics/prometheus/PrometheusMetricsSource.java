@@ -41,6 +41,7 @@ public class PrometheusMetricsSource implements MetricsSource {
 
     private final RestClient client;
     private final URI queryRangeUrl;
+    private final URI buildInfoUrl;
     private final double timerUnitsPerSecond;
     private final Duration minRateWindow;
     private final JsonMapper jsonMapper;
@@ -51,10 +52,28 @@ public class PrometheusMetricsSource implements MetricsSource {
                 .build());
         requestFactory.setReadTimeout(properties.getTimeout());
         this.client = builder.requestFactory(requestFactory).build();
-        this.queryRangeUrl = URI.create(properties.getUrl().toString().replaceAll("/+$", "") + "/api/v1/query_range");
+        String url = properties.getUrl().toString().replaceAll("/+$", "");
+        this.queryRangeUrl = URI.create(url + "/api/v1/query_range");
+        this.buildInfoUrl = URI.create(url + "/api/v1/status/buildinfo");
         this.timerUnitsPerSecond = properties.getTimerBaseUnit().convert(1, TimeUnit.SECONDS);
         this.minRateWindow = properties.getMinRateWindow();
         this.jsonMapper = jsonMapper;
+    }
+
+    @Override
+    public void testConnection() {
+        try {
+            client.get()
+                    .uri(buildInfoUrl)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, (request, failure) -> {
+                        throw new MetricsSourceException("Prometheus answered " + failure.getStatusCode().value() + ": "
+                                + error(failure.getBody().readAllBytes()), null);
+                    })
+                    .toBodilessEntity();
+        } catch (ResourceAccessException e) {
+            throw new MetricsSourceException("Prometheus at " + buildInfoUrl + " did not answer", e);
+        }
     }
 
     @Override

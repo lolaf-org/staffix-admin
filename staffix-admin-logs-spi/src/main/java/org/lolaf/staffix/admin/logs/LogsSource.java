@@ -15,4 +15,13 @@ public interface LogsSource {
      * @throws LogsSourceException if the backend cannot be queried
      */
     List<LogEntry> query(LogQuery query);
+
+    /**
+     * Probes the backend with a cheap request, so an admin knows a connector works before relying on it.
+     *
+     * @throws LogsSourceException if the backend does not answer as expected, or cannot be tested
+     */
+    default void testConnection() {
+        throw new LogsSourceException("This logs backend cannot be tested", null);
+    }
 }

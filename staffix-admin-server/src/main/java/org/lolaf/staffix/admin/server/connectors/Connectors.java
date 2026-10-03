@@ -2,8 +2,10 @@ package org.lolaf.staffix.admin.server.connectors;
 
 import org.jspecify.annotations.Nullable;
 import org.lolaf.staffix.admin.logs.LogsSource;
+import org.lolaf.staffix.admin.logs.LogsSourceException;
 import org.lolaf.staffix.admin.logs.LogsSourceFactory;
 import org.lolaf.staffix.admin.metrics.MetricsSource;
+import org.lolaf.staffix.admin.metrics.MetricsSourceException;
 import org.lolaf.staffix.admin.metrics.MetricsSourceFactory;
 import org.lolaf.staffix.admin.store.Connector;
 import org.lolaf.staffix.admin.store.ConnectorStore;
@@ -13,6 +15,7 @@ import org.lolaf.staffix.admin.store.EngineMapping;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -58,15 +61,19 @@ public class Connectors implements EngineTelemetry {
     }
 
     /**
-     * Secrets typed as plain values are stored encrypted.
+     * Secrets typed as plain values are stored encrypted, and those sent back as {@value ConnectorSecrets#SET} keep
+     * their stored value.
      *
      * @throws InvalidConnectorsException listing every problem, before anything is stored
      */
     public ConnectorsConfig save(ConnectorsConfig config) {
         List<String> problems = new ArrayList<>();
+        ConnectorsConfig stored = store.load();
         ConnectorsConfig protectedConfig = config.toBuilder()
                 .clearConnectors()
-                .connectors(config.getConnectors().stream().map(connector -> protectSecrets(connector, problems)).toList())
+                .connectors(config.getConnectors().stream()
+                        .map(connector -> protectSecrets(restoreSecrets(connector, stored, problems), problems))
+                        .toList())
                 .build();
         problems.addAll(problems(protectedConfig));
         if (!problems.isEmpty()) {
@@ -77,6 +84,44 @@ public class Connectors implements EngineTelemetry {
         metricsSources.keySet().retainAll(ids);
         logsSources.keySet().retainAll(ids);
         return saved;
+    }
+
+    /**
+     * Builds the connector, with the stored value of any secret sent as {@value ConnectorSecrets#SET}, and probes its
+     * backend.
+     *
+     * @throws InvalidConnectorsException if it cannot be built
+     * @throws MetricsSourceException     if its metrics backend does not answer as expected
+     * @throws LogsSourceException        if its logs backend does not answer as expected
+     */
+    public void testConnection(Connector connector) {
+        List<String> problems = new ArrayList<>();
+        Connector restored = restoreSecrets(connector, store.load(), problems);
+        if (!problems.isEmpty()) {
+            throw new InvalidConnectorsException(problems);
+        }
+        try {
+            if (metricsFactories.containsKey(restored.getKind())) {
+                createMetricsSource(restored).testConnection();
+            } else if (logsFactories.containsKey(restored.getKind())) {
+                createLogsSource(restored).testConnection();
+            } else {
+                throw new InvalidConnectorsException(List.of("unknown kind " + restored.getKind() + ", known: " + kinds()));
+            }
+        } catch (IllegalArgumentException e) {
+            throw new InvalidConnectorsException(List.of(e.getMessage()));
+        }
+    }
+
+    /**
+     * Every kind a connector can be of, with its settings, for a form to edit one.
+     */
+    public List<ConnectorKind> describeKinds() {
+        List<ConnectorKind> kinds = new ArrayList<>();
+        metricsFactories.values().forEach(factory -> kinds.add(ConnectorKind.of(factory.getKind(), ConnectorRole.METRICS, factory.getSettingsClass())));
+        logsFactories.values().forEach(factory -> kinds.add(ConnectorKind.of(factory.getKind(), ConnectorRole.LOGS, factory.getSettingsClass())));
+        kinds.sort(Comparator.comparing(ConnectorKind::getKind));
+        return kinds;
     }
 
     /**
@@ -185,6 +230,13 @@ public class Connectors implements EngineTelemetry {
         Stream<String> byEmitter = mapping == null ? Stream.empty() : emitters.apply(mapping).values().stream()
                 .filter(connectorId -> !connectorId.equals(EngineConnectors.NONE));
         return Stream.concat(byEmitter, assigned(config, mapping, null, role).stream()).distinct();
+    }
+
+    private Connector restoreSecrets(Connector connector, ConnectorsConfig stored, List<String> problems) {
+        return settingsClass(connector)
+                .map(settingsClass -> secrets.restore(connector,
+                        connector.getId() == null ? null : connector(stored, connector.getId()).orElse(null), settingsClass, problems))
+                .orElse(connector);
     }
 
     private Connector protectSecrets(Connector connector, List<String> problems) {

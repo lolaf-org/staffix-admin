@@ -1,6 +1,7 @@
 package org.lolaf.staffix.admin.server.connectors;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.lolaf.staffix.admin.secrets.Secret;
 import org.lolaf.staffix.admin.server.secrets.SecretCipher;
 import org.lolaf.staffix.admin.store.Connector;
@@ -24,6 +25,22 @@ class ConnectorSecrets {
     static final String SET = "set";
 
     private final SecretCipher cipher;
+
+    /**
+     * The API shows a secret as {@link #SET}, so one sent back as such keeps its stored value.
+     */
+    Connector restore(Connector connector, @Nullable Connector stored, Class<?> settingsClass, List<String> problems) {
+        return replaceSecrets(connector, settingsClass, (name, value) -> {
+            if (!SET.equals(value)) {
+                return value;
+            }
+            if (stored != null && stored.getSettings().get(name) instanceof String storedValue) {
+                return storedValue;
+            }
+            problems.add("connector " + connector.getId() + ": secret " + name + " has no stored value to keep");
+            return value;
+        });
+    }
 
     /**
      * Encrypts plain values, and re-encrypts those under a previous master key; a plain value without a master key

@@ -9,6 +9,7 @@ import org.lolaf.staffix.admin.store.ConnectorStore;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import tools.jackson.databind.JacksonModule;
 
 @Configuration
 class ConnectorsConfiguration {
@@ -16,6 +17,11 @@ class ConnectorsConfiguration {
     @Bean
     ConnectorStore connectorStore(AdminProperties properties) {
         return new YamlConnectorStore(properties.getDataDir());
+    }
+
+    @Bean
+    JacksonModule connectorsJacksonModule() {
+        return ConnectorsJackson.module();
     }
 
     @Bean

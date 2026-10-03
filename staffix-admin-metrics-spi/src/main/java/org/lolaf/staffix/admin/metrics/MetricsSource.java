@@ -18,4 +18,13 @@ public interface MetricsSource {
      * @throws MetricsSourceException if the backend cannot be queried
      */
     List<MetricSeries> query(MetricQuery query);
+
+    /**
+     * Probes the backend with a cheap request, so an admin knows a connector works before relying on it.
+     *
+     * @throws MetricsSourceException if the backend does not answer as expected, or cannot be tested
+     */
+    default void testConnection() {
+        throw new MetricsSourceException("This metrics backend cannot be tested", null);
+    }
 }

@@ -56,6 +56,13 @@ class PrometheusMetricsSourceTest {
             exchange.getResponseBody().write(body);
             exchange.close();
         });
+        prometheus.createContext("/api/v1/status/buildinfo", exchange -> {
+            byte[] body = (status == 200 ? "{\"status\":\"success\",\"data\":{\"version\":\"3.5.0\"}}"
+                    : "{\"status\":\"error\",\"error\":\"unauthorized\"}").getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(status, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
         prometheus.start();
     }
 
@@ -127,6 +134,20 @@ class PrometheusMetricsSourceTest {
         assertThatThrownBy(() -> source(TimeUnit.MILLISECONDS).query(query(MetricKind.MESSAGE_RATE, Duration.ofSeconds(5))))
                 .isInstanceOf(MetricsSourceException.class)
                 .hasMessage("Prometheus answered 400: parse error");
+    }
+
+    @Test
+    void testsTheConnectionWithTheBuildInfo() {
+        source(TimeUnit.MILLISECONDS).testConnection();
+    }
+
+    @Test
+    void reportsAConnectionTestPrometheusRefuses() {
+        status = 401;
+
+        assertThatThrownBy(() -> source(TimeUnit.MILLISECONDS).testConnection())
+                .isInstanceOf(MetricsSourceException.class)
+                .hasMessage("Prometheus answered 401: unauthorized");
     }
 
     @Test

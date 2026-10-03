@@ -39,6 +39,7 @@ public class LokiLogsSource implements LogsSource {
 
     private final RestClient client;
     private final URI queryRangeUrl;
+    private final URI labelsUrl;
     private final String streamSelectorMatchers;
     private final Set<String> indexedLabels;
 
@@ -51,10 +52,31 @@ public class LokiLogsSource implements LogsSource {
             builder.defaultHeader("X-Scope-OrgID", properties.getTenant());
         }
         this.client = builder.requestFactory(requestFactory).build();
-        this.queryRangeUrl = URI.create(properties.getUrl().toString().replaceAll("/+$", "") + "/loki/api/v1/query_range");
+        String url = properties.getUrl().toString().replaceAll("/+$", "");
+        this.queryRangeUrl = URI.create(url + "/loki/api/v1/query_range");
+        this.labelsUrl = URI.create(url + "/loki/api/v1/labels");
         String streamSelector = properties.getStreamSelector().strip();
         this.streamSelectorMatchers = streamSelector.substring(1, streamSelector.length() - 1).strip();
         this.indexedLabels = properties.getIndexedLabels();
+    }
+
+    /**
+     * Lists the labels, which also checks the tenant of a multi-tenant Loki.
+     */
+    @Override
+    public void testConnection() {
+        try {
+            client.get()
+                    .uri(labelsUrl)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, (request, failure) -> {
+                        throw new LogsSourceException("Loki answered " + failure.getStatusCode().value() + ": "
+                                + new String(failure.getBody().readAllBytes(), StandardCharsets.UTF_8).strip(), null);
+                    })
+                    .toBodilessEntity();
+        } catch (ResourceAccessException e) {
+            throw new LogsSourceException("Loki at " + labelsUrl + " did not answer", e);
+        }
     }
 
     @Override

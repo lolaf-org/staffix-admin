@@ -58,6 +58,13 @@ class LokiLogsSourceTest {
             exchange.getResponseBody().write(body);
             exchange.close();
         });
+        loki.createContext("/loki/api/v1/labels", exchange -> {
+            tenant = exchange.getRequestHeaders().getFirst("X-Scope-OrgID");
+            byte[] body = (status == 200 ? "{\"status\":\"success\",\"data\":[\"fix_eid\"]}" : "no org id").getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(status, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
         loki.start();
     }
 
@@ -121,6 +128,22 @@ class LokiLogsSourceTest {
         assertThatThrownBy(() -> source(null).query(query().build()))
                 .isInstanceOf(LogsSourceException.class)
                 .hasMessage("Loki answered 400: parse error at line 1, col 25");
+    }
+
+    @Test
+    void testsTheConnectionByListingTheLabelsOfTheTenant() {
+        source("alpha-tenant").testConnection();
+
+        assertThat(tenant).isEqualTo("alpha-tenant");
+    }
+
+    @Test
+    void reportsAConnectionTestLokiRefuses() {
+        status = 401;
+
+        assertThatThrownBy(() -> source(null).testConnection())
+                .isInstanceOf(LogsSourceException.class)
+                .hasMessage("Loki answered 401: no org id");
     }
 
     @Test
