@@ -53,7 +53,7 @@ Engines appear once they announce themselves: add staffix's HTTP admin API conne
 credentials of a user with the `ENGINE` role. The console then calls each engine with the token it announced.
 
 To try the console without real engines, run the demo (simulated engines, generated metrics and FIX logs, demo
-users): `./mvnw install`, then `docker compose up --build` in `staffix-admin-demo`. See `staffix-admin-demo/README.md`,
+users): `./mvnw install`, then `docker compose up` in `staffix-admin-demo`. See `staffix-admin-demo/README.md`,
 which also runs it without Docker.
 
 ## Metrics and logs

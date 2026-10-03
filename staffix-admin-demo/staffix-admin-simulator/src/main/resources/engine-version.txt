@@ -1,0 +1,4 @@
+# Read by staffix's announcer, which takes it from staffix-impl in a real engine
+engineName=Staffix
+engineVersion=1.0.0-demo
+engineVendor=Lolaf

@@ -14,11 +14,11 @@ and generated metrics and FIX logs.
 ```shell
 ./mvnw install                  # in the repository root
 cd staffix-admin-demo
-docker compose up --build
+docker compose up
 ```
 
-Open http://localhost:8080 and log in as `reader` or `writer` (password = name). The images are built from what
-`./mvnw install` produced, so rebuild after a change. `docker compose down -v` also forgets the connectors the console
+Open http://localhost:8080 and log in as `reader` or `writer` (password = name). The images are rebuilt on each
+`up` from what `./mvnw install` produced. `docker compose down -v` also forgets the connectors the console
 stored in its volume.
 
 ## Run it without Docker
