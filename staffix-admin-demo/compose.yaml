@@ -1,11 +1,10 @@
+# The whole demo, from what ./mvnw install built: docker compose up --build
 name: staffix-admin-demo
 
 services:
 
   console:
-    build:
-      context: .
-      dockerfile: console.Dockerfile
+    build: staffix-admin-dist-demo
     image: staffix-admin-demo-console
     ports:
       - "8080:8080"
@@ -13,9 +12,7 @@ services:
       - console-data:/data
 
   simulator:
-    build:
-      context: .
-      dockerfile: simulator.Dockerfile
+    build: staffix-admin-simulator
     image: staffix-admin-simulator
     # the engines advertise their host name, which the console resolves on this network
     hostname: simulator

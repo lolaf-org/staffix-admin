@@ -6,14 +6,20 @@ real engines: they announce themselves, answer `status`, `settings`, `emitters` 
 staffix refuses. Sessions log on, drop, reconnect, follow session windows and can be switched to their backups.
 
 Their metrics and FIX logs are generated and served on a separate port for the console's `demo-metrics` and
-`demo-logs` connectors (`connectors.yaml` declares them). Values derive from the instant and the session, so a chart
-shows the same data on each refresh. `nyc-uat` logs through slf4j and has no monitoring plugin, so the console shows
-its telemetry as not collected; `paris-prod`'s client acceptors measure no decoding, encoding or clock offset.
+`demo-logs` connectors, which the demo distribution (`staffix-admin-dist-demo`) declares in `data/connectors.yaml`.
+Values derive from the instant and the session, so a chart shows the same data on each refresh. `nyc-uat` logs
+through slf4j and has no monitoring plugin, so the console shows its telemetry as not collected; `paris-prod`'s
+client acceptors measure no decoding, encoding or clock offset.
 
 ```shell
 ./mvnw install
 ./mvnw exec:java -pl :staffix-admin-simulator
+# or without Maven, from the runnable jar the build produces
+java -jar staffix-admin-demo/staffix-admin-simulator/target/staffix-admin-simulator.jar
 ```
+
+Its `Dockerfile` builds an image from that jar; the demo's `compose.yaml` (see the demo's README) runs it next to the
+console, with these properties in `JAVA_OPTS`.
 
 | System property | Default | |
 |---|---|---|

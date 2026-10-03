@@ -1,0 +1,3 @@
+*
+!target/staffix-admin-demo
+!src/docker/connectors.yaml

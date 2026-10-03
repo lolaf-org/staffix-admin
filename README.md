@@ -52,23 +52,9 @@ Engines appear once they announce themselves: add staffix's HTTP admin API conne
 (`staffix-admin-api-http-impl`, see staffix's runtime administration guide) with `announceUrl` pointing here and the
 credentials of a user with the `ENGINE` role. The console then calls each engine with the token it announced.
 
-To try the console without real engines, run the demo: the console with the demo users (`reader`, `writer`,
-`engine`, password = name) and the simulator, a separate process whose three engines announce themselves through
-staffix's own HTTP admin API connector, with sessions that drop, reconnect and follow session windows, and serve
-generated metrics and FIX logs to the `demo-metrics` and `demo-logs` connectors. With Docker:
-
-```shell
-./mvnw install
-(cd staffix-admin-demo/staffix-admin-dist-demo/target/docker && docker compose up --build)
-```
-
-or from the demo distribution (`staffix-admin-demo/staffix-admin-dist-demo/target/staffix-admin-demo.zip`, also
-unpacked under `staffix-admin-demo/staffix-admin-dist-demo/target/staffix-admin-demo/`), whose `data/` already holds the connectors to the simulator:
-
-```shell
-(cd staffix-admin-demo/staffix-admin-dist-demo/target/staffix-admin-demo/staffix-admin && java -jar staffix-admin.jar) &
-java -jar staffix-admin-demo/staffix-admin-simulator/target/staffix-admin-simulator.jar
-```
+To try the console without real engines, run the demo (simulated engines, generated metrics and FIX logs, demo
+users): `./mvnw install`, then `docker compose up --build` in `staffix-admin-demo`. See `staffix-admin-demo/README.md`,
+which also runs it without Docker.
 
 ## Metrics and logs
 
@@ -184,7 +170,7 @@ durable as your logging. To keep it elsewhere (a file of its own, a database, a 
 
 1. Run `DevelopmentApplication` (in the server's test sources, so on the test class path holding the plugins and the
    development users) from the IDE in the repository root, port 8080, after
-   `[ -f data/connectors.yaml ] || { mkdir -p data && cp staffix-admin-demo/staffix-admin-simulator/connectors.yaml data/; }`; and the
+   `[ -f data/connectors.yaml ] || { mkdir -p data && cp staffix-admin-demo/staffix-admin-dist-demo/src/data/connectors.yaml data/; }`; and the
    simulator (`./mvnw exec:java -pl :staffix-admin-simulator`) for engines.
 2. Start the UI dev server, which first regenerates the TypeScript types from the running backend:
 
