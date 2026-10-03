@@ -12,7 +12,7 @@ its telemetry as not collected; `paris-prod`'s client acceptors measure no decod
 
 ```shell
 ./mvnw install
-./mvnw exec:java -pl staffix-admin-simulator
+./mvnw exec:java -pl :staffix-admin-simulator
 ```
 
 | System property | Default | |

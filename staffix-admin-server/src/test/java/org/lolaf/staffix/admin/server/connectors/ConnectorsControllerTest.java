@@ -98,7 +98,7 @@ class ConnectorsControllerTest {
 
         mockMvc.perform(put("/api/connectors").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(invalid))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.problems[0]").value("connector alpha: unknown kind elastic, known: loki, prometheus"))
+                .andExpect(jsonPath("$.problems[0]").value("connector alpha: unknown kind elastic, known: demo-logs, demo-metrics, loki, prometheus"))
                 .andExpect(jsonPath("$.problems[1]").value("the defaults: metrics connector missing is not a metrics connector"));
     }
 
@@ -127,15 +127,14 @@ class ConnectorsControllerTest {
     void describesEachKindsSettings() throws Exception {
         mockMvc.perform(get("/api/connectors/kinds"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].kind").value("loki"))
-                .andExpect(jsonPath("$[0].role").value("LOGS"))
-                .andExpect(jsonPath("$[0].settings[?(@.name == 'tenant')].secret").value(hasItem(true)))
-                .andExpect(jsonPath("$[0].settings[?(@.name == 'tenant')].description")
+                .andExpect(jsonPath("$[?(@.kind == 'loki')].role").value(hasItem("LOGS")))
+                .andExpect(jsonPath("$[?(@.kind == 'loki')].settings[?(@.name == 'tenant')].secret").value(hasItem(true)))
+                .andExpect(jsonPath("$[?(@.kind == 'loki')].settings[?(@.name == 'tenant')].description")
                         .value(hasItem("Sent as X-Scope-OrgID to a multi-tenant Loki; leave empty for a single-tenant one.")))
-                .andExpect(jsonPath("$[0].settings[?(@.name == 'url')].required").value(hasItem(true)))
-                .andExpect(jsonPath("$[0].settings[?(@.name == 'timeout')].defaultValue").value(hasItem("10s")))
-                .andExpect(jsonPath("$[0].settings[?(@.name == 'indexedLabels')].values[*]").value(hasItem("fix_eid")))
-                .andExpect(jsonPath("$[1].settings[?(@.name == 'timerBaseUnit')].values[*]").value(hasItem("microseconds")));
+                .andExpect(jsonPath("$[?(@.kind == 'loki')].settings[?(@.name == 'url')].required").value(hasItem(true)))
+                .andExpect(jsonPath("$[?(@.kind == 'loki')].settings[?(@.name == 'timeout')].defaultValue").value(hasItem("10s")))
+                .andExpect(jsonPath("$[?(@.kind == 'loki')].settings[?(@.name == 'indexedLabels')].values[*]").value(hasItem("fix_eid")))
+                .andExpect(jsonPath("$[?(@.kind == 'prometheus')].settings[?(@.name == 'timerBaseUnit')].values[*]").value(hasItem("microseconds")));
     }
 
     @Test

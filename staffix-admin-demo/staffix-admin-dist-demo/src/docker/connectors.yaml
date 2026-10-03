@@ -1,0 +1,15 @@
+version: 0
+connectors:
+  - id: simulator-metrics
+    name: Simulator metrics
+    kind: demo-metrics
+    settings:
+      url: http://simulator:8688
+  - id: simulator-logs
+    name: Simulator logs
+    kind: demo-logs
+    settings:
+      url: http://simulator:8688
+defaults:
+  metrics: simulator-metrics
+  logs: simulator-logs

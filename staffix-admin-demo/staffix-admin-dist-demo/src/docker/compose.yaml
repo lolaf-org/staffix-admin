@@ -1,0 +1,28 @@
+name: staffix-admin-demo
+
+services:
+
+  console:
+    build:
+      context: .
+      dockerfile: console.Dockerfile
+    image: staffix-admin-demo-console
+    ports:
+      - "8080:8080"
+    volumes:
+      - console-data:/data
+
+  simulator:
+    build:
+      context: .
+      dockerfile: simulator.Dockerfile
+    image: staffix-admin-simulator
+    # the engines advertise their host name, which the console resolves on this network
+    hostname: simulator
+    environment:
+      JAVA_OPTS: -DconsoleUrl=http://console:8080
+    depends_on:
+      - console
+
+volumes:
+  console-data:

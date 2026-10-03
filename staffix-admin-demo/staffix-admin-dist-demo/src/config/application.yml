@@ -1,0 +1,6 @@
+# The demo console: development users, connectors reading the simulator's generated telemetry.
+staffix:
+  admin:
+    data-dir: data
+    security:
+      jaas-config: file:config/jaas.conf

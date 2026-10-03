@@ -24,12 +24,11 @@
         <module>staffix-admin-metrics</module>
         <module>staffix-admin-store</module>
         <module>staffix-admin-connector-spi</module>
-        <module>staffix-admin-demo-connector</module>
-        <module>staffix-admin-simulator</module>
         <module>staffix-admin-server</module>
         <module>staffix-admin-ui</module>
         <module>staffix-admin-app</module>
         <module>staffix-admin-dist</module>
+        <module>staffix-admin-demo</module>
     </modules>
 
     <profiles>
@@ -89,7 +88,7 @@
             </dependency>
             <dependency>
                 <groupId>org.lolaf</groupId>
-                <artifactId>staffix-admin-demo-connector</artifactId>
+                <artifactId>staffix-admin-connector-demo</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

@@ -15,9 +15,8 @@ serves a React UI and proxies the engines' HTTP admin connectors. The browser ne
 | `staffix-admin-store` | `staffix-admin-store-spi`, where the connectors are kept; `staffix-admin-store-yaml`, a YAML file |
 | `staffix-admin-audit` | `staffix-admin-audit-spi`, where audit entries go; `staffix-admin-audit-log`, log lines |
 | `staffix-admin-connector-spi` | What a backend plugin declares about its settings: descriptions, secrets, secret references |
-| `staffix-admin-demo-connector` | The `demo-metrics` and `demo-logs` connector kinds, reading the simulator's generated telemetry |
-| `staffix-admin-simulator` | Simulated engines for demos and UI work, a separate process seen by the console as real engines |
 | `staffix-admin-dist` | The distribution: the console's jar, its plugins and an example configuration |
+| `staffix-admin-demo` | `staffix-admin-simulator`, simulated engines seen by the console as real ones; `staffix-admin-connector-demo`, the `demo-metrics` and `demo-logs` kinds reading their telemetry; `staffix-admin-dist-demo`, the distribution with them and demo users, and a docker compose running console and simulator |
 
 ## API contract
 
@@ -43,8 +42,8 @@ java -jar staffix-admin.jar
 ```
 
 The build produces the distribution `staffix-admin-dist/target/staffix-admin.zip` (and `.tar.gz`, and unpacked under
-`staffix-admin-dist/target/staffix-admin/`): `staffix-admin.jar`, `plugins/` with the Prometheus, Loki and demo
-connectors, and `config/`, read from the directory the console starts in: `application.yml`, `jaas.conf` and
+`staffix-admin-dist/target/staffix-admin/`): `staffix-admin.jar`, `plugins/` with the YAML store, the audit log,
+the Prometheus and Loki connectors, and `config/`, read from the directory the console starts in: `application.yml`, `jaas.conf` and
 `users.properties`, which defines no user until you add one, so a fresh install lets nobody in.
 
 Open http://localhost:8080. The build downloads its own Node into `staffix-admin-ui/node/`; no system Node needed.
@@ -53,16 +52,22 @@ Engines appear once they announce themselves: add staffix's HTTP admin API conne
 (`staffix-admin-api-http-impl`, see staffix's runtime administration guide) with `announceUrl` pointing here and the
 credentials of a user with the `ENGINE` role. The console then calls each engine with the token it announced.
 
-To try the console without real engines, run it with the development users (`dev/console`: `reader`,
-`writer` and `engine`, password = name) and start the simulator, a separate process whose three engines announce
-themselves through staffix's own HTTP admin API connector, with sessions that drop, reconnect and follow session
-windows, and serve generated metrics and FIX logs to the `demo-metrics` and `demo-logs` connectors:
+To try the console without real engines, run the demo: the console with the demo users (`reader`, `writer`,
+`engine`, password = name) and the simulator, a separate process whose three engines announce themselves through
+staffix's own HTTP admin API connector, with sessions that drop, reconnect and follow session windows, and serve
+generated metrics and FIX logs to the `demo-metrics` and `demo-logs` connectors. With Docker:
 
 ```shell
-DIST=staffix-admin-dist/target/staffix-admin/staffix-admin
-[ -f data/connectors.yaml ] || { mkdir -p data && cp staffix-admin-simulator/connectors.yaml data/; }
-java -Dloader.path=$DIST/plugins -jar $DIST/staffix-admin.jar --staffix.admin.security.jaas-config=file:dev/console/jaas.conf
-./mvnw exec:java -pl staffix-admin-simulator
+./mvnw install
+(cd staffix-admin-demo/staffix-admin-dist-demo/target/docker && docker compose up --build)
+```
+
+or from the demo distribution (`staffix-admin-demo/staffix-admin-dist-demo/target/staffix-admin-demo.zip`, also
+unpacked under `staffix-admin-demo/staffix-admin-dist-demo/target/staffix-admin-demo/`), whose `data/` already holds the connectors to the simulator:
+
+```shell
+(cd staffix-admin-demo/staffix-admin-dist-demo/target/staffix-admin-demo/staffix-admin && java -jar staffix-admin.jar) &
+java -jar staffix-admin-demo/staffix-admin-simulator/target/staffix-admin-simulator.jar
 ```
 
 ## Metrics and logs
@@ -150,7 +155,8 @@ names its auto-configuration, which registers beans of the console's SPIs:
 
 The console provides Spring Boot (web, RestClient), Jackson, the SPIs above and `staffix-api`: a plugin depends on
 them as `provided`, as `staffix-admin-logs/staffix-admin-logs-loki/pom.xml` does. Anything else it needs, it shades into its jar or ships as more jars in `plugins/`. The
-distribution's own `plugins/` holds the YAML store, the audit log and the Prometheus, Loki and demo connectors; the
+distribution's own `plugins/` holds the YAML store, the audit log and the Prometheus and Loki connectors (the demo
+distribution adds the demo connector); the
 console refuses to start without a store and an audit sink, and the connectors you do not use can go.
 
 ## Security
@@ -176,9 +182,10 @@ durable as your logging. To keep it elsewhere (a file of its own, a database, a 
 
 ## UI development with hot reload
 
-1. Run `StaffixAdminApplication` from the IDE (port 8080), in the repository root, with
-   `--staffix.admin.security.jaas-config=file:dev/console/jaas.conf`,
-   and the simulator (`./mvnw exec:java -pl staffix-admin-simulator`) for engines.
+1. Run `DevelopmentApplication` (in the server's test sources, so on the test class path holding the plugins and the
+   development users) from the IDE in the repository root, port 8080, after
+   `[ -f data/connectors.yaml ] || { mkdir -p data && cp staffix-admin-demo/staffix-admin-simulator/connectors.yaml data/; }`; and the
+   simulator (`./mvnw exec:java -pl :staffix-admin-simulator`) for engines.
 2. Start the UI dev server, which first regenerates the TypeScript types from the running backend:
 
    ```shell
