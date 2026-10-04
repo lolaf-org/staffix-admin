@@ -39,11 +39,9 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 /**
- * Calls the engines' HTTP admin connectors with the token each announced. A session box is named after its main
- * config, while the connector addresses the config that runs, so each operation first reads the engine's status.
+ * Calls the engines' HTTP admin connectors, version {@value #API_VERSION} of their API, with the token each announced.
  */
 @Component
 class HttpEngineGateway implements EngineGateway {
@@ -53,6 +51,7 @@ class HttpEngineGateway implements EngineGateway {
      * engine's work does not grow with the number of viewers.
      */
     static final Duration STATUS_FRESH = Duration.ofSeconds(1);
+    static final String API_VERSION = "v1";
 
     private final EngineRegistry registry;
     private final RestClient client;
@@ -99,38 +98,32 @@ class HttpEngineGateway implements EngineGateway {
 
     @Override
     public JsonNode getSessionSettings(SessionRef session) {
-        return call(session.getEngineId(), HttpMethod.GET, runningConfig(session, "settings"), null, JsonNode.class);
+        return call(session.getEngineId(), HttpMethod.GET, sessionPath(session, "settings"), null, JsonNode.class);
     }
 
     @Override
     public JsonNode getEmitters(String engineId) {
-        return call(engineId, HttpMethod.GET, List.of("emitters"), null, JsonNode.class);
+        return call(engineId, HttpMethod.GET, List.of("components"), null, JsonNode.class);
     }
 
     @Override
     public void logon(SessionRef session) {
-        operate(session, HttpMethod.POST, () -> runningConfig(session, "logon"), null);
+        operate(session, HttpMethod.POST, sessionPath(session, "logon"), null);
     }
 
     @Override
     public void logout(SessionRef session) {
-        operate(session, HttpMethod.POST, () -> runningConfig(session, "logout"), null);
+        operate(session, HttpMethod.POST, sessionPath(session, "logout"), null);
     }
 
     @Override
     public void reset(SessionRef session, ResetMode mode) {
-        operate(session, HttpMethod.POST, () -> runningConfig(session, "reset"), Map.of("mode", mode.name()));
+        operate(session, HttpMethod.POST, sessionPath(session, "reset"), Map.of("mode", mode.name()));
     }
 
     @Override
     public void activate(SessionRef session, String configId) {
-        operate(session, HttpMethod.POST, () -> {
-            if (session(session).description().getConfigs().stream().noneMatch(config -> config.getName().equals(configId))) {
-                throw GatewayException.invalid("Session '" + session.getGroup() + "." + session.getSessionId()
-                        + "' has no config '" + configId + "'");
-            }
-            return List.of("sessions", session.getGroup(), configId, "activate");
-        }, null);
+        operate(session, HttpMethod.POST, sessionPath(session, "activate"), Map.of("config", configId));
     }
 
     @Override
@@ -142,12 +135,12 @@ class HttpEngineGateway implements EngineGateway {
         if (outgoing != null) {
             seqNums.put("outgoing", outgoing);
         }
-        operate(session, HttpMethod.PUT, () -> runningConfig(session, "seqnums"), seqNums);
+        operate(session, HttpMethod.PUT, sessionPath(session, "seqnums"), seqNums);
     }
 
     @Override
     public void sendMessage(SessionRef session, String message, char separator, boolean possDup) {
-        operate(session, HttpMethod.POST, () -> runningConfig(session, "messages"),
+        operate(session, HttpMethod.POST, sessionPath(session, "messages"),
                 Map.of("message", message, "separator", String.valueOf(separator), "possDup", possDup));
     }
 
@@ -212,13 +205,11 @@ class HttpEngineGateway implements EngineGateway {
     }
 
     /**
-     * Reads a fresh status first, as a backup may have taken over within the cache window, and marks it stale after,
-     * so the next poll shows the operation's effect.
+     * Marks the status stale after, so the next poll shows the operation's effect.
      */
-    private void operate(SessionRef session, HttpMethod method, Supplier<List<String>> path, @Nullable Object body) {
-        markStale(session.getEngineId());
+    private void operate(SessionRef session, HttpMethod method, List<String> path, @Nullable Object body) {
         try {
-            call(session.getEngineId(), method, path.get(), body, Void.class);
+            call(session.getEngineId(), method, path, body, Void.class);
         } finally {
             markStale(session.getEngineId());
         }
@@ -240,8 +231,8 @@ class HttpEngineGateway implements EngineGateway {
                 .orElseThrow(() -> GatewayException.unknownSession(session));
     }
 
-    private List<String> runningConfig(SessionRef session, String operation) {
-        return List.of("sessions", session.getGroup(), session(session).status().getSelectedConfig(), operation);
+    private static List<String> sessionPath(SessionRef session, String operation) {
+        return List.of("sessions", session.getGroup(), session.getSessionId(), operation);
     }
 
     private <T> T call(String engineId, HttpMethod method, List<String> path, @Nullable Object body, Class<T> responseType) {
@@ -264,7 +255,7 @@ class HttpEngineGateway implements EngineGateway {
     }
 
     private static URI uri(URI baseUrl, List<String> path) {
-        StringBuilder uri = new StringBuilder(baseUrl.toString().replaceAll("/+$", ""));
+        StringBuilder uri = new StringBuilder(baseUrl.toString().replaceAll("/+$", "")).append('/').append(API_VERSION);
         path.forEach(segment -> uri.append('/').append(UriUtils.encodePathSegment(segment, StandardCharsets.UTF_8)));
         return URI.create(uri.toString());
     }

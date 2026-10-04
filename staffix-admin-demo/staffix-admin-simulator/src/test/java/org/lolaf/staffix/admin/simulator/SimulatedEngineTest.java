@@ -48,7 +48,7 @@ class SimulatedEngineTest {
     void refusesWhatStaffixRefuses() {
         FixSessionId acme = session("acme", "trading").getFixSessionId();
 
-        assertThatThrownBy(() -> paris.resetSession(acme, AdminApi.ResetFixSessionMode.LOGOUT_LOGON_REST_NUM_FLAG))
+        assertThatThrownBy(() -> paris.resetSession(acme, AdminApi.ResetFixSessionMode.LOGOUT_LOGON_RESET_NUM_FLAG))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("needs an initiator session");
         ticks(3);

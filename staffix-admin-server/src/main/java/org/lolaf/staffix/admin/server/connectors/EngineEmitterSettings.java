@@ -24,7 +24,7 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 /**
- * How an engine's emitters export, read from the settings staffix's HTTP connector serves ({@code GET emitters}).
+ * How an engine's emitters export, read from the settings staffix's HTTP connector serves ({@code GET components}).
  * The only place that knows staffix's settings field names; empty when the engine never answered.
  */
 @Component

@@ -73,10 +73,11 @@ final class SimulatedEngine implements AdminApi {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public synchronized void resetSession(FixSessionId fixSessionId, ResetFixSessionMode resetFixSessionMode) {
         SimulatedSession session = running(fixSessionId);
         switch (resetFixSessionMode) {
-            case LOGOUT_LOGON_REST_NUM_FLAG -> {
+            case LOGOUT_LOGON_RESET_NUM_FLAG, LOGOUT_LOGON_REST_NUM_FLAG -> {
                 if (session.settings.getFixSessionType() != FixSessionType.INITIATOR) {
                     throw new IllegalStateException(resetFixSessionMode
                             + " needs an initiator session: only the initiator sends the Logon carrying the reset");

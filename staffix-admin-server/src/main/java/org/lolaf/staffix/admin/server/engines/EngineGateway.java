@@ -26,7 +26,7 @@ public interface EngineGateway {
 
     /**
      * The engine's messages loggers and session plugins with their settings, as staffix's HTTP connector serves them
-     * ({@code GET emitters}); static for the engine's life.
+     * ({@code GET components}); static for the engine's life.
      */
     JsonNode getEmitters(String engineId);
 

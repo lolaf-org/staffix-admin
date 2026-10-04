@@ -2,7 +2,7 @@
 
 Three simulated engines (`paris-prod`, `london-prod`, `nyc-uat`) for demos and UI work. Each implements staffix's
 `AdminApi` and is served by staffix's own HTTP admin API connector, so the console meets them exactly as it meets
-real engines: they announce themselves, answer `status`, `settings`, `emitters` and dictionaries, and refuse what
+real engines: they announce themselves, answer `status`, `settings`, `components` and dictionaries, and refuse what
 staffix refuses. Sessions log on, drop, reconnect, follow session windows and can be switched to their backups.
 
 Their metrics and FIX logs are generated and served on a separate port for the console's `demo-metrics` and

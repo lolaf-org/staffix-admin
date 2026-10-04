@@ -12,7 +12,7 @@ export const RESET_MODES: { mode: ResetMode; label: string; description: string;
     description: 'Logon with ResetSeqNumFlag=Y over the live connection. The peer is told; the connection is kept.',
   },
   {
-    mode: 'LOGOUT_LOGON_REST_NUM_FLAG',
+    mode: 'LOGOUT_LOGON_RESET_NUM_FLAG',
     label: 'Logout, then logon with reset',
     description: 'Drops the connection and logs back on with ResetSeqNumFlag=Y. The peer is told. Initiators only.',
     initiatorOnly: true,

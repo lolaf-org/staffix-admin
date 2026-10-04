@@ -75,13 +75,15 @@ class HttpEngineGatewayTest {
     void setUp() throws Exception {
         connector = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         connector.createContext("/engines/alpha-engine/", exchange -> {
-            String path = exchange.getRequestURI().getRawPath().substring("/engines/alpha-engine/".length());
-            String request = exchange.getRequestMethod() + " " + path;
-            if (!"Bearer alpha-token".equals(exchange.getRequestHeaders().getFirst("Authorization"))) {
-                exchange.sendResponseHeaders(401, -1);
+            String versionedPath = exchange.getRequestURI().getRawPath().substring("/engines/alpha-engine/".length());
+            if (!"Bearer alpha-token".equals(exchange.getRequestHeaders().getFirst("Authorization"))
+                    || !versionedPath.startsWith("v1/")) {
+                exchange.sendResponseHeaders(versionedPath.startsWith("v1/") ? 401 : 404, -1);
                 exchange.close();
                 return;
             }
+            String path = versionedPath.substring("v1/".length());
+            String request = exchange.getRequestMethod() + " " + path;
             requests.add(request);
             bodies.put(request, new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             byte[] body = switch (path) {
@@ -166,7 +168,7 @@ class HttpEngineGatewayTest {
     }
 
     @Test
-    void operationsAddressTheRunningConfig() {
+    void operationsAddressTheSessionByItsName() {
         gateway.logon(trading());
         gateway.reset(trading(), ResetMode.RESET_SEQUENCE);
         gateway.setSeqNums(trading(), null, 42L);
@@ -174,14 +176,15 @@ class HttpEngineGatewayTest {
         gateway.activate(trading(), "trading");
 
         assertThat(requests).filteredOn(request -> !request.startsWith("GET ")).containsExactly(
-                "POST sessions/alpha/trading-drp/logon",
-                "POST sessions/alpha/trading-drp/reset",
-                "PUT sessions/alpha/trading-drp/seqnums",
-                "POST sessions/alpha/trading-drp/messages",
+                "POST sessions/alpha/trading/logon",
+                "POST sessions/alpha/trading/reset",
+                "PUT sessions/alpha/trading/seqnums",
+                "POST sessions/alpha/trading/messages",
                 "POST sessions/alpha/trading/activate");
-        assertThat(bodies.get("POST sessions/alpha/trading-drp/reset")).isEqualTo("{\"mode\":\"RESET_SEQUENCE\"}");
-        assertThat(bodies.get("PUT sessions/alpha/trading-drp/seqnums")).isEqualTo("{\"outgoing\":42}");
-        assertThat(bodies.get("POST sessions/alpha/trading-drp/messages"))
+        assertThat(bodies.get("POST sessions/alpha/trading/activate")).isEqualTo("{\"config\":\"trading\"}");
+        assertThat(bodies.get("POST sessions/alpha/trading/reset")).isEqualTo("{\"mode\":\"RESET_SEQUENCE\"}");
+        assertThat(bodies.get("PUT sessions/alpha/trading/seqnums")).isEqualTo("{\"outgoing\":42}");
+        assertThat(bodies.get("POST sessions/alpha/trading/messages"))
                 .contains("\"message\":\"35=B|\"", "\"separator\":\"|\"", "\"possDup\":true");
     }
 
@@ -221,8 +224,7 @@ class HttpEngineGatewayTest {
         gateway.logon(trading());
         gateway.listGroups("alpha-engine");
 
-        assertThat(requests).containsExactly("GET status", "GET sessions", "GET status", "POST sessions/alpha/trading-drp/logon",
-                "GET status");
+        assertThat(requests).containsExactly("GET status", "GET sessions", "POST sessions/alpha/trading/logon", "GET status");
     }
 
     @Test
@@ -237,7 +239,7 @@ class HttpEngineGatewayTest {
 
     @Test
     void anEngineRefusalKeepsItsStatusAndReason() {
-        statuses.put("POST sessions/alpha/trading-drp/messages", 409);
+        statuses.put("POST sessions/alpha/trading/messages", 409);
 
         assertThatThrownBy(() -> gateway.sendMessage(trading(), "35=B|", '|', false))
                 .isInstanceOfSatisfying(GatewayException.class, e -> {
@@ -248,10 +250,13 @@ class HttpEngineGatewayTest {
 
     @Test
     void unknownSessionsConfigsAndTokensAreReported() throws Exception {
+        statuses.put("POST sessions/gamma/trading/logon", 404);
+        statuses.put("POST sessions/alpha/trading/activate", 404);
+
         assertThatThrownBy(() -> gateway.logon(SessionRef.of("alpha-engine", "gamma", "trading")))
                 .isInstanceOfSatisfying(GatewayException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
         assertThatThrownBy(() -> gateway.activate(trading(), "trading-uat"))
-                .isInstanceOfSatisfying(GatewayException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+                .isInstanceOfSatisfying(GatewayException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
 
         announce("stale-token", connector.getAddress().getPort());
         assertThatThrownBy(() -> gateway.listGroups("alpha-engine"))

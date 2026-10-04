@@ -82,7 +82,7 @@ class SimulatedEngine {
     synchronized void reset(SessionRef ref, ResetMode mode) {
         SimulatedSession session = connection(ref).running();
         switch (mode) {
-            case LOGOUT_LOGON_REST_NUM_FLAG -> {
+            case LOGOUT_LOGON_RESET_NUM_FLAG -> {
                 if (session.type != SessionType.INITIATOR) {
                     throw GatewayException.rejected(mode + " needs an initiator session: only the initiator sends the Logon carrying the reset");
                 }

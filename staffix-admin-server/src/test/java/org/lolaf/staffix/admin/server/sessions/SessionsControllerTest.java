@@ -75,7 +75,7 @@ class SessionsControllerTest {
     void answersARefusalWithAProblem() throws Exception {
         mockMvc.perform(post(ACME_TRADING + "/reset").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"mode\": \"LOGOUT_LOGON_REST_NUM_FLAG\"}"))
+                        .content("{\"mode\": \"LOGOUT_LOGON_RESET_NUM_FLAG\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail", containsString("initiator")));
     }

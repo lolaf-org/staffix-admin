@@ -119,7 +119,7 @@ class SimulatedEngineTest {
 
     @Test
     void refusesLogoutLogonResetOnAnAcceptor() {
-        assertThatThrownBy(() -> engine.reset(CLIENT_TRADING, ResetMode.LOGOUT_LOGON_REST_NUM_FLAG))
+        assertThatThrownBy(() -> engine.reset(CLIENT_TRADING, ResetMode.LOGOUT_LOGON_RESET_NUM_FLAG))
                 .isInstanceOfSatisfying(GatewayException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
     }
 

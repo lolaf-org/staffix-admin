@@ -112,7 +112,7 @@ engines:
       clients-metrics: none        # by monitoring plugin instance id
 ```
 
-The console also reads how each engine emits (staffix's `GET emitters`): the timer unit of its monitoring plugin,
+The console also reads how each engine emits (staffix's `GET components`): the timer unit of its monitoring plugin,
 the meters it has on (charts of the others are not offered), and whether a messages logger exports anything a
 backend reads (a slf4j or file logger does not, so its sessions' logs show as not collected).
 

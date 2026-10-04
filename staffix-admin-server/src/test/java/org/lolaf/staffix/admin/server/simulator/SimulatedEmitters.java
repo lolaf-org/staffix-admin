@@ -11,7 +11,7 @@ import java.util.Objects;
 import java.util.TreeSet;
 
 /**
- * Emitters shaped as staffix's {@code GET emitters} answers, chosen by instance id so the scenario shows each case:
+ * Emitters shaped as staffix's {@code GET components} answers, chosen by instance id so the scenario shows each case:
  * an OTLP logger, one behind an async wrapper, a logger that exports nothing, and monitoring plugins with different
  * meters.
  */

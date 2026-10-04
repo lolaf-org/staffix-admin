@@ -15,7 +15,7 @@ import java.util.List;
 @Builder
 @Jacksonized
 class ConnectorStatus {
-    String instanceId;
+    String engineId;
     String sessionsVersion;
     @Singular
     List<Session> sessions;
