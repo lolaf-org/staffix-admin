@@ -52,6 +52,32 @@ Engines appear once they announce themselves: add staffix's HTTP admin API conne
 (`staffix-admin-api-http-impl`, see staffix's runtime administration guide) with `announceUrl` pointing here and the
 credentials of a user with the `ENGINE` role. The console then calls each engine with the token it announced.
 
+### Docker image
+
+`staffix-admin-dist/Dockerfile` packages the distribution, running as a non-root user:
+
+```shell
+./mvnw install
+docker build -t staffix-admin staffix-admin-dist
+docker run -p 8080:8080 \
+    -v /etc/staffix-admin:/opt/staffix-admin/config:ro \
+    -v staffix-admin-data:/data \
+    -e STAFFIX_ADMIN_SECRETS_MASTERKEY=... \
+    staffix-admin
+```
+
+- `config/` holds the image's copy of the distribution's: as shipped it lets nobody in. Mount your own in its place,
+  starting from `staffix-admin-dist/src/config/`: `application.yml`, `jaas.conf` and your users or JAAS module. Hash
+  a password with the image itself:
+  `docker run --rm --entrypoint sh staffix-admin -c "java -Dloader.main=org.lolaf.staffix.admin.server.security.jaas.PasswordHasher -jar staffix-admin.jar 'secret'"`.
+- `/data` is the data directory: `connectors.yaml` lives there, so keep it on a volume.
+- `JAVA_OPTS` passes JVM options; any setting can also come from the environment
+  (`staffix.admin.engine-request-timeout` as `STAFFIX_ADMIN_ENGINEREQUESTTIMEOUT`).
+- Plugins of your own: build on the image, `FROM staffix-admin` then `COPY my-plugin.jar plugins/`, rather than
+  mounting over `plugins/`, which would hide the store and audit log the console needs.
+- The console serves plain HTTP: put it behind a TLS-terminating proxy, or configure Spring Boot's `server.ssl` in
+  `application.yml`.
+
 To try the console without real engines, run the demo (simulated engines, generated metrics and FIX logs, demo
 users): `./mvnw install`, then `docker compose up` in `staffix-admin-demo`. See `staffix-admin-demo/README.md`,
 which also runs it without Docker.
