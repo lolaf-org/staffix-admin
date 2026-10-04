@@ -25,7 +25,15 @@ public class EngineRegistry {
     private final AdminProperties properties;
     private final Clock clock;
 
+    /**
+     * @throws GatewayException if TLS is required and the engine announces a plain {@code http} URL
+     */
     public void announce(EngineAnnouncement announcement) {
+        if (properties.isRequireEngineTls() && !"https".equalsIgnoreCase(announcement.getBaseUrl().getScheme())) {
+            log.warn("Engine {} refused: it announced {}, and staffix.admin.require-engine-tls is set",
+                    announcement.getEngineId(), announcement.getBaseUrl());
+            throw GatewayException.invalid("Engine '" + announcement.getEngineId() + "' must be served over https");
+        }
         RegisteredEngine engine = RegisteredEngine.builder()
                 .engineId(announcement.getEngineId())
                 .baseUrl(announcement.getBaseUrl())

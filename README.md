@@ -75,8 +75,7 @@ docker run -p 8080:8080 \
   (`staffix.admin.engine-request-timeout` as `STAFFIX_ADMIN_ENGINEREQUESTTIMEOUT`).
 - Plugins of your own: build on the image, `FROM staffix-admin` then `COPY my-plugin.jar plugins/`, rather than
   mounting over `plugins/`, which would hide the store and audit log the console needs.
-- The console serves plain HTTP: put it behind a TLS-terminating proxy, or configure Spring Boot's `server.ssl` in
-  `application.yml`.
+- The console serves plain HTTP until told otherwise: see [TLS](#tls).
 
 To try the console without real engines, run the demo (simulated engines, generated metrics and FIX logs, demo
 users): `./mvnw install`, then `docker compose up` in `staffix-admin-demo`. See `staffix-admin-demo/README.md`,
@@ -204,6 +203,48 @@ The console ships no other sink: to keep the trail elsewhere (a file of its own,
    `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`.
 3. Drop the jar into `plugins/`. Every sink receives every entry: keep `staffix-admin-audit-log` next to yours to
    keep the log lines too, or remove it. The console refuses to start without any sink.
+
+### TLS
+
+Two links carry credentials: browsers and engines to the console (logins, session cookies, engine announcements
+with their tokens), and the console to the engines (each engine's bearer token, on every call).
+
+The console serves HTTPS with a Spring Boot SSL bundle; behind a TLS-terminating proxy instead, let it trust the
+proxy's forwarded headers so it knows requests came in over HTTPS and marks its session cookie secure:
+
+```yaml
+spring:
+  ssl:
+    bundle:
+      pem:
+        console:
+          keystore:
+            certificate: file:/etc/staffix-admin/tls/console.crt
+            private-key: file:/etc/staffix-admin/tls/console.key
+        engines:
+          truststore:
+            certificate: file:/etc/staffix-admin/tls/engines-ca.crt
+server:
+  port: 8443
+  ssl:
+    bundle: console
+  # behind a proxy, instead of server.ssl:
+  # forward-headers-strategy: native
+staffix:
+  admin:
+    engine-ssl-bundle: engines
+    require-engine-tls: true
+```
+
+- `staffix.admin.engine-ssl-bundle`: the bundle whose truststore the console trusts engines' HTTPS certificates with;
+  unset uses the JVM's default truststore.
+- `staffix.admin.require-engine-tls`: refuses an engine announcing a plain `http` URL (400, logged). Off by default
+  so the demo and a local setup work without certificates; turn it on in production.
+
+On the engine side, staffix's HTTP admin connector serves HTTPS with `sslContext` (Spring Boot
+`staffix.admin-api-http.ssl-bundle`) and trusts an HTTPS console with `announceSslContext`
+(`staffix.admin-api-http.announce-ssl-bundle`), the JVM's default truststore otherwise. Client certificates are not
+supported yet.
 
 ## UI development with hot reload
 

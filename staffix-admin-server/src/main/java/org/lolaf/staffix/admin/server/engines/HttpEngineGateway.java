@@ -13,6 +13,7 @@ import org.lolaf.staffix.admin.server.sessions.SessionHealth;
 import org.lolaf.staffix.admin.server.sessions.SessionState;
 import org.lolaf.staffix.admin.server.sessions.SessionSummary;
 import org.lolaf.staffix.admin.server.sessions.SessionType;
+import org.springframework.boot.ssl.SslBundles;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
@@ -59,14 +60,16 @@ class HttpEngineGateway implements EngineGateway {
     private final Clock clock;
     private final Map<String, CachedStatus> statuses = new ConcurrentHashMap<>();
 
-    HttpEngineGateway(EngineRegistry registry, AdminProperties properties, RestClient.Builder builder, JsonMapper jsonMapper,
-                      Clock clock) {
+    HttpEngineGateway(EngineRegistry registry, AdminProperties properties, SslBundles sslBundles, RestClient.Builder builder,
+                      JsonMapper jsonMapper, Clock clock) {
         this.registry = registry;
         this.jsonMapper = jsonMapper;
         this.clock = clock;
-        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
-                .connectTimeout(properties.getEngineRequestTimeout())
-                .build());
+        HttpClient.Builder httpClient = HttpClient.newBuilder().connectTimeout(properties.getEngineRequestTimeout());
+        if (properties.getEngineSslBundle() != null) {
+            httpClient.sslContext(sslBundles.getBundle(properties.getEngineSslBundle()).createSslContext());
+        }
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient.build());
         requestFactory.setReadTimeout(properties.getEngineRequestTimeout());
         this.client = builder.requestFactory(requestFactory).build();
     }

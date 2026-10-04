@@ -1,6 +1,9 @@
 package org.lolaf.staffix.admin.server.engines;
 
+import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import com.sun.net.httpserver.HttpsConfigurator;
+import com.sun.net.httpserver.HttpsServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,10 +17,15 @@ import org.lolaf.staffix.admin.server.sessions.SessionGroup;
 import org.lolaf.staffix.admin.server.sessions.SessionHealth;
 import org.lolaf.staffix.admin.server.sessions.SessionState;
 import org.lolaf.staffix.admin.server.sessions.SessionSummary;
+import org.lolaf.staffix.admin.server.TestTls;
+import org.springframework.boot.ssl.DefaultSslBundleRegistry;
+import org.springframework.boot.ssl.SslBundle;
+import org.springframework.boot.ssl.SslStoreBundle;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -74,41 +82,53 @@ class HttpEngineGatewayTest {
     @BeforeEach
     void setUp() throws Exception {
         connector = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
-        connector.createContext("/engines/alpha-engine/", exchange -> {
-            String versionedPath = exchange.getRequestURI().getRawPath().substring("/engines/alpha-engine/".length());
-            if (!"Bearer alpha-token".equals(exchange.getRequestHeaders().getFirst("Authorization"))
-                    || !versionedPath.startsWith("v1/")) {
-                exchange.sendResponseHeaders(versionedPath.startsWith("v1/") ? 401 : 404, -1);
-                exchange.close();
-                return;
-            }
-            String path = versionedPath.substring("v1/".length());
-            String request = exchange.getRequestMethod() + " " + path;
-            requests.add(request);
-            bodies.put(request, new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            byte[] body = switch (path) {
-                case "status" -> STATUS.formatted(sessionsVersion).getBytes(StandardCharsets.UTF_8);
-                case "sessions" -> SESSIONS.getBytes(StandardCharsets.UTF_8);
-                case "dictionaries/default-FIX.4.4" -> "<fix/>".getBytes(StandardCharsets.UTF_8);
-                default -> new byte[0];
-            };
-            int status = statuses.getOrDefault(request, body.length > 0 ? 200 : 204);
-            if (status >= 400) {
-                body = ("{\"status\":" + status + ",\"detail\":\"trading is not logged in\"}").getBytes(StandardCharsets.UTF_8);
-            }
-            exchange.getResponseHeaders().set("Content-Type", status >= 400 ? "application/problem+json"
-                    : path.startsWith("dictionaries/") ? "application/xml" : "application/json");
-            exchange.sendResponseHeaders(status, status == 204 ? -1 : body.length);
-            if (status != 204) {
-                exchange.getResponseBody().write(body);
-            }
-            exchange.close();
-        });
+        connector.createContext("/engines/alpha-engine/", this::serve);
         connector.start();
-        AdminProperties properties = new AdminProperties(Duration.ofSeconds(90), Duration.ofSeconds(2), Path.of("data"));
-        registry = new EngineRegistry(properties, Clock.systemUTC());
+        registry = new EngineRegistry(properties(null), Clock.systemUTC());
         announce("alpha-token", connector.getAddress().getPort());
-        gateway = new HttpEngineGateway(registry, properties, RestClient.builder(), JsonMapper.builder().build(), clock);
+        gateway = gateway(null);
+    }
+
+    private void serve(HttpExchange exchange) throws IOException {
+        String versionedPath = exchange.getRequestURI().getRawPath().substring("/engines/alpha-engine/".length());
+        if (!"Bearer alpha-token".equals(exchange.getRequestHeaders().getFirst("Authorization"))
+                || !versionedPath.startsWith("v1/")) {
+            exchange.sendResponseHeaders(versionedPath.startsWith("v1/") ? 401 : 404, -1);
+            exchange.close();
+            return;
+        }
+        String path = versionedPath.substring("v1/".length());
+        String request = exchange.getRequestMethod() + " " + path;
+        requests.add(request);
+        bodies.put(request, new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+        byte[] body = switch (path) {
+            case "status" -> STATUS.formatted(sessionsVersion).getBytes(StandardCharsets.UTF_8);
+            case "sessions" -> SESSIONS.getBytes(StandardCharsets.UTF_8);
+            case "dictionaries/default-FIX.4.4" -> "<fix/>".getBytes(StandardCharsets.UTF_8);
+            default -> new byte[0];
+        };
+        int status = statuses.getOrDefault(request, body.length > 0 ? 200 : 204);
+        if (status >= 400) {
+            body = ("{\"status\":" + status + ",\"detail\":\"trading is not logged in\"}").getBytes(StandardCharsets.UTF_8);
+        }
+        exchange.getResponseHeaders().set("Content-Type", status >= 400 ? "application/problem+json"
+                : path.startsWith("dictionaries/") ? "application/xml" : "application/json");
+        exchange.sendResponseHeaders(status, status == 204 ? -1 : body.length);
+        if (status != 204) {
+            exchange.getResponseBody().write(body);
+        }
+        exchange.close();
+    }
+
+    private static AdminProperties properties(String engineSslBundle) {
+        return new AdminProperties(Duration.ofSeconds(90), Duration.ofSeconds(2), Path.of("data"), engineSslBundle, false);
+    }
+
+    private HttpEngineGateway gateway(String engineSslBundle) {
+        DefaultSslBundleRegistry sslBundles = new DefaultSslBundleRegistry();
+        sslBundles.registerBundle("engines", SslBundle.of(SslStoreBundle.of(null, null, TestTls.trustStore())));
+        return new HttpEngineGateway(registry, properties(engineSslBundle), sslBundles, RestClient.builder(),
+                JsonMapper.builder().build(), clock);
     }
 
     @AfterEach
@@ -117,9 +137,13 @@ class HttpEngineGatewayTest {
     }
 
     private void announce(String token, int port) {
+        announce(token, URI.create("http://127.0.0.1:" + port + "/engines/alpha-engine"));
+    }
+
+    private void announce(String token, URI baseUrl) {
         registry.announce(EngineAnnouncement.builder()
                 .engineId("alpha-engine")
-                .baseUrl(URI.create("http://127.0.0.1:" + port + "/engines/alpha-engine"))
+                .baseUrl(baseUrl)
                 .token(token)
                 .build());
     }
@@ -276,6 +300,33 @@ class HttpEngineGatewayTest {
 
         assertThatThrownBy(() -> gateway.listGroups("alpha-engine"))
                 .isInstanceOfSatisfying(GatewayException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY));
+    }
+
+    @Test
+    void anHttpsEngineIsCalledWithTheConfiguredBundlesTrust() throws Exception {
+        URI httpsBaseUrl = startHttpsConnector();
+        announce("alpha-token", httpsBaseUrl);
+
+        assertThat(gateway("engines").listGroups("alpha-engine")).extracting(SessionGroup::getGroup).contains("alpha");
+    }
+
+    @Test
+    void anHttpsEngineNotTrustedIsUnavailable() throws Exception {
+        URI httpsBaseUrl = startHttpsConnector();
+        announce("alpha-token", httpsBaseUrl);
+
+        assertThatThrownBy(() -> gateway.listGroups("alpha-engine"))
+                .isInstanceOfSatisfying(GatewayException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY));
+    }
+
+    private URI startHttpsConnector() throws IOException {
+        connector.stop(0);
+        HttpsServer httpsConnector = HttpsServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        httpsConnector.setHttpsConfigurator(new HttpsConfigurator(TestTls.serverContext()));
+        httpsConnector.createContext("/engines/alpha-engine/", this::serve);
+        httpsConnector.start();
+        connector = httpsConnector;
+        return URI.create("https://127.0.0.1:" + connector.getAddress().getPort() + "/engines/alpha-engine");
     }
 
     @Test
