@@ -31,10 +31,12 @@ public final class SimulatorApplication {
         List<AdminApiExporter> exporters = engines.stream().map(engine -> {
             AdminApiExporter exporter = HttpAdminApiSettings.builder()
                     .port(Integer.getInteger("adminApiPort", 8687))
-                    .announceUrl(consoleUrl)
-                    .announceUsername(System.getProperty("consoleUsername", "engine"))
-                    .announcePassword(System.getProperty("consolePassword", "engine"))
-                    .announceInterval(Duration.ofSeconds(10))
+                    .announcement(HttpAdminApiSettings.AnnouncementSettings.builder()
+                            .url(consoleUrl)
+                            .username(System.getProperty("consoleUsername", "engine"))
+                            .password(System.getProperty("consolePassword", "engine"))
+                            .interval(Duration.ofSeconds(10))
+                            .build())
                     .build()
                     .instance();
             exporter.export(engine);

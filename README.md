@@ -49,8 +49,8 @@ the Prometheus and Loki connectors, and `config/`, read from the directory the c
 Open http://localhost:8080. The build downloads its own Node into `staffix-admin-ui/node/`; no system Node needed.
 
 Engines appear once they announce themselves: add staffix's HTTP admin API connector to each engine
-(`staffix-admin-api-http-impl`, see staffix's runtime administration guide) with `announceUrl` pointing here and the
-credentials of a user with the `ENGINE` role. The console then calls each engine with the token it announced.
+(`staffix-admin-api-http-impl`, see staffix's runtime administration guide) with its `announcement` URL pointing
+here and the credentials of a user with the `ENGINE` role. The console then calls each engine with the token it announced.
 
 ### Docker image
 
@@ -248,7 +248,7 @@ staffix:
   so the demo and a local setup work without certificates; turn it on in production.
 
 On the engine side, staffix's HTTP admin connector serves HTTPS with `sslContext` (Spring Boot
-`staffix.admin-api-http.ssl-bundle`) and trusts an HTTPS console with `announceSslContext`
+`staffix.admin-api-http.ssl-bundle`) and trusts an HTTPS console with its announcement's `sslContext`
 (`staffix.admin-api-http.announce-ssl-bundle`), the JVM's default truststore otherwise. Client certificates are not
 supported yet.
 
