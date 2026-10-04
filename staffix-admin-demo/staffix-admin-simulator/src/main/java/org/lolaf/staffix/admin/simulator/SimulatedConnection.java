@@ -27,6 +27,14 @@ final class SimulatedConnection {
         return running;
     }
 
+    SimulatedSession main() {
+        return configs.getFirst();
+    }
+
+    List<SimulatedSession> backups() {
+        return configs.subList(1, configs.size());
+    }
+
     boolean hasConfig(FixSessionId fixSessionId) {
         return configs.stream().anyMatch(config -> config.fixSessionId().equals(fixSessionId));
     }

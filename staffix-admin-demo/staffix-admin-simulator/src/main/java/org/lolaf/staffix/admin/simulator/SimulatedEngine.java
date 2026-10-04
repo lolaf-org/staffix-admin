@@ -4,6 +4,7 @@ import org.lolaf.staffix.api.FixInitiatorTarget;
 import org.lolaf.staffix.api.admin.AdminApi;
 import org.lolaf.staffix.api.admin.FixAcceptorSessions;
 import org.lolaf.staffix.api.admin.FixInitiatorTargets;
+import org.lolaf.staffix.api.application.FixApplicationSessionSettingDescriptor;
 import org.lolaf.staffix.api.logging.FixMessagesLoggerSettings;
 import org.lolaf.staffix.api.session.FixSession;
 import org.lolaf.staffix.api.session.FixSession.FixSessionType;
@@ -12,9 +13,11 @@ import org.lolaf.staffix.api.session.FixSessionSettings;
 import org.lolaf.staffix.api.session.plugins.FixSessionsPluginSettings;
 
 import java.net.InetSocketAddress;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -147,6 +150,40 @@ final class SimulatedEngine implements AdminApi {
     }
 
     @Override
+    public boolean isFixSessionsSettingsStorePersistent(String instanceId) {
+        reloadFixSessionsSettingsStore(instanceId);
+        return false;
+    }
+
+    @Override
+    public synchronized Optional<String> findFixSessionsSettingsStore(FixSessionId fixSessionId, FixSessionType fixSessionType) {
+        return getManagedFixSessionsSettings().stream()
+                .filter(settings -> settings.getFixSessionId().equals(fixSessionId) && settings.getFixSessionType() == fixSessionType)
+                .findFirst()
+                .map(settings -> SETTINGS_STORE);
+    }
+
+    @Override
+    public void addFixSessionSettings(String storeInstanceId, FixSessionSettings settings) {
+        throw new IllegalStateException("The simulator does not edit sessions yet");
+    }
+
+    @Override
+    public void updateFixSessionSettings(FixSessionId fixSessionId, FixSessionSettings settings) {
+        throw new IllegalStateException("The simulator does not edit sessions yet");
+    }
+
+    @Override
+    public void removeFixSessionSettings(FixSessionId fixSessionId, FixSessionType fixSessionType) {
+        throw new IllegalStateException("The simulator does not edit sessions yet");
+    }
+
+    @Override
+    public Collection<FixApplicationSessionSettingDescriptor> getFixApplicationSessionSettingDescriptors(FixSessionId fixSessionId) {
+        return List.of();
+    }
+
+    @Override
     public synchronized List<FixSession> getManagedFixSessions() {
         return runningConfigs().stream().map(session -> SimulatedFixSession.of(session, this)).toList();
     }
@@ -177,7 +214,8 @@ final class SimulatedEngine implements AdminApi {
                 .map(connection -> FixInitiatorTargets.builder()
                         .instanceId(connection.instanceId)
                         .activeFixSessionId(connection.running().fixSessionId())
-                        .targets(connection.configs.stream().map(SimulatedEngine::target).toList())
+                        .mainTarget(target(connection.main()))
+                        .backupTargets(connection.backups().stream().map(SimulatedEngine::target).toList())
                         .build())
                 .toList();
     }

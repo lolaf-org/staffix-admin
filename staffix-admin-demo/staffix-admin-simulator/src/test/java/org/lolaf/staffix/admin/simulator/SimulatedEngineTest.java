@@ -63,7 +63,7 @@ class SimulatedEngineTest {
                 .filter(targets -> targets.getInstanceId().equals("alpha-trading"))
                 .findFirst()
                 .orElseThrow();
-        FixSessionId backup = trading.getTargets().get(1).getFixSessionId();
+        FixSessionId backup = trading.getBackupTargets().get(0).getFixSessionId();
 
         paris.switchInitiatorSession(backup);
 
