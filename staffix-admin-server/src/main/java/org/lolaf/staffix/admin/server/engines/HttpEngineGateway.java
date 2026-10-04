@@ -28,12 +28,17 @@ import tools.jackson.databind.json.JsonMapper;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Calls the engines' HTTP admin connectors with the token each announced. A session box is named after its main
@@ -42,13 +47,23 @@ import java.util.function.Function;
 @Component
 class HttpEngineGateway implements EngineGateway {
 
+    /**
+     * Every open page polls its engines every 2s; within this window all of them share one status call, so the
+     * engine's work does not grow with the number of viewers.
+     */
+    static final Duration STATUS_FRESH = Duration.ofSeconds(1);
+
     private final EngineRegistry registry;
     private final RestClient client;
     private final JsonMapper jsonMapper;
+    private final Clock clock;
+    private final Map<String, CachedStatus> statuses = new ConcurrentHashMap<>();
 
-    HttpEngineGateway(EngineRegistry registry, AdminProperties properties, RestClient.Builder builder, JsonMapper jsonMapper) {
+    HttpEngineGateway(EngineRegistry registry, AdminProperties properties, RestClient.Builder builder, JsonMapper jsonMapper,
+                      Clock clock) {
         this.registry = registry;
         this.jsonMapper = jsonMapper;
+        this.clock = clock;
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
                 .connectTimeout(properties.getEngineRequestTimeout())
                 .build());
@@ -92,27 +107,28 @@ class HttpEngineGateway implements EngineGateway {
 
     @Override
     public void logon(SessionRef session) {
-        call(session.getEngineId(), HttpMethod.POST, runningConfig(session, "logon"), null, Void.class);
+        operate(session, HttpMethod.POST, () -> runningConfig(session, "logon"), null);
     }
 
     @Override
     public void logout(SessionRef session) {
-        call(session.getEngineId(), HttpMethod.POST, runningConfig(session, "logout"), null, Void.class);
+        operate(session, HttpMethod.POST, () -> runningConfig(session, "logout"), null);
     }
 
     @Override
     public void reset(SessionRef session, ResetMode mode) {
-        call(session.getEngineId(), HttpMethod.POST, runningConfig(session, "reset"), Map.of("mode", mode.name()), Void.class);
+        operate(session, HttpMethod.POST, () -> runningConfig(session, "reset"), Map.of("mode", mode.name()));
     }
 
     @Override
     public void activate(SessionRef session, String configId) {
-        ConnectorStatus.Session status = session(session);
-        if (status.getConfigs().stream().noneMatch(config -> config.getName().equals(configId))) {
-            throw GatewayException.invalid("Session '" + session.getGroup() + "." + session.getSessionId()
-                    + "' has no config '" + configId + "'");
-        }
-        call(session.getEngineId(), HttpMethod.POST, List.of("sessions", session.getGroup(), configId, "activate"), null, Void.class);
+        operate(session, HttpMethod.POST, () -> {
+            if (session(session).getConfigs().stream().noneMatch(config -> config.getName().equals(configId))) {
+                throw GatewayException.invalid("Session '" + session.getGroup() + "." + session.getSessionId()
+                        + "' has no config '" + configId + "'");
+            }
+            return List.of("sessions", session.getGroup(), configId, "activate");
+        }, null);
     }
 
     @Override
@@ -124,13 +140,13 @@ class HttpEngineGateway implements EngineGateway {
         if (outgoing != null) {
             seqNums.put("outgoing", outgoing);
         }
-        call(session.getEngineId(), HttpMethod.PUT, runningConfig(session, "seqnums"), seqNums, Void.class);
+        operate(session, HttpMethod.PUT, () -> runningConfig(session, "seqnums"), seqNums);
     }
 
     @Override
     public void sendMessage(SessionRef session, String message, char separator, boolean possDup) {
-        call(session.getEngineId(), HttpMethod.POST, runningConfig(session, "messages"),
-                Map.of("message", message, "separator", String.valueOf(separator), "possDup", possDup), Void.class);
+        operate(session, HttpMethod.POST, () -> runningConfig(session, "messages"),
+                Map.of("message", message, "separator", String.valueOf(separator), "possDup", possDup));
     }
 
     /**
@@ -155,7 +171,38 @@ class HttpEngineGateway implements EngineGateway {
     }
 
     private ConnectorStatus status(String engineId) {
-        return call(engineId, HttpMethod.GET, List.of("status"), null, ConnectorStatus.class);
+        RegisteredEngine engine = registry.get(engineId);
+        CachedStatus cached = statuses.computeIfAbsent(engineId, id -> new CachedStatus());
+        synchronized (cached) {
+            Instant now = clock.instant();
+            if (!cached.isFresh(engine, now)) {
+                cached.engine = engine;
+                cached.at = now;
+                try {
+                    cached.status = call(engineId, HttpMethod.GET, List.of("status"), null, ConnectorStatus.class);
+                    cached.failure = null;
+                } catch (GatewayException e) {
+                    cached.failure = e;
+                }
+            }
+            if (cached.failure != null) {
+                throw cached.failure;
+            }
+            return cached.status;
+        }
+    }
+
+    /**
+     * Reads a fresh status first, as a backup may have taken over within the cache window, and drops it after, so
+     * the next poll shows the operation's effect.
+     */
+    private void operate(SessionRef session, HttpMethod method, Supplier<List<String>> path, @Nullable Object body) {
+        statuses.remove(session.getEngineId());
+        try {
+            call(session.getEngineId(), method, path.get(), body, Void.class);
+        } finally {
+            statuses.remove(session.getEngineId());
+        }
     }
 
     private ConnectorStatus.Session session(SessionRef session) {
@@ -244,5 +291,21 @@ class HttpEngineGateway implements EngineGateway {
                 .sender(compIds.apply(identity.getSender()))
                 .target(compIds.apply(identity.getTarget()))
                 .build();
+    }
+
+    /**
+     * Also holds a failed call, so the viewers waiting on an engine that does not answer do not each wait out the
+     * request timeout in turn.
+     */
+    private static final class CachedStatus {
+        @Nullable RegisteredEngine engine;
+        @Nullable Instant at;
+        @Nullable ConnectorStatus status;
+        @Nullable GatewayException failure;
+
+        boolean isFresh(RegisteredEngine current, Instant now) {
+            return engine != null && at != null && now.isBefore(at.plus(STATUS_FRESH))
+                    && engine.getBaseUrl().equals(current.getBaseUrl()) && engine.getToken().equals(current.getToken());
+        }
     }
 }

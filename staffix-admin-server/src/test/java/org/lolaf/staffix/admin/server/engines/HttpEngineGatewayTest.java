@@ -5,6 +5,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.lolaf.staffix.admin.server.AdminProperties;
+import org.lolaf.staffix.admin.server.SteppingClock;
 import org.lolaf.staffix.admin.server.dictionaries.DictionaryRef;
 import org.lolaf.staffix.admin.server.onboarding.EngineAnnouncement;
 import org.lolaf.staffix.admin.server.sessions.ResetMode;
@@ -55,6 +56,7 @@ class HttpEngineGatewayTest {
     private final List<String> requests = new CopyOnWriteArrayList<>();
     private final Map<String, String> bodies = new ConcurrentHashMap<>();
     private final Map<String, Integer> statuses = new ConcurrentHashMap<>();
+    private final SteppingClock clock = new SteppingClock();
     private HttpServer connector;
     private EngineRegistry registry;
     private HttpEngineGateway gateway;
@@ -93,7 +95,7 @@ class HttpEngineGatewayTest {
         AdminProperties properties = new AdminProperties(Duration.ofSeconds(90), Duration.ofSeconds(2), Path.of("data"));
         registry = new EngineRegistry(properties, Clock.systemUTC());
         announce("alpha-token", connector.getAddress().getPort());
-        gateway = new HttpEngineGateway(registry, properties, RestClient.builder(), JsonMapper.builder().build());
+        gateway = new HttpEngineGateway(registry, properties, RestClient.builder(), JsonMapper.builder().build(), clock);
     }
 
     @AfterEach
@@ -170,6 +172,38 @@ class HttpEngineGatewayTest {
         assertThat(bodies.get("PUT sessions/alpha/trading-drp/seqnums")).isEqualTo("{\"outgoing\":42}");
         assertThat(bodies.get("POST sessions/alpha/trading-drp/messages"))
                 .contains("\"message\":\"35=B|\"", "\"separator\":\"|\"", "\"possDup\":true");
+    }
+
+    @Test
+    void readsWithinTheFreshnessWindowShareOneStatusCall() {
+        gateway.listGroups("alpha-engine");
+        gateway.getSession(trading());
+        gateway.getDictionaries(trading());
+        assertThat(requests).containsExactly("GET status");
+
+        clock.step(HttpEngineGateway.STATUS_FRESH);
+        gateway.listGroups("alpha-engine");
+        assertThat(requests).containsExactly("GET status", "GET status");
+    }
+
+    @Test
+    void anOperationReadsAFreshStatusAndTheNextPollSeesItsEffect() {
+        gateway.listGroups("alpha-engine");
+
+        gateway.logon(trading());
+        gateway.listGroups("alpha-engine");
+
+        assertThat(requests).containsExactly("GET status", "GET status", "POST sessions/alpha/trading-drp/logon", "GET status");
+    }
+
+    @Test
+    void aReannouncedEngineIsReadAgainWithinTheWindow() {
+        gateway.listGroups("alpha-engine");
+
+        announce("restarted-token", connector.getAddress().getPort());
+
+        assertThatThrownBy(() -> gateway.listGroups("alpha-engine"))
+                .isInstanceOfSatisfying(GatewayException.class, e -> assertThat(e.getBody().getDetail()).contains("refused its token"));
     }
 
     @Test
