@@ -2,13 +2,13 @@ import { useState } from 'react'
 import { Alert, Empty, Flex, Segmented, Select, Skeleton, Typography } from 'antd'
 import { useEffect } from 'react'
 import { AreaChartOutlined, TableOutlined } from '@ant-design/icons'
-import { useMetricKinds, useMetrics, type MetricKind, type MetricScope } from '../api/queries'
+import { useMessageTypes, useMetricKinds, useMetrics, type MetricKind, type MetricScope } from '../api/queries'
 import { isNotCollected, type Schemas } from '../api/client'
 import { NotCollectedNotice } from './NotCollectedNotice'
 import { formatRateValue, formatSeconds } from './format'
 import { MetricChart, SeriesLegend, niceTicks, type ChartSeries } from './MetricChart'
 import { MetricTable } from './MetricTable'
-import { messageTypeName, plottedMessageTypes, seriesColors } from './series'
+import { messageTypeName, plottedMessageTypes, rankedMessageTypes, SERIES_COUNT, seriesColors } from './series'
 import { useThemeMode } from '../theme/ThemeMode'
 import { TIME_WINDOWS } from './timeWindows'
 
@@ -47,11 +47,16 @@ export function MetricsPanel({ scope, chartHeight }: Props) {
   const [quantile, setQuantile] = useState(0.99)
   const [minutes, setMinutes] = useState(60)
   const [view, setView] = useState<'chart' | 'table'>('chart')
+  const [pickedTypes, setPickedTypes] = useState<string[]>([])
   const sessionScoped = scope.sessionId !== undefined
   const metrics = useMetrics(scope, kind, quantile, minutes)
   const measured = useMetricKinds(scope).data
   const isMeasured = (k: MetricKind) => measured === undefined || measured.includes(k)
   const colors = seriesColors(useThemeMode().dark)
+  const dictionaryTypes = useMessageTypes(scope).data
+  const typeName = (code: string) => messageTypeName(code, dictionaryTypes?.find((t) => t.msgType === code)?.name)
+  const typesWithData = metrics.data?.series.flatMap((s) => (s.labels['messageType'] ? [s.labels['messageType']] : [])) ?? []
+  const plottedTypes = plottedMessageTypes(typesWithData, pickedTypes)
   useEffect(() => {
     if (!sessionScoped && KINDS.find((k) => k.value === kind)?.perSession) {
       setKind('MESSAGE_RATE')
@@ -88,6 +93,22 @@ export function MetricsPanel({ scope, chartHeight }: Props) {
             aria-label="Quantile"
           />
         )}
+        {typesWithData.length > 0 && (
+          <Select
+            mode="multiple"
+            allowClear
+            showSearch
+            maxCount={SERIES_COUNT}
+            placeholder="Message types"
+            value={plottedTypes}
+            onChange={setPickedTypes}
+            optionFilterProp="label"
+            options={rankedMessageTypes(typesWithData).map((code) => ({ value: code, label: typeName(code) }))}
+            style={{ minWidth: 260, maxWidth: '100%' }}
+            aria-label={`Message types, up to ${SERIES_COUNT}`}
+            title={`Up to ${SERIES_COUNT} message types; cleared, the ${SERIES_COUNT} first by order flow`}
+          />
+        )}
         <Segmented options={TIME_WINDOWS} value={minutes} onChange={setMinutes} />
         <Segmented
           value={view}
@@ -111,7 +132,7 @@ export function MetricsPanel({ scope, chartHeight }: Props) {
       {metrics.isSuccess && <NotCollectedNotice what="metrics" sessions={metrics.data.notCollected} />}
       {metrics.isSuccess && metrics.data.series.length === 0 && <Empty description="No data for this period" />}
       {metrics.isSuccess && metrics.data.series.length > 0 && (() => {
-        const facets = toFacets(metrics.data.series, title, colors)
+        const facets = toFacets(metrics.data.series, title, colors, plottedTypes, typeName)
         if (view === 'table') return <MetricTable facets={facets} format={format} />
         const perDirection = facets.length > 1
         const yTicks = perDirection ? niceTicks(Math.max(...facets.flatMap((f) => f.series.flatMap((s) => s.points.map((p) => p.value))))) : undefined
@@ -130,17 +151,17 @@ export function MetricsPanel({ scope, chartHeight }: Props) {
   )
 }
 
-function toFacets(series: Schemas['MetricSeries'][], title: string, colors: string[]): Facet[] {
+function toFacets(series: Schemas['MetricSeries'][], title: string, colors: string[], types: string[],
+                  typeName: (code: string) => string): Facet[] {
   const perMessageType = series.some((s) => s.labels['messageType'])
   if (!perMessageType) {
     return [{ title, series: series.map((s, i) => ({ key: `s${i}`, name: title, color: colors[0]!, points: s.points })) }]
   }
-  const types = plottedMessageTypes(series.map((s) => s.labels['messageType']!))
   return DIRECTIONS.map((direction) => ({
     title: `${title}, ${direction.title}`,
     series: types.flatMap((type, slot): ChartSeries[] => {
       const match = series.find((s) => s.labels['messageType'] === type && s.labels['direction'] === direction.value)
-      return match ? [{ key: `t${type}`, name: messageTypeName(type), color: colors[slot]!, points: match.points }] : []
+      return match ? [{ key: `t${type}`, name: typeName(type), color: colors[slot]!, points: match.points }] : []
     }),
   }))
 }
