@@ -1,11 +1,15 @@
 import { Alert, Card, Empty, Flex, Input, Select, Skeleton, Space, Tag, Tooltip, Typography, theme } from 'antd'
+import { PlusOutlined } from '@ant-design/icons'
+import { useState } from 'react'
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router'
 import type { Schemas } from '../api/client'
 import { sessionRoute, useEngines, useGroups } from '../api/queries'
 import { STATUS_LABELS, STATUSES, statusOf, type Status } from '../sessions/health'
+import { AddSessionModal } from '../sessions/AddSessionModal'
 import { StatusBadge } from '../sessions/StatusBadge'
 import { SessionBox } from '../sessions/SessionBox'
 import { useSessionFilters } from '../sessions/filters'
+import { WriteButton } from '../sessions/WriteButton'
 
 export function OverviewPage() {
   const engines = useEngines()
@@ -57,6 +61,7 @@ export function OverviewPage() {
 function EngineCard({ engine }: { engine: Schemas['Engine'] }) {
   const groups = useGroups(engine.engineId)
   const filters = useSessionFilters()
+  const [adding, setAdding] = useState(false)
 
   const shown = (groups.data ?? [])
     .map((group) => ({ ...group, sessions: group.sessions.filter(filters.matches) }))
@@ -85,6 +90,10 @@ function EngineCard({ engine }: { engine: Schemas['Engine'] }) {
           {counts.map(({ status, count }) => (
             <StatusBadge key={status} status={status} text={count} title={STATUS_LABELS[status]} />
           ))}
+          <WriteButton size="small" icon={<PlusOutlined />} onConfirm={() => setAdding(true)}>
+            Acceptor session
+          </WriteButton>
+          <AddSessionModal engineId={engine.engineId} open={adding} onClose={() => setAdding(false)} groups={groups.data ?? []} />
         </Space>
       }
     >

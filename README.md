@@ -81,6 +81,26 @@ To try the console without real engines, run the demo (simulated engines, genera
 users): `./mvnw install`, then `docker compose up` in `staffix-admin-demo`. See `staffix-admin-demo/README.md`,
 which also runs it without Docker.
 
+## Session settings
+
+A session's Settings tab shows its settings as the engine stores them, in a form built from the engine's own session
+settings schema: each field's tooltip gives its name as files and the API write it and what it does, and an unset
+field shows the default the engine applies. Writers edit and save them; the engine restarts the session on them
+unless its "Restart live session on update" is off.
+
+- Writers add acceptor sessions from an engine's card ("Acceptor session"), blank or starting from another acceptor
+  session's settings, into one of the engine's session settings stores, and remove acceptor sessions from their Status
+  tab.
+  An initiator's sessions are the targets it was built with: the console neither adds nor removes them, nor changes
+  their identity.
+- A store backed by files keeps the change; one held in memory loses it when the engine restarts, which the tab and
+  the store picker say.
+- Application settings the session's application declares are listed with their descriptions; a secret one is typed
+  blind and left empty keeps its value. Certificates stay as the engine's files configure them.
+- A field a session file sets through a `${...}` placeholder keeps it when its value is not changed; changing it is
+  refused, as its source owns it.
+- Every change is audited by the names of the fields it changed, never their values.
+
 ## Metrics and logs
 
 The console reads engines' metrics and FIX logs from backends described by connectors. A connector has an id, a

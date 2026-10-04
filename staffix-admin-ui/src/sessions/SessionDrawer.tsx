@@ -33,7 +33,7 @@ export function SessionDrawer() {
             {
               key: 'settings',
               label: 'Settings',
-              children: <SessionSettingsTab sessionRef={ref} runningConfigId={session.data.summary.runningConfigId} />,
+              children: <SessionSettingsTab sessionRef={ref} detail={session.data} />,
             },
             { key: 'metrics', label: 'Metrics', children: <SessionTelemetryTab sessionRef={ref} summary={session.data.summary} view="metrics" /> },
             { key: 'logs', label: 'Logs', children: <SessionTelemetryTab sessionRef={ref} summary={session.data.summary} view="logs" /> },

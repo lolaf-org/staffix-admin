@@ -69,6 +69,82 @@ export function useSessionSettings(ref: SessionRef, runningConfigId: string) {
 }
 
 /**
+ * The engine's own: its staffix version defines the settings it accepts. Static for the engine's life.
+ */
+export function useSessionSettingsSchema(engineId: string) {
+  return useQuery({
+    queryKey: ['sessionSettingsSchema', engineId],
+    queryFn: () => call(api.GET('/api/engines/{engineId}/schemas/session-settings', { params: { path: { engineId } } })),
+    staleTime: Infinity,
+  })
+}
+
+export type SessionSettingsStore = Schemas['SessionSettingsStore']
+export type ApplicationSetting = Schemas['ApplicationSetting']
+
+export function useSessionSettingsStores(engineId: string) {
+  return useQuery({
+    queryKey: ['sessionSettingsStores', engineId],
+    queryFn: () => call(api.GET('/api/engines/{engineId}/session-settings-stores', { params: { path: { engineId } } })),
+    staleTime: Infinity,
+  })
+}
+
+/**
+ * Those the session's application declares, with their descriptions and which are secret.
+ */
+export function useApplicationSettings(ref: SessionRef | undefined) {
+  return useQuery({
+    queryKey: ['applicationSettings', ref?.engineId, ref?.group, ref?.sessionId],
+    queryFn: () => call(api.GET('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/application-settings', sessionPath(ref!))),
+    enabled: ref !== undefined,
+  })
+}
+
+export function fetchSessionSettings(ref: SessionRef) {
+  return call(api.GET('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/settings', sessionPath(ref)))
+}
+
+/**
+ * Writes a session's settings, refreshing them and the engine's sessions once the engine took them.
+ */
+function useSettingsMutation<V>(engineId: string, mutationFn: (variables: V) => Promise<unknown>, success: string) {
+  const queryClient = useQueryClient()
+  const { message } = App.useApp()
+  return useMutation({
+    mutationFn,
+    onSuccess: () => {
+      message.success(success)
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['groups', engineId] }),
+        queryClient.invalidateQueries({ queryKey: ['settings', engineId] }),
+      ])
+    },
+  })
+}
+
+export function useUpdateSessionSettings(ref: SessionRef) {
+  return useSettingsMutation(ref.engineId, (settings: Record<string, unknown>) =>
+    call(api.PUT('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/settings', { ...sessionPath(ref), body: settings })),
+  'Settings saved; the session restarts on them')
+}
+
+export function useRemoveSession(ref: SessionRef) {
+  return useSettingsMutation(ref.engineId, () =>
+    call(api.DELETE('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/settings', sessionPath(ref))),
+  'Session removed')
+}
+
+export function useAddSession(engineId: string) {
+  return useSettingsMutation(engineId, ({ store, settings }: { store: string; settings: Record<string, unknown> }) =>
+    call(api.POST('/api/engines/{engineId}/session-settings-stores/{sessionSettingsStore}/sessions', {
+      params: { path: { engineId, sessionSettingsStore: store } },
+      body: settings,
+    })),
+  'Session added')
+}
+
+/**
  * A state-changing call on an engine: reports the outcome to the operator and refreshes that engine's sessions.
  */
 export function useEngineMutation<V>(engineId: string, mutationFn: (variables: V) => Promise<unknown>, success: string) {

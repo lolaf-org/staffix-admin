@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Descriptions, Divider, Flex, InputNumber, Modal, Select, Table, Tag, Typography } from 'antd'
+import { App, Descriptions, Divider, Flex, InputNumber, Modal, Select, Table, Tag, Typography } from 'antd'
+import { useLocation, useNavigate } from 'react-router'
 import { api, call, type Schemas } from '../api/client'
-import { sessionPath, useEngineMutation, type SessionRef } from '../api/queries'
+import { sessionPath, useEngineMutation, useRemoveSession, type SessionRef } from '../api/queries'
 import { HEALTH_LABELS, statusOf } from './health'
 import { StatusBadge } from './StatusBadge'
 import { formatCompIds } from './identity'
@@ -56,6 +57,9 @@ export function SessionStatusTab({ sessionRef, detail }: Props) {
             Log out
           </WriteButton>
           <SeqNumsButton sessionRef={sessionRef} detail={detail} />
+          {summary.type === 'ACCEPTOR' && detail.sessionSettingsStore !== undefined && (
+            <RemoveSessionButton sessionRef={sessionRef} detail={detail} />
+          )}
         </Flex>
       </div>
       <ResetSection sessionRef={sessionRef} summary={summary} />
@@ -89,6 +93,32 @@ function ResetSection({ sessionRef, summary }: { sessionRef: SessionRef; summary
         {selected.description}
       </Typography.Paragraph>
     </div>
+  )
+}
+
+/**
+ * Acceptor sessions only: an initiator's sessions are the targets it was built with.
+ */
+function RemoveSessionButton({ sessionRef, detail }: Props) {
+  const remove = useRemoveSession(sessionRef)
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { message } = App.useApp()
+  return (
+    <WriteButton
+      danger
+      style={{ marginLeft: 'auto' }}
+      loading={remove.isPending}
+      confirm={`Remove ${sessionRef.group}.${sessionRef.sessionId} from store ${detail.sessionSettingsStore}? The live session is disconnected unless its "Disconnect on remove" setting is off.`}
+      onConfirm={() =>
+        remove.mutate(undefined, {
+          onSuccess: () => navigate({ pathname: '/', search: location.search }),
+          onError: (error) => message.error(error.message),
+        })
+      }
+    >
+      Remove session
+    </WriteButton>
   )
 }
 
