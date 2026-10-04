@@ -23,16 +23,26 @@ public class EngineRegistry {
 
     private final Map<String, RegisteredEngine> engines = new ConcurrentHashMap<>();
     private final AdminProperties properties;
+    private final EngineProbe probe;
     private final Clock clock;
 
     /**
-     * @throws GatewayException if TLS is required and the engine announces a plain {@code http} URL
+     * A known engine announcing another URL or token must answer there with it, and, when it moved, no longer answer
+     * at its current URL: any ENGINE user could otherwise point a live engine's operations at a server of their own.
+     *
+     * @throws GatewayException if TLS is required and the engine announces a plain {@code http} URL, or the
+     *                          announcement would take over another engine
      */
     public void announce(EngineAnnouncement announcement) {
         if (properties.isRequireEngineTls() && !"https".equalsIgnoreCase(announcement.getBaseUrl().getScheme())) {
             log.warn("Engine {} refused: it announced {}, and staffix.admin.require-engine-tls is set",
                     announcement.getEngineId(), announcement.getBaseUrl());
             throw GatewayException.invalid("Engine '" + announcement.getEngineId() + "' must be served over https");
+        }
+        RegisteredEngine current = engines.get(announcement.getEngineId());
+        if (current != null && (!current.getBaseUrl().equals(announcement.getBaseUrl())
+                || !current.getToken().equals(announcement.getToken()))) {
+            verifyChange(current, announcement);
         }
         RegisteredEngine engine = RegisteredEngine.builder()
                 .engineId(announcement.getEngineId())
@@ -43,6 +53,20 @@ public class EngineRegistry {
                 .build();
         if (engines.put(engine.getEngineId(), engine) == null) {
             log.info("Engine {} registered at {}", engine.getEngineId(), engine.getBaseUrl());
+        }
+    }
+
+    private void verifyChange(RegisteredEngine current, EngineAnnouncement announcement) {
+        String engineId = announcement.getEngineId();
+        if (!current.getBaseUrl().equals(announcement.getBaseUrl()) && isReachable(current)
+                && probe.answersAs(current.getBaseUrl(), current.getToken(), engineId)) {
+            log.warn("Engine {} refused at {}: it still answers at {}", engineId, announcement.getBaseUrl(), current.getBaseUrl());
+            throw GatewayException.rejected("Engine '" + engineId + "' still answers at its registered URL");
+        }
+        if (!probe.answersAs(announcement.getBaseUrl(), announcement.getToken(), engineId)) {
+            log.warn("Engine {} refused: it does not answer at {} with the token it announced", engineId, announcement.getBaseUrl());
+            throw GatewayException.invalid("Engine '" + engineId + "' does not answer at " + announcement.getBaseUrl()
+                    + " with the token it announced");
         }
     }
 

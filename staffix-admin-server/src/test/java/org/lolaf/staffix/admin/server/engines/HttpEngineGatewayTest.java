@@ -76,6 +76,10 @@ class HttpEngineGatewayTest {
     private final Map<String, Integer> statuses = new ConcurrentHashMap<>();
     private final SteppingClock clock = new SteppingClock();
     private HttpServer connector;
+    /**
+     * Only the engine being announced answers its probe, so a test may move it.
+     */
+    private volatile URI announcing;
     private EngineRegistry registry;
     private HttpEngineGateway gateway;
 
@@ -84,7 +88,7 @@ class HttpEngineGatewayTest {
         connector = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         connector.createContext("/engines/alpha-engine/", this::serve);
         connector.start();
-        registry = new EngineRegistry(properties(null), Clock.systemUTC());
+        registry = new EngineRegistry(properties(null), (baseUrl, token, engineId) -> baseUrl.equals(announcing), Clock.systemUTC());
         announce("alpha-token", connector.getAddress().getPort());
         gateway = gateway(null);
     }
@@ -141,6 +145,7 @@ class HttpEngineGatewayTest {
     }
 
     private void announce(String token, URI baseUrl) {
+        announcing = baseUrl;
         registry.announce(EngineAnnouncement.builder()
                 .engineId("alpha-engine")
                 .baseUrl(baseUrl)

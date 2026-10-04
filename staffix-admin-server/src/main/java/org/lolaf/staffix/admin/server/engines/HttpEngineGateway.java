@@ -18,7 +18,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -27,7 +26,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
@@ -65,13 +63,7 @@ class HttpEngineGateway implements EngineGateway {
         this.registry = registry;
         this.jsonMapper = jsonMapper;
         this.clock = clock;
-        HttpClient.Builder httpClient = HttpClient.newBuilder().connectTimeout(properties.getEngineRequestTimeout());
-        if (properties.getEngineSslBundle() != null) {
-            httpClient.sslContext(sslBundles.getBundle(properties.getEngineSslBundle()).createSslContext());
-        }
-        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient.build());
-        requestFactory.setReadTimeout(properties.getEngineRequestTimeout());
-        this.client = builder.requestFactory(requestFactory).build();
+        this.client = builder.requestFactory(EngineRequestFactory.create(properties, sslBundles)).build();
     }
 
     @Override

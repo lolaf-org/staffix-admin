@@ -186,6 +186,12 @@ staffix:
         fix-support: [READER]
 ```
 
+Engines announce themselves with an `ENGINE` user's credentials. An engine already registered that announces another
+URL or token is accepted only if it answers there with that token and, when its URL changed, no longer answers at
+the old one: so an `ENGINE` user cannot point a live engine's operations at another server, while an engine
+restarted with a new token, or moved, is taken at once. An engine id never seen, or one whose engine is down, is
+accepted as announced: keep the `ENGINE` password as secret as an operator's.
+
 Every state-changing action, and every refused one, is an audit entry (`AuditEntry`): when, who, what, the outcome
 and why it failed, and the engine, group and session when it is a session's. It never holds a secret: a connector
 change names what changed, not the values. The distribution's `staffix-admin-audit-log` plugin logs each entry on
