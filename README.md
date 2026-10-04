@@ -161,10 +161,23 @@ staffix:
         fix-support: [READER]
 ```
 
-Every state-changing action, and every refused one, is an audit entry: who, what, the session when it is one, the
-outcome and why it failed. By default entries are logged on the `staffix.admin.audit` logger, so the trail is as
-durable as your logging. To keep it elsewhere (a file of its own, a database, a SIEM), define a bean implementing
-`AuditSink` from `staffix-admin-audit-spi`; define a `LoggerAuditSink` bean too to keep the log lines.
+Every state-changing action, and every refused one, is an audit entry (`AuditEntry`): when, who, what, the outcome
+and why it failed, and the engine, group and session when it is a session's. It never holds a secret: a connector
+change names what changed, not the values. The distribution's `staffix-admin-audit-log` plugin logs each entry on
+the `staffix.admin.audit` logger (INFO when it succeeded, WARN when it failed), so the trail is as durable as your
+logging.
+
+The console ships no other sink: to keep the trail elsewhere (a file of its own, a database, a SIEM), write one as a
+[plugin](#plugins):
+
+1. Implement `AuditSink` from `staffix-admin-audit-spi` (`provided`). `record(AuditEntry)` is called after the
+   action, on the request's thread: keep it short, or hand the entry to a thread of your own. A sink that throws is
+   logged and neither stops the other sinks nor undoes the action, which already happened, so a sink that must not
+   lose entries buffers or retries itself.
+2. Declare it as a bean in an `@AutoConfiguration` class, named in your jar's
+   `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`.
+3. Drop the jar into `plugins/`. Every sink receives every entry: keep `staffix-admin-audit-log` next to yours to
+   keep the log lines too, or remove it. The console refuses to start without any sink.
 
 ## UI development with hot reload
 
