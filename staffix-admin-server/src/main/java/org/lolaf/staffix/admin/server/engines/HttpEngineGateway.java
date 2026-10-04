@@ -31,6 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -74,21 +75,22 @@ class HttpEngineGateway implements EngineGateway {
     @Override
     public List<SessionGroup> listGroups(String engineId) {
         Map<String, SessionGroup.SessionGroupBuilder> groups = new TreeMap<>();
-        status(engineId).getSessions().stream()
-                .sorted(Comparator.comparing(ConnectorStatus.Session::getGroup).thenComparing(ConnectorStatus.Session::getName))
-                .forEach(session -> groups.computeIfAbsent(session.getGroup(), group -> SessionGroup.builder().group(group))
+        sessions(engineId).stream()
+                .sorted(Comparator.comparing((EngineSession session) -> session.status().getGroup())
+                        .thenComparing(session -> session.status().getName()))
+                .forEach(session -> groups.computeIfAbsent(session.status().getGroup(), group -> SessionGroup.builder().group(group))
                         .session(summary(session)));
         return groups.values().stream().map(SessionGroup.SessionGroupBuilder::build).toList();
     }
 
     @Override
     public SessionDetail getSession(SessionRef session) {
-        ConnectorStatus.Session status = session(session);
+        EngineSession engineSession = session(session);
         SessionDetail.SessionDetailBuilder detail = SessionDetail.builder()
-                .summary(summary(status))
-                .incomingSeqNum(status.getIncomingSeqNum())
-                .outgoingSeqNum(status.getOutgoingSeqNum());
-        status.getConfigs().forEach(config -> detail.config(SessionConfig.builder()
+                .summary(summary(engineSession))
+                .incomingSeqNum(engineSession.status().getIncomingSeqNum())
+                .outgoingSeqNum(engineSession.status().getOutgoingSeqNum());
+        engineSession.description().getConfigs().forEach(config -> detail.config(SessionConfig.builder()
                 .id(config.getName())
                 .connectAddresses(config.getConnectAddresses())
                 .build()));
@@ -123,7 +125,7 @@ class HttpEngineGateway implements EngineGateway {
     @Override
     public void activate(SessionRef session, String configId) {
         operate(session, HttpMethod.POST, () -> {
-            if (session(session).getConfigs().stream().noneMatch(config -> config.getName().equals(configId))) {
+            if (session(session).description().getConfigs().stream().noneMatch(config -> config.getName().equals(configId))) {
                 throw GatewayException.invalid("Session '" + session.getGroup() + "." + session.getSessionId()
                         + "' has no config '" + configId + "'");
             }
@@ -149,15 +151,12 @@ class HttpEngineGateway implements EngineGateway {
                 Map.of("message", message, "separator", String.valueOf(separator), "possDup", possDup));
     }
 
-    /**
-     * An engine knows the dictionaries of the configs that run only, so a backup gets those of the config its
-     * session runs, which is nearly always the same dictionary.
-     */
     @Override
     public List<DictionaryRef> getDictionaries(SessionRef config) {
-        return status(config.getEngineId()).getSessions().stream()
-                .filter(session -> session.getGroup().equals(config.getGroup())
-                        && session.getConfigs().stream().anyMatch(c -> c.getName().equals(config.getSessionId())))
+        return sessions(config.getEngineId()).stream()
+                .filter(session -> session.status().getGroup().equals(config.getGroup()))
+                .flatMap(session -> session.description().getConfigs().stream())
+                .filter(c -> c.getName().equals(config.getSessionId()))
                 .findFirst()
                 .orElseThrow(() -> GatewayException.unknownSession(config))
                 .getDictionaries().stream()
@@ -170,7 +169,7 @@ class HttpEngineGateway implements EngineGateway {
         return call(engineId, HttpMethod.GET, List.of("dictionaries", dictionaryId), null, byte[].class);
     }
 
-    private ConnectorStatus status(String engineId) {
+    private List<EngineSession> sessions(String engineId) {
         RegisteredEngine engine = registry.get(engineId);
         CachedStatus cached = statuses.computeIfAbsent(engineId, id -> new CachedStatus());
         synchronized (cached) {
@@ -179,7 +178,11 @@ class HttpEngineGateway implements EngineGateway {
                 cached.engine = engine;
                 cached.at = now;
                 try {
-                    cached.status = call(engineId, HttpMethod.GET, List.of("status"), null, ConnectorStatus.class);
+                    ConnectorStatus status = call(engineId, HttpMethod.GET, List.of("status"), null, ConnectorStatus.class);
+                    if (cached.described == null || !cached.described.getVersion().equals(status.getSessionsVersion())) {
+                        cached.described = call(engineId, HttpMethod.GET, List.of("sessions"), null, ConnectorSessions.class);
+                    }
+                    cached.sessions = join(cached.described, status);
                     cached.failure = null;
                 } catch (GatewayException e) {
                     cached.failure = e;
@@ -188,32 +191,57 @@ class HttpEngineGateway implements EngineGateway {
             if (cached.failure != null) {
                 throw cached.failure;
             }
-            return cached.status;
+            return cached.sessions;
         }
     }
 
     /**
-     * Reads a fresh status first, as a backup may have taken over within the cache window, and drops it after, so
-     * the next poll shows the operation's effect.
+     * A session that came after the description was read is left out until the next poll reads the new one.
+     */
+    private static List<EngineSession> join(ConnectorSessions described, ConnectorStatus status) {
+        Map<List<String>, ConnectorSessions.Session> descriptions = new HashMap<>();
+        described.getSessions().forEach(session -> descriptions.put(List.of(session.getGroup(), session.getName()), session));
+        List<EngineSession> joined = new ArrayList<>();
+        for (ConnectorStatus.Session session : status.getSessions()) {
+            ConnectorSessions.Session description = descriptions.get(List.of(session.getGroup(), session.getName()));
+            if (description != null) {
+                joined.add(new EngineSession(description, session));
+            }
+        }
+        return joined;
+    }
+
+    /**
+     * Reads a fresh status first, as a backup may have taken over within the cache window, and marks it stale after,
+     * so the next poll shows the operation's effect.
      */
     private void operate(SessionRef session, HttpMethod method, Supplier<List<String>> path, @Nullable Object body) {
-        statuses.remove(session.getEngineId());
+        markStale(session.getEngineId());
         try {
             call(session.getEngineId(), method, path.get(), body, Void.class);
         } finally {
-            statuses.remove(session.getEngineId());
+            markStale(session.getEngineId());
         }
     }
 
-    private ConnectorStatus.Session session(SessionRef session) {
-        return status(session.getEngineId()).getSessions().stream()
-                .filter(s -> s.getGroup().equals(session.getGroup()) && s.getName().equals(session.getSessionId()))
+    private void markStale(String engineId) {
+        CachedStatus cached = statuses.get(engineId);
+        if (cached != null) {
+            synchronized (cached) {
+                cached.at = null;
+            }
+        }
+    }
+
+    private EngineSession session(SessionRef session) {
+        return sessions(session.getEngineId()).stream()
+                .filter(s -> s.status().getGroup().equals(session.getGroup()) && s.status().getName().equals(session.getSessionId()))
                 .findFirst()
                 .orElseThrow(() -> GatewayException.unknownSession(session));
     }
 
     private List<String> runningConfig(SessionRef session, String operation) {
-        return List.of("sessions", session.getGroup(), session(session).getSelectedConfig(), operation);
+        return List.of("sessions", session.getGroup(), session(session).status().getSelectedConfig(), operation);
     }
 
     private <T> T call(String engineId, HttpMethod method, List<String> path, @Nullable Object body, Class<T> responseType) {
@@ -260,27 +288,29 @@ class HttpEngineGateway implements EngineGateway {
         };
     }
 
-    private static SessionSummary summary(ConnectorStatus.Session session) {
+    private static SessionSummary summary(EngineSession session) {
+        ConnectorSessions.Session description = session.description();
+        ConnectorStatus.Session status = session.status();
         return SessionSummary.builder()
-                .group(session.getGroup())
-                .id(session.getName())
-                .type(SessionType.valueOf(session.getType()))
-                .instanceId(session.getInstanceId())
-                .configIds(session.getConfigs().stream().map(ConnectorStatus.Config::getName).toList())
-                .runningConfigId(session.getSelectedConfig())
-                .identity(identity(session.getIdentity()))
-                .health(SessionHealth.of(session.isLoggedIn(), session.isWithinSessionTime()))
-                .loggedIn(session.isLoggedIn())
-                .connected(session.isConnected())
-                .withinSessionTime(session.isWithinSessionTime())
-                .desiredState(SessionState.valueOf(session.getDesiredState()))
-                .messagesLoggerInstanceId(session.getMessagesLoggerInstanceId())
-                .monitoringInstanceId(session.getMonitoringInstanceId())
+                .group(status.getGroup())
+                .id(status.getName())
+                .type(SessionType.valueOf(description.getType()))
+                .instanceId(description.getInstanceId())
+                .configIds(description.getConfigs().stream().map(ConnectorSessions.Config::getName).toList())
+                .runningConfigId(status.getSelectedConfig())
+                .identity(identity(session.selectedConfig().getIdentity()))
+                .health(SessionHealth.of(status.isLoggedIn(), status.isWithinSessionTime()))
+                .loggedIn(status.isLoggedIn())
+                .connected(status.isConnected())
+                .withinSessionTime(status.isWithinSessionTime())
+                .desiredState(SessionState.valueOf(status.getDesiredState()))
+                .messagesLoggerInstanceId(description.getMessagesLoggerInstanceId())
+                .monitoringInstanceId(description.getMonitoringInstanceId())
                 .build();
     }
 
-    private static FixIdentity identity(ConnectorStatus.Identity identity) {
-        Function<ConnectorStatus.CompIds, CompIds> compIds = ids -> CompIds.builder()
+    private static FixIdentity identity(ConnectorSessions.Identity identity) {
+        Function<ConnectorSessions.CompIds, CompIds> compIds = ids -> CompIds.builder()
                 .compId(ids.getCompId())
                 .subId(ids.getSubId())
                 .locationId(ids.getLocationId())
@@ -293,14 +323,25 @@ class HttpEngineGateway implements EngineGateway {
                 .build();
     }
 
+    private record EngineSession(ConnectorSessions.Session description, ConnectorStatus.Session status) {
+
+        ConnectorSessions.Config selectedConfig() {
+            return description.getConfigs().stream()
+                    .filter(config -> config.getName().equals(status.getSelectedConfig()))
+                    .findFirst()
+                    .orElse(description.getConfigs().get(0));
+        }
+    }
+
     /**
      * Also holds a failed call, so the viewers waiting on an engine that does not answer do not each wait out the
-     * request timeout in turn.
+     * request timeout in turn. The description is kept until the status reports another version.
      */
     private static final class CachedStatus {
         @Nullable RegisteredEngine engine;
         @Nullable Instant at;
-        @Nullable ConnectorStatus status;
+        @Nullable ConnectorSessions described;
+        @Nullable List<EngineSession> sessions;
         @Nullable GatewayException failure;
 
         boolean isFresh(RegisteredEngine current, Instant now) {

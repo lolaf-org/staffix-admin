@@ -36,23 +36,33 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class HttpEngineGatewayTest {
 
-    private static final String STATUS = """
-            {"instanceId":"alpha-engine","sessions":[
+    private static final String SESSIONS = """
+            {"instanceId":"alpha-engine","version":"v1","sessions":[
              {"group":"beta","name":"drop-copy","type":"ACCEPTOR","instanceId":"main-acceptor",
-              "configs":[{"name":"drop-copy","connectAddresses":[]}],"selectedConfig":"drop-copy",
-              "identity":{"fixVersion":"FIXT.1.1","defaultApplVerId":"9","sender":{"compId":"US"},"target":{"compId":"BETA","locationId":"LDN"}},
-              "loggedIn":false,"connected":false,"withinSessionTime":true,"desiredState":"LOGGED_OUT",
-              "incomingSeqNum":1,"outgoingSeqNum":1,"dictionaries":[{"id":"FIXT.1.1","hash":"aa"},{"id":"default-FIX.5.0-SP2","hash":"bb"}],
+              "configs":[{"name":"drop-copy","connectAddresses":[],
+                "identity":{"fixVersion":"FIXT.1.1","defaultApplVerId":"9","sender":{"compId":"US"},"target":{"compId":"BETA","locationId":"LDN"}},
+                "dictionaries":[{"id":"FIXT.1.1","hash":"aa"},{"id":"default-FIX.5.0-SP2","hash":"bb"}]}],
               "messagesLoggerInstanceId":"default","monitoringInstanceId":null},
              {"group":"alpha","name":"trading","type":"INITIATOR","instanceId":"alpha-initiator",
-              "configs":[{"name":"trading","connectAddresses":["alpha.example.com:9001"]},{"name":"trading-drp","connectAddresses":["drp.example.com:9001"]}],
-              "selectedConfig":"trading-drp",
-              "identity":{"fixVersion":"FIX.4.4","sender":{"compId":"US","subId":"DR"},"target":{"compId":"ALPHA"}},
-              "loggedIn":true,"connected":true,"withinSessionTime":true,"desiredState":"LOGGED_IN",
-              "incomingSeqNum":12,"outgoingSeqNum":34,"dictionaries":[{"id":"default-FIX.4.4","hash":"cc"}],
+              "configs":[{"name":"trading","connectAddresses":["alpha.example.com:9001"],
+                "identity":{"fixVersion":"FIX.4.4","sender":{"compId":"US"},"target":{"compId":"ALPHA"}},
+                "dictionaries":[{"id":"default-FIX.4.4","hash":"cc"}]},
+               {"name":"trading-drp","connectAddresses":["drp.example.com:9001"],
+                "identity":{"fixVersion":"FIX.4.4","sender":{"compId":"US","subId":"DR"},"target":{"compId":"ALPHA"}},
+                "dictionaries":[{"id":"default-FIX.4.4","hash":"cc"}]}],
               "messagesLoggerInstanceId":"otlp","monitoringInstanceId":"otlp-metrics","addedLater":true}]}
             """;
+    private static final String STATUS = """
+            {"instanceId":"alpha-engine","sessionsVersion":"%s","sessions":[
+             {"group":"beta","name":"drop-copy","selectedConfig":"drop-copy",
+              "loggedIn":false,"connected":false,"withinSessionTime":true,"desiredState":"LOGGED_OUT","incomingSeqNum":1,"outgoingSeqNum":1},
+             {"group":"alpha","name":"trading","selectedConfig":"trading-drp",
+              "loggedIn":true,"connected":true,"withinSessionTime":true,"desiredState":"LOGGED_IN","incomingSeqNum":12,"outgoingSeqNum":34},
+             {"group":"alpha","name":"added-since","selectedConfig":"added-since",
+              "loggedIn":true,"connected":true,"withinSessionTime":true,"desiredState":"LOGGED_IN","incomingSeqNum":1,"outgoingSeqNum":1}]}
+            """;
 
+    private volatile String sessionsVersion = "v1";
     private final List<String> requests = new CopyOnWriteArrayList<>();
     private final Map<String, String> bodies = new ConcurrentHashMap<>();
     private final Map<String, Integer> statuses = new ConcurrentHashMap<>();
@@ -75,7 +85,8 @@ class HttpEngineGatewayTest {
             requests.add(request);
             bodies.put(request, new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             byte[] body = switch (path) {
-                case "status" -> STATUS.getBytes(StandardCharsets.UTF_8);
+                case "status" -> STATUS.formatted(sessionsVersion).getBytes(StandardCharsets.UTF_8);
+                case "sessions" -> SESSIONS.getBytes(StandardCharsets.UTF_8);
                 case "dictionaries/default-FIX.4.4" -> "<fix/>".getBytes(StandardCharsets.UTF_8);
                 default -> new byte[0];
             };
@@ -162,7 +173,7 @@ class HttpEngineGatewayTest {
         gateway.sendMessage(trading(), "35=B|", '|', true);
         gateway.activate(trading(), "trading");
 
-        assertThat(requests).filteredOn(request -> !request.equals("GET status")).containsExactly(
+        assertThat(requests).filteredOn(request -> !request.startsWith("GET ")).containsExactly(
                 "POST sessions/alpha/trading-drp/logon",
                 "POST sessions/alpha/trading-drp/reset",
                 "PUT sessions/alpha/trading-drp/seqnums",
@@ -179,11 +190,28 @@ class HttpEngineGatewayTest {
         gateway.listGroups("alpha-engine");
         gateway.getSession(trading());
         gateway.getDictionaries(trading());
-        assertThat(requests).containsExactly("GET status");
+        assertThat(requests).containsExactly("GET status", "GET sessions");
 
         clock.step(HttpEngineGateway.STATUS_FRESH);
         gateway.listGroups("alpha-engine");
-        assertThat(requests).containsExactly("GET status", "GET status");
+        assertThat(requests).as("same sessions version").containsExactly("GET status", "GET sessions", "GET status");
+    }
+
+    @Test
+    void anotherSessionsVersionReadsTheSessionsAgain() {
+        gateway.listGroups("alpha-engine");
+
+        sessionsVersion = "v2";
+        clock.step(HttpEngineGateway.STATUS_FRESH);
+        gateway.listGroups("alpha-engine");
+
+        assertThat(requests).containsExactly("GET status", "GET sessions", "GET status", "GET sessions");
+    }
+
+    @Test
+    void aSessionNotYetDescribedIsLeftOutUntilItIs() {
+        assertThat(gateway.listGroups("alpha-engine").get(0).getSessions()).extracting(SessionSummary::getId)
+                .containsExactly("trading");
     }
 
     @Test
@@ -193,7 +221,8 @@ class HttpEngineGatewayTest {
         gateway.logon(trading());
         gateway.listGroups("alpha-engine");
 
-        assertThat(requests).containsExactly("GET status", "GET status", "POST sessions/alpha/trading-drp/logon", "GET status");
+        assertThat(requests).containsExactly("GET status", "GET sessions", "GET status", "POST sessions/alpha/trading-drp/logon",
+                "GET status");
     }
 
     @Test
@@ -245,7 +274,7 @@ class HttpEngineGatewayTest {
     }
 
     @Test
-    void aBackupDecodesWithTheDictionariesOfTheConfigItsSessionRuns() {
+    void eachConfigDecodesWithItsOwnDictionaries() {
         assertThat(gateway.getDictionaries(SessionRef.of("alpha-engine", "alpha", "trading")))
                 .containsExactly(DictionaryRef.of("default-FIX.4.4", "cc"));
         assertThat(gateway.getDictionaries(SessionRef.of("alpha-engine", "beta", "drop-copy")))
