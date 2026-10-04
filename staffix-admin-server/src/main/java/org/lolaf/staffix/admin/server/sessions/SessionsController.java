@@ -4,9 +4,11 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.lolaf.staffix.admin.server.audit.AuditLog;
 import org.lolaf.staffix.admin.server.engines.EngineGateway;
+import org.lolaf.staffix.admin.server.engines.GatewayException;
 import org.lolaf.staffix.admin.server.engines.SessionRef;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -41,11 +43,46 @@ public class SessionsController {
     }
 
     /**
-     * The running config's FixSessionSettings as JSON, free form until its format is settled.
+     * A document of the engine's session settings schema; secret values masked.
      */
     @GetMapping(SESSION + "/settings")
     public JsonNode getSessionSettings(@PathVariable String engineId, @PathVariable String group, @PathVariable String sessionId) {
         return gateway.getSessionSettings(SessionRef.of(engineId, group, sessionId));
+    }
+
+    /**
+     * A value sent back masked keeps the session's. Audited by the names of the fields that changed, never values.
+     */
+    @PreAuthorize(WRITER)
+    @PutMapping(SESSION + "/settings")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateSessionSettings(@PathVariable String engineId, @PathVariable String group, @PathVariable String sessionId,
+                                      @RequestBody JsonNode settings) {
+        SessionRef session = SessionRef.of(engineId, group, sessionId);
+        String changes = SettingsChanges.describe(gateway.getSessionSettings(session), settings);
+        auditLog.record(session, "update settings: " + changes, () -> gateway.updateSessionSettings(session, settings));
+    }
+
+    /**
+     * Acceptor sessions only: an initiator's sessions are the targets it was built with.
+     */
+    @PreAuthorize(WRITER)
+    @DeleteMapping(SESSION + "/settings")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removeSession(@PathVariable String engineId, @PathVariable String group, @PathVariable String sessionId) {
+        SessionRef session = SessionRef.of(engineId, group, sessionId);
+        auditLog.record(session, "remove session", () -> {
+            if (gateway.getSession(session).getSummary().getType() != SessionType.ACCEPTOR) {
+                throw GatewayException.rejected("Only an acceptor session can be removed: an initiator's sessions are the targets it was built with");
+            }
+            gateway.removeSession(session);
+        });
+    }
+
+    @GetMapping(SESSION + "/application-settings")
+    public List<ApplicationSetting> getApplicationSettings(@PathVariable String engineId, @PathVariable String group,
+                                                           @PathVariable String sessionId) {
+        return gateway.getApplicationSettings(SessionRef.of(engineId, group, sessionId));
     }
 
     @PreAuthorize(WRITER)

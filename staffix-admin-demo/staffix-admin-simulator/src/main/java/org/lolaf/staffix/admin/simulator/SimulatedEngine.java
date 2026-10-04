@@ -13,6 +13,7 @@ import org.lolaf.staffix.api.session.FixSessionSettings;
 import org.lolaf.staffix.api.session.plugins.FixSessionsPluginSettings;
 
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -39,7 +40,7 @@ final class SimulatedEngine implements AdminApi {
     SimulatedEngine(String engineId, List<SimulatedConnection> connections, List<FixMessagesLoggerSettings> loggers,
                     List<FixSessionsPluginSettings<?>> plugins) {
         this.engineId = engineId;
-        this.connections = List.copyOf(connections);
+        this.connections = new ArrayList<>(connections);
         this.loggers = List.copyOf(loggers);
         this.plugins = List.copyOf(plugins);
     }
@@ -157,30 +158,64 @@ final class SimulatedEngine implements AdminApi {
 
     @Override
     public synchronized Optional<String> findFixSessionsSettingsStore(FixSessionId fixSessionId, FixSessionType fixSessionType) {
-        return getManagedFixSessionsSettings().stream()
-                .filter(settings -> settings.getFixSessionId().equals(fixSessionId) && settings.getFixSessionType() == fixSessionType)
+        return stored(fixSessionId, fixSessionType).map(connection -> SETTINGS_STORE);
+    }
+
+    @Override
+    public synchronized void addFixSessionSettings(String storeInstanceId, FixSessionSettings settings) {
+        reloadFixSessionsSettingsStore(storeInstanceId);
+        requireUnusedName(settings.getFixSessionId(), null);
+        String acceptor = connections.stream()
+                .filter(connection -> connection.type == FixSessionType.ACCEPTOR)
+                .map(connection -> connection.instanceId)
                 .findFirst()
-                .map(settings -> SETTINGS_STORE);
+                .orElse("acceptor");
+        connections.add(new SimulatedConnection(settings.getFixSessionType() == FixSessionType.ACCEPTOR ? acceptor : "initiator",
+                settings.getFixSessionType(), List.of(new SimulatedSession(settings, null, false, 0, true))));
     }
 
     @Override
-    public void addFixSessionSettings(String storeInstanceId, FixSessionSettings settings) {
-        throw new IllegalStateException("The simulator does not edit sessions yet");
+    public synchronized void updateFixSessionSettings(FixSessionId fixSessionId, FixSessionSettings settings) {
+        SimulatedConnection connection = stored(fixSessionId, settings.getFixSessionType())
+                .orElseThrow(() -> noStoreHolds(fixSessionId));
+        if (!settings.getFixSessionId().equals(fixSessionId)) {
+            if (connection.type == FixSessionType.INITIATOR) {
+                throw new IllegalArgumentException("An initiator session's id is set by the initiator's targets");
+            }
+            requireUnusedName(settings.getFixSessionId(), fixSessionId);
+        }
+        connection.restartOn(settings);
     }
 
     @Override
-    public void updateFixSessionSettings(FixSessionId fixSessionId, FixSessionSettings settings) {
-        throw new IllegalStateException("The simulator does not edit sessions yet");
-    }
-
-    @Override
-    public void removeFixSessionSettings(FixSessionId fixSessionId, FixSessionType fixSessionType) {
-        throw new IllegalStateException("The simulator does not edit sessions yet");
+    public synchronized void removeFixSessionSettings(FixSessionId fixSessionId, FixSessionType fixSessionType) {
+        connections.remove(stored(fixSessionId, fixSessionType).orElseThrow(() -> noStoreHolds(fixSessionId)));
     }
 
     @Override
     public Collection<FixApplicationSessionSettingDescriptor> getFixApplicationSessionSettingDescriptors(FixSessionId fixSessionId) {
-        return List.of();
+        return SimulationScenario.APPLICATION_SETTINGS;
+    }
+
+    private Optional<SimulatedConnection> stored(FixSessionId fixSessionId, FixSessionType fixSessionType) {
+        return connections.stream()
+                .filter(connection -> connection.type == fixSessionType && connection.main().fixSessionId().equals(fixSessionId))
+                .findFirst();
+    }
+
+    private void requireUnusedName(FixSessionId fixSessionId, FixSessionId replacedOrNull) {
+        connections.stream()
+                .flatMap(connection -> connection.configs.stream())
+                .map(SimulatedSession::fixSessionId)
+                .filter(id -> !id.equals(replacedOrNull) && id.getQualifiedName().equals(fixSessionId.getQualifiedName()))
+                .findFirst()
+                .ifPresent(id -> {
+                    throw new IllegalStateException("The engine already has a session " + id.getQualifiedName());
+                });
+    }
+
+    private static IllegalArgumentException noStoreHolds(FixSessionId fixSessionId) {
+        return new IllegalArgumentException("No store holds session " + fixSessionId);
     }
 
     @Override

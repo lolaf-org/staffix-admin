@@ -5,10 +5,13 @@ import org.lolaf.staffix.admin.server.dictionaries.DictionaryRef;
 import org.lolaf.staffix.admin.server.engines.EngineGateway;
 import org.lolaf.staffix.admin.server.engines.GatewayException;
 import org.lolaf.staffix.admin.server.engines.SessionRef;
+import org.lolaf.staffix.admin.server.sessions.ApplicationSetting;
 import org.lolaf.staffix.admin.server.sessions.ResetMode;
 import org.lolaf.staffix.admin.server.sessions.SessionDetail;
 import org.lolaf.staffix.admin.server.sessions.SessionGroup;
+import org.lolaf.staffix.admin.server.sessions.SessionSettingsStore;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.JsonNodeFactory;
 
 import java.util.Collection;
 import java.util.List;
@@ -55,6 +58,40 @@ class SimulatedEngineGateway implements EngineGateway {
     @Override
     public JsonNode getSessionSettings(SessionRef session) {
         return engine(session.getEngineId()).getSessionSettings(session);
+    }
+
+    @Override
+    public void updateSessionSettings(SessionRef session, JsonNode settings) {
+        engine(session.getEngineId()).updateSessionSettings(session, settings);
+    }
+
+    @Override
+    public void removeSession(SessionRef session) {
+        engine(session.getEngineId()).removeSession(session);
+    }
+
+    @Override
+    public void addSession(String engineId, String sessionSettingsStore, JsonNode settings) {
+        engine(engineId);
+        throw GatewayException.rejected("The simulator does not add sessions");
+    }
+
+    @Override
+    public JsonNode getSessionSettingsSchema(String engineId) {
+        engine(engineId);
+        return JsonNodeFactory.instance.objectNode().put("type", "object");
+    }
+
+    @Override
+    public List<SessionSettingsStore> listSessionSettingsStores(String engineId) {
+        engine(engineId);
+        return List.of(SessionSettingsStore.builder().instanceId(SimulatedEngine.SETTINGS_STORE).build());
+    }
+
+    @Override
+    public List<ApplicationSetting> getApplicationSettings(SessionRef session) {
+        engine(session.getEngineId()).getSession(session);
+        return List.of();
     }
 
     @Override

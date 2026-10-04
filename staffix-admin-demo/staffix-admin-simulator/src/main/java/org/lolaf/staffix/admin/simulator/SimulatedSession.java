@@ -15,7 +15,7 @@ final class SimulatedSession {
 
     private static final int RECONNECT_TICKS = 2;
 
-    final FixSessionSettings settings;
+    FixSessionSettings settings;
     /**
      * {@code host:port} an initiator dials; null for an acceptor.
      */
@@ -58,6 +58,15 @@ final class SimulatedSession {
 
     String name() {
         return settings.getFixSessionId().getName();
+    }
+
+    /**
+     * As an engine restarting the session on settings an operator changed.
+     */
+    void restartOn(FixSessionSettings newSettings) {
+        settings = newSettings;
+        desiredState = newSettings.getDesiredSessionState();
+        drop(RECONNECT_TICKS);
     }
 
     void tick(Random random) {

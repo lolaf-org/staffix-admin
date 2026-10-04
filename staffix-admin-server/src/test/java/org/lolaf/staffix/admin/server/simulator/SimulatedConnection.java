@@ -6,6 +6,7 @@ import org.lolaf.staffix.admin.server.sessions.SessionConfig;
 import org.lolaf.staffix.admin.server.sessions.SessionHealth;
 import org.lolaf.staffix.admin.server.sessions.SessionSummary;
 import org.lolaf.staffix.admin.server.sessions.SessionType;
+import tools.jackson.databind.JsonNode;
 
 import java.util.List;
 
@@ -53,6 +54,13 @@ class SimulatedConnection {
         running.loggedIn = false;
         running = target;
         target.drop(2);
+    }
+
+    /**
+     * Every config runs on the session's settings.
+     */
+    void replaceSettings(JsonNode settings) {
+        configs.forEach(config -> config.settings = settings);
     }
 
     boolean hasConfig(String configId) {

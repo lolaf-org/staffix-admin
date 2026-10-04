@@ -2,9 +2,11 @@ package org.lolaf.staffix.admin.server.engines;
 
 import org.jspecify.annotations.Nullable;
 import org.lolaf.staffix.admin.server.dictionaries.DictionaryRef;
+import org.lolaf.staffix.admin.server.sessions.ApplicationSetting;
 import org.lolaf.staffix.admin.server.sessions.ResetMode;
 import org.lolaf.staffix.admin.server.sessions.SessionDetail;
 import org.lolaf.staffix.admin.server.sessions.SessionGroup;
+import org.lolaf.staffix.admin.server.sessions.SessionSettingsStore;
 import tools.jackson.databind.JsonNode;
 
 import java.util.List;
@@ -22,7 +24,34 @@ public interface EngineGateway {
 
     SessionDetail getSession(SessionRef session);
 
+    /**
+     * The session's settings as a document of the engine's session settings schema, secret values masked.
+     */
     JsonNode getSessionSettings(SessionRef session);
+
+    /**
+     * Replaces the session's settings; a value sent back masked keeps the session's.
+     */
+    void updateSessionSettings(SessionRef session, JsonNode settings);
+
+    /**
+     * Removes the session from the store holding its settings, which stops it.
+     */
+    void removeSession(SessionRef session);
+
+    /**
+     * Adds a session to one of the engine's session settings stores, which starts it.
+     */
+    void addSession(String engineId, String sessionSettingsStore, JsonNode settings);
+
+    /**
+     * The JSON Schema of the engine's session settings documents, each field described.
+     */
+    JsonNode getSessionSettingsSchema(String engineId);
+
+    List<SessionSettingsStore> listSessionSettingsStores(String engineId);
+
+    List<ApplicationSetting> getApplicationSettings(SessionRef session);
 
     /**
      * The engine's messages loggers and session plugins with their settings, as staffix's HTTP connector serves them

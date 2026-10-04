@@ -13,6 +13,7 @@ import static org.awaitility.Awaitility.await;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -108,5 +109,54 @@ class SessionsControllerTest {
         mockMvc.perform(get("/api/engines/nowhere/groups"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.detail", containsString("nowhere")));
+    }
+
+    @Test
+    void updatesASessionsSettings() throws Exception {
+        String fundBeta = "/api/engines/london-prod/groups/fund-beta/sessions/trading/settings";
+
+        mockMvc.perform(put(fundBeta).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"desiredSessionState\": \"LOGGED_OUT\"}"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get(fundBeta)).andExpect(jsonPath("$.desiredSessionState").value("LOGGED_OUT"));
+    }
+
+    @Test
+    void removesAnAcceptorSessionButNotAnInitiators() throws Exception {
+        mockMvc.perform(delete("/api/engines/london-prod/groups/fund-alpha/sessions/drop-copy/settings").with(csrf()))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/engines/london-prod/groups/fund-alpha/sessions/drop-copy")).andExpect(status().isNotFound());
+
+        mockMvc.perform(delete("/api/engines/london-prod/groups/delta/sessions/market-data/settings").with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail", containsString("Only an acceptor session")));
+    }
+
+    @Test
+    void addsOnlyAcceptorSessions() throws Exception {
+        mockMvc.perform(post("/api/engines/london-prod/session-settings-stores/simulated/sessions").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fixSessionId\": {\"group\": \"delta\", \"name\": \"new\"}, \"fixSessionType\": \"INITIATOR\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail", containsString("Only an acceptor session")));
+    }
+
+    @Test
+    void servesTheEnginesSchemaAndSettingsStores() throws Exception {
+        mockMvc.perform(get("/api/engines/london-prod/schemas/session-settings")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/engines/london-prod/session-settings-stores"))
+                .andExpect(jsonPath("$[0].instanceId").value("simulated"))
+                .andExpect(jsonPath("$[0].persistent").value(false));
+        mockMvc.perform(get("/api/engines/london-prod/groups/fund-beta/sessions/trading"))
+                .andExpect(jsonPath("$.sessionSettingsStore").value("simulated"));
+    }
+
+    @Test
+    @WithMockUser(roles = "READER")
+    void aReaderCannotChangeSettings() throws Exception {
+        mockMvc.perform(delete("/api/engines/london-prod/groups/fund-beta/sessions/trading/settings").with(csrf()))
+                .andExpect(status().isForbidden());
     }
 }

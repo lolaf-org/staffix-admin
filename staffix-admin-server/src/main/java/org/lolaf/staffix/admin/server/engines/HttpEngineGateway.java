@@ -5,6 +5,7 @@ import org.lolaf.staffix.admin.server.AdminProperties;
 import org.lolaf.staffix.admin.server.dictionaries.DictionaryRef;
 import org.lolaf.staffix.admin.server.sessions.CompIds;
 import org.lolaf.staffix.admin.server.sessions.FixIdentity;
+import org.lolaf.staffix.admin.server.sessions.ApplicationSetting;
 import org.lolaf.staffix.admin.server.sessions.ResetMode;
 import org.lolaf.staffix.admin.server.sessions.SessionConfig;
 import org.lolaf.staffix.admin.server.sessions.SessionDetail;
@@ -12,6 +13,7 @@ import org.lolaf.staffix.admin.server.sessions.SessionGroup;
 import org.lolaf.staffix.admin.server.sessions.SessionHealth;
 import org.lolaf.staffix.admin.server.sessions.SessionState;
 import org.lolaf.staffix.admin.server.sessions.SessionSummary;
+import org.lolaf.staffix.admin.server.sessions.SessionSettingsStore;
 import org.lolaf.staffix.admin.server.sessions.SessionType;
 import org.springframework.boot.ssl.SslBundles;
 import org.springframework.http.HttpHeaders;
@@ -83,7 +85,8 @@ class HttpEngineGateway implements EngineGateway {
         SessionDetail.SessionDetailBuilder detail = SessionDetail.builder()
                 .summary(summary(engineSession))
                 .incomingSeqNum(engineSession.status().getIncomingSeqNum())
-                .outgoingSeqNum(engineSession.status().getOutgoingSeqNum());
+                .outgoingSeqNum(engineSession.status().getOutgoingSeqNum())
+                .sessionSettingsStore(engineSession.description().getSessionSettingsStore());
         engineSession.description().getConfigs().forEach(config -> detail.config(SessionConfig.builder()
                 .id(config.getName())
                 .connectAddresses(config.getConnectAddresses())
@@ -94,6 +97,41 @@ class HttpEngineGateway implements EngineGateway {
     @Override
     public JsonNode getSessionSettings(SessionRef session) {
         return call(session.getEngineId(), HttpMethod.GET, sessionPath(session, "settings"), null, JsonNode.class);
+    }
+
+    @Override
+    public void updateSessionSettings(SessionRef session, JsonNode settings) {
+        operate(session, HttpMethod.PUT, sessionPath(session, "settings"), settings);
+    }
+
+    @Override
+    public void removeSession(SessionRef session) {
+        operate(session, HttpMethod.DELETE, sessionPath(session, "settings"), null);
+    }
+
+    @Override
+    public void addSession(String engineId, String sessionSettingsStore, JsonNode settings) {
+        try {
+            call(engineId, HttpMethod.POST, List.of("session-settings-stores", sessionSettingsStore, "sessions"), settings, Void.class);
+        } finally {
+            markStale(engineId);
+        }
+    }
+
+    @Override
+    public JsonNode getSessionSettingsSchema(String engineId) {
+        return call(engineId, HttpMethod.GET, List.of("schemas", "session-settings"), null, JsonNode.class);
+    }
+
+    @Override
+    public List<SessionSettingsStore> listSessionSettingsStores(String engineId) {
+        return List.of(call(engineId, HttpMethod.GET, List.of("session-settings-stores"), null, SessionSettingsStore[].class));
+    }
+
+    @Override
+    public List<ApplicationSetting> getApplicationSettings(SessionRef session) {
+        return List.of(call(session.getEngineId(), HttpMethod.GET, sessionPath(session, "application-settings"), null,
+                ApplicationSetting[].class));
     }
 
     @Override

@@ -20,7 +20,7 @@ class SimulatedSession {
     final String group;
     final FixIdentity identity;
     final SessionType type;
-    final JsonNode settings;
+    JsonNode settings;
     /**
      * {@code host:port} an initiator dials; null for an acceptor.
      */

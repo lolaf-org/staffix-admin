@@ -2,6 +2,7 @@ package org.lolaf.staffix.admin.simulator;
 
 import org.lolaf.staffix.api.session.FixSession.FixSessionType;
 import org.lolaf.staffix.api.session.FixSessionId;
+import org.lolaf.staffix.api.session.FixSessionSettings;
 
 import java.util.List;
 
@@ -33,6 +34,14 @@ final class SimulatedConnection {
 
     List<SimulatedSession> backups() {
         return configs.subList(1, configs.size());
+    }
+
+    /**
+     * A backup runs on its main config's settings under its own id.
+     */
+    void restartOn(FixSessionSettings settings) {
+        main().restartOn(settings);
+        backups().forEach(backup -> backup.restartOn(settings.toBuilder().fixSessionId(backup.fixSessionId()).build()));
     }
 
     boolean hasConfig(FixSessionId fixSessionId) {

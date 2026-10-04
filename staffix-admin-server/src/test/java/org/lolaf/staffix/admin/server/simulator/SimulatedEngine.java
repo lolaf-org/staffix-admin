@@ -9,6 +9,7 @@ import org.lolaf.staffix.admin.server.sessions.SessionSummary;
 import org.lolaf.staffix.admin.server.sessions.SessionType;
 import tools.jackson.databind.JsonNode;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
@@ -22,6 +23,8 @@ import java.util.stream.Stream;
  */
 class SimulatedEngine {
 
+    static final String SETTINGS_STORE = "simulated";
+
     final String engineId;
     final String staffixVersion;
     private final List<SimulatedConnection> connections;
@@ -29,7 +32,7 @@ class SimulatedEngine {
     SimulatedEngine(String engineId, String staffixVersion, List<SimulatedConnection> connections) {
         this.engineId = engineId;
         this.staffixVersion = staffixVersion;
-        this.connections = List.copyOf(connections);
+        this.connections = new ArrayList<>(connections);
     }
 
     synchronized void tick(Random random) {
@@ -60,6 +63,7 @@ class SimulatedEngine {
                 .incomingSeqNum(connection.running().incomingSeqNum)
                 .outgoingSeqNum(connection.running().outgoingSeqNum)
                 .configs(connection.describeConfigs())
+                .sessionSettingsStore(SETTINGS_STORE)
                 .build();
     }
 
@@ -69,6 +73,14 @@ class SimulatedEngine {
 
     synchronized JsonNode getSessionSettings(SessionRef ref) {
         return connection(ref).running().settings;
+    }
+
+    synchronized void updateSessionSettings(SessionRef ref, JsonNode settings) {
+        connection(ref).replaceSettings(settings);
+    }
+
+    synchronized void removeSession(SessionRef ref) {
+        connections.remove(connection(ref));
     }
 
     synchronized void logon(SessionRef ref) {

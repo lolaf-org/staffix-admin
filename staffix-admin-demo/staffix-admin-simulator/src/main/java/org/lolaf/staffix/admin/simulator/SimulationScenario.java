@@ -2,6 +2,7 @@ package org.lolaf.staffix.admin.simulator;
 
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
+import org.lolaf.staffix.api.application.FixApplicationSessionSettingDescriptor;
 import org.lolaf.staffix.api.logging.FixMessagesLoggerSettings;
 import org.lolaf.staffix.api.monitoring.FixSessionsMonitoringManager;
 import org.lolaf.staffix.api.session.FixSession.FixSessionType;
@@ -29,6 +30,15 @@ import java.util.concurrent.TimeUnit;
  */
 @UtilityClass
 class SimulationScenario {
+
+    static final FixApplicationSessionSettingDescriptor LOGON_PASSWORD =
+            FixApplicationSessionSettingDescriptor.secret("logon.password", "The password the session's Logon(A) carries");
+    static final FixApplicationSessionSettingDescriptor ACCOUNT =
+            FixApplicationSessionSettingDescriptor.of("account", "The account the session's orders are booked to");
+    /**
+     * What every simulated session's application declares.
+     */
+    static final List<FixApplicationSessionSettingDescriptor> APPLICATION_SETTINGS = List.of(LOGON_PASSWORD, ACCOUNT);
 
     List<SimulatedEngine> engines() {
         return List.of(paris(), london(), newYork());
@@ -167,7 +177,9 @@ class SimulationScenario {
                             .group(connection.group).name(name).senderCompID(compId).targetCompID(counterparty).build()))
                     .fixSessionType(connection.type)
                     .desiredSessionState(connection.loggedOut ? FixSessionState.LOGGED_OUT : FixSessionState.LOGGED_IN)
-                    .fixMessageLoggerInstanceId(connection.messagesLogger);
+                    .fixMessageLoggerInstanceId(connection.messagesLogger)
+                    .fixApplicationSessionSetting(LOGON_PASSWORD, "demo-" + connection.group)
+                    .fixApplicationSessionSetting(ACCOUNT, counterparty + "-1");
             if (connection.monitoring != null) {
                 settings.fixSessionPluginsInstanceId(FixSessionsMonitoringManager.class, connection.monitoring);
             }

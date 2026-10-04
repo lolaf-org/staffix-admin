@@ -11,18 +11,21 @@ import org.lolaf.staffix.admin.server.AdminProperties;
 import org.lolaf.staffix.admin.server.SteppingClock;
 import org.lolaf.staffix.admin.server.dictionaries.DictionaryRef;
 import org.lolaf.staffix.admin.server.onboarding.EngineAnnouncement;
+import org.lolaf.staffix.admin.server.sessions.ApplicationSetting;
 import org.lolaf.staffix.admin.server.sessions.ResetMode;
 import org.lolaf.staffix.admin.server.sessions.SessionDetail;
 import org.lolaf.staffix.admin.server.sessions.SessionGroup;
 import org.lolaf.staffix.admin.server.sessions.SessionHealth;
 import org.lolaf.staffix.admin.server.sessions.SessionState;
 import org.lolaf.staffix.admin.server.sessions.SessionSummary;
+import org.lolaf.staffix.admin.server.sessions.SessionSettingsStore;
 import org.lolaf.staffix.admin.server.TestTls;
 import org.springframework.boot.ssl.DefaultSslBundleRegistry;
 import org.springframework.boot.ssl.SslBundle;
 import org.springframework.boot.ssl.SslStoreBundle;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
@@ -109,6 +112,10 @@ class HttpEngineGatewayTest {
             case "status" -> STATUS.formatted(sessionsVersion).getBytes(StandardCharsets.UTF_8);
             case "sessions" -> SESSIONS.getBytes(StandardCharsets.UTF_8);
             case "dictionaries/default-FIX.4.4" -> "<fix/>".getBytes(StandardCharsets.UTF_8);
+            case "session-settings-stores" -> "[{\"instanceId\":\"main\",\"persistent\":true}]".getBytes(StandardCharsets.UTF_8);
+            case "schemas/session-settings" -> "{\"type\":\"object\"}".getBytes(StandardCharsets.UTF_8);
+            case "sessions/alpha/trading/application-settings" ->
+                    "[{\"id\":\"logon.password\",\"secret\":true}]".getBytes(StandardCharsets.UTF_8);
             default -> new byte[0];
         };
         int status = statuses.getOrDefault(request, body.length > 0 ? 200 : 204);
@@ -341,5 +348,28 @@ class HttpEngineGatewayTest {
         assertThat(gateway.getDictionaries(SessionRef.of("alpha-engine", "beta", "drop-copy")))
                 .extracting(DictionaryRef::getId).containsExactly("FIXT.1.1", "default-FIX.5.0-SP2");
         assertThat(gateway.getDictionaryXml("alpha-engine", "default-FIX.4.4")).isEqualTo("<fix/>".getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void sessionSettingsAreReplacedRemovedAndAddedThroughTheirRoutes() {
+        JsonMapper json = JsonMapper.builder().build();
+        JsonNode settings = json.readTree("{\"fixSessionType\":\"ACCEPTOR\"}");
+
+        gateway.updateSessionSettings(trading(), settings);
+        gateway.removeSession(trading());
+        gateway.addSession("alpha-engine", "main", settings);
+
+        assertThat(requests).contains("PUT sessions/alpha/trading/settings", "DELETE sessions/alpha/trading/settings",
+                "POST session-settings-stores/main/sessions");
+        assertThat(bodies.get("POST session-settings-stores/main/sessions")).isEqualTo("{\"fixSessionType\":\"ACCEPTOR\"}");
+    }
+
+    @Test
+    void storesSchemaAndApplicationSettingsAreRead() {
+        assertThat(gateway.listSessionSettingsStores("alpha-engine"))
+                .containsExactly(SessionSettingsStore.builder().instanceId("main").persistent(true).build());
+        assertThat(gateway.getSessionSettingsSchema("alpha-engine").path("type").asString()).isEqualTo("object");
+        assertThat(gateway.getApplicationSettings(trading()))
+                .containsExactly(ApplicationSetting.builder().id("logon.password").secret(true).build());
     }
 }

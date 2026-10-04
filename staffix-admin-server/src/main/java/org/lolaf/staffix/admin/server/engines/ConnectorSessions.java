@@ -34,6 +34,8 @@ class ConnectorSessions {
         String messagesLoggerInstanceId;
         @Nullable
         String monitoringInstanceId;
+        @Nullable
+        String sessionSettingsStore;
     }
 
     @Value
