@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Badge, Descriptions, Divider, Flex, InputNumber, Modal, Select, Table, Tag, Typography } from 'antd'
+import { Descriptions, Divider, Flex, InputNumber, Modal, Select, Table, Tag, Typography } from 'antd'
 import { api, call, type Schemas } from '../api/client'
 import { sessionPath, useEngineMutation, type SessionRef } from '../api/queries'
-import { HEALTH_LABELS, HEALTH_STATUS } from './health'
+import { HEALTH_LABELS, statusOf } from './health'
+import { StatusBadge } from './StatusBadge'
 import { formatCompIds } from './identity'
 import { RESET_MODES } from './resetModes'
 import { WriteButton } from './WriteButton'
@@ -24,7 +25,7 @@ export function SessionStatusTab({ sessionRef, detail }: Props) {
         column={1}
         bordered
         items={[
-          { label: 'Status', children: <Badge status={HEALTH_STATUS[summary.health]} text={HEALTH_LABELS[summary.health]} /> },
+          { label: 'Status', children: <StatusBadge status={statusOf(summary)} text={HEALTH_LABELS[summary.health]} /> },
           { label: 'Group', children: summary.group },
           { label: 'Session', children: summary.id },
           { label: 'Instance', children: `${summary.type.toLowerCase()} ${summary.instanceId}` },
@@ -37,7 +38,7 @@ export function SessionStatusTab({ sessionRef, detail }: Props) {
           { label: 'Within session time', children: yesNo(summary.withinSessionTime) },
           {
             label: 'Desired state',
-            children: summary.desiredState === 'LOGGED_OUT' ? <Tag>logged out by an operator</Tag> : summary.desiredState.toLowerCase().replace('_', ' '),
+            children: summary.desiredState === 'LOGGED_OUT' ? <Tag color="orange">logged out by an operator</Tag> : summary.desiredState.toLowerCase().replace('_', ' '),
           },
           { label: 'Next incoming seq num', children: detail.incomingSeqNum },
           { label: 'Next outgoing seq num', children: detail.outgoingSeqNum },

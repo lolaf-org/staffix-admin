@@ -1,6 +1,6 @@
 import { useSearchParams } from 'react-router'
 import type { Schemas } from '../api/client'
-import type { Health } from './health'
+import { statusOf, type Status } from './health'
 import { formatIdentity } from './identity'
 
 /**
@@ -9,7 +9,7 @@ import { formatIdentity } from './identity'
 export function useSessionFilters() {
   const [params, setParams] = useSearchParams()
   const text = params.get('q') ?? ''
-  const healths = params.getAll('health') as Health[]
+  const statuses = params.getAll('status') as Status[]
   const engines = params.getAll('engine')
 
   const update = (name: string, values: string[]) =>
@@ -28,15 +28,15 @@ export function useSessionFilters() {
       .toLowerCase()
 
   const matches = (session: Schemas['SessionSummary']) =>
-    (healths.length === 0 || healths.includes(session.health)) &&
+    (statuses.length === 0 || statuses.includes(statusOf(session))) &&
     (text === '' || searchable(session).includes(text.toLowerCase()))
 
   return {
     text,
-    healths,
+    statuses,
     engines,
     setText: (value: string) => update('q', [value]),
-    setHealths: (values: Health[]) => update('health', values),
+    setStatuses: (values: Status[]) => update('status', values),
     setEngines: (values: string[]) => update('engine', values),
     matches,
   }

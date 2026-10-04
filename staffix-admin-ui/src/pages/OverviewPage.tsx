@@ -1,8 +1,9 @@
-import { Alert, Badge, Card, Empty, Flex, Input, Select, Skeleton, Space, Tag, Tooltip, Typography, theme } from 'antd'
+import { Alert, Card, Empty, Flex, Input, Select, Skeleton, Space, Tag, Tooltip, Typography, theme } from 'antd'
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router'
 import type { Schemas } from '../api/client'
 import { sessionRoute, useEngines, useGroups } from '../api/queries'
-import { HEALTH_LABELS, HEALTH_STATUS, HEALTHS, type Health } from '../sessions/health'
+import { STATUS_LABELS, STATUSES, statusOf, type Status } from '../sessions/health'
+import { StatusBadge } from '../sessions/StatusBadge'
 import { SessionBox } from '../sessions/SessionBox'
 import { useSessionFilters } from '../sessions/filters'
 
@@ -25,13 +26,13 @@ export function OverviewPage() {
           onChange={(e) => filters.setText(e.target.value)}
           style={{ width: 320, maxWidth: '100%' }}
         />
-        <Select<Health[]>
+        <Select<Status[]>
           mode="multiple"
           allowClear
           placeholder="Any status"
-          value={filters.healths}
-          onChange={filters.setHealths}
-          options={HEALTHS.map((h) => ({ value: h, label: <Badge status={HEALTH_STATUS[h]} text={HEALTH_LABELS[h]} /> }))}
+          value={filters.statuses}
+          onChange={filters.setStatuses}
+          options={STATUSES.map((s) => ({ value: s, label: <StatusBadge status={s} /> }))}
           style={{ minWidth: 220, maxWidth: '100%' }}
         />
         <Select<string[]>
@@ -60,9 +61,9 @@ function EngineCard({ engine }: { engine: Schemas['Engine'] }) {
   const shown = (groups.data ?? [])
     .map((group) => ({ ...group, sessions: group.sessions.filter(filters.matches) }))
     .filter((group) => group.sessions.length > 0)
-  const counts = HEALTHS.map((health) => ({
-    health,
-    count: (groups.data ?? []).flatMap((g) => g.sessions).filter((s) => s.health === health).length,
+  const counts = STATUSES.map((status) => ({
+    status,
+    count: (groups.data ?? []).flatMap((g) => g.sessions).filter((s) => statusOf(s) === status).length,
   }))
 
   return (
@@ -81,8 +82,8 @@ function EngineCard({ engine }: { engine: Schemas['Engine'] }) {
       }
       extra={
         <Space>
-          {counts.map(({ health, count }) => (
-            <Badge key={health} status={HEALTH_STATUS[health]} text={count} showZero title={HEALTH_LABELS[health]} />
+          {counts.map(({ status, count }) => (
+            <StatusBadge key={status} status={status} text={count} title={STATUS_LABELS[status]} />
           ))}
         </Space>
       }
