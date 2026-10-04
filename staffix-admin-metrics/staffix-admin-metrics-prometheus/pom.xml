@@ -16,6 +16,11 @@
     <!-- provided: what staffix-admin.jar gives every plugin in plugins/ -->
     <dependencies>
         <dependency>
+            <groupId>org.lolaf.staffix</groupId>
+            <artifactId>staffix-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
             <groupId>org.lolaf</groupId>
             <artifactId>staffix-admin-connector-spi</artifactId>
             <scope>provided</scope>

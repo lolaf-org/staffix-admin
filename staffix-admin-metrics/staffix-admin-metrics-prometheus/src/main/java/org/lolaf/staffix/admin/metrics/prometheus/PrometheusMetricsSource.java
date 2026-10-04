@@ -32,11 +32,24 @@ import java.util.concurrent.TimeUnit;
  */
 public class PrometheusMetricsSource implements MetricsSource {
 
+    private static final String ENGINE = PrometheusLabel.FIX_EID.label();
+    private static final String GROUP = PrometheusLabel.FIX_SG.label();
+    private static final String SESSION = PrometheusLabel.FIX_SN.label();
+    private static final String MESSAGE_TYPE = PrometheusLabel.FIX_MSG_TYPE.label();
+    private static final String DIRECTION = PrometheusLabel.FIX_MSG_DIR.label();
     private static final Map<String, String> SERIES_LABELS = Map.of(
-            "fix_msg_type", MetricSeries.MESSAGE_TYPE,
-            "fix_msg_dir", MetricSeries.DIRECTION,
-            "fix_sg", MetricSeries.GROUP,
-            "fix_sn", MetricSeries.SESSION_ID);
+            MESSAGE_TYPE, MetricSeries.MESSAGE_TYPE,
+            DIRECTION, MetricSeries.DIRECTION,
+            GROUP, MetricSeries.GROUP,
+            SESSION, MetricSeries.SESSION_ID);
+    private static final String BY_MESSAGE = MESSAGE_TYPE + ", " + DIRECTION;
+    private static final String BY_SESSION = GROUP + ", " + SESSION;
+    private static final String MESSAGE_RATE_QUERY =
+            "sum by (" + BY_MESSAGE + ") (rate(messages_read_latency_count{%1$s," + DIRECTION + "=\"in\"}[%2$s]))"
+            + " or sum by (" + BY_MESSAGE + ") (rate(messages_write_latency_count{%1$s," + DIRECTION + "=\"out\"}[%2$s]))";
+    private static final String ROUND_TRIP_TIME_QUERY = "sum by (" + BY_SESSION + ") (rate(session_rtt_sum{%1$s}[%2$s]))"
+            + " / sum by (" + BY_SESSION + ") (rate(session_rtt_count{%1$s}[%2$s]))";
+    private static final String CLOCK_OFFSET_QUERY = "avg by (" + BY_SESSION + ") (session_clock_offset{%1$s})";
     private static final double NANOS_PER_SECOND = TimeUnit.SECONDS.toNanos(1);
 
     private final RestClient client;
@@ -81,38 +94,31 @@ public class PrometheusMetricsSource implements MetricsSource {
         String selector = selector(query);
         String window = window(query);
         return switch (query.getKind()) {
-            case MESSAGE_RATE -> queryRange(query, 1,
-                    "sum by (fix_msg_type, fix_msg_dir) (rate(messages_read_latency_count{%1$s,fix_msg_dir=\"in\"}[%2$s]))"
-                    + " or sum by (fix_msg_type, fix_msg_dir) (rate(messages_write_latency_count{%1$s,fix_msg_dir=\"out\"}[%2$s]))",
-                    selector, window);
+            case MESSAGE_RATE -> queryRange(query, 1, MESSAGE_RATE_QUERY, selector, window);
             case READ_LATENCY -> latency(query, "messages_read_latency", "in", selector, window);
             case DECODING_LATENCY -> latency(query, "messages_decoding_latency", "in", selector, window);
             case WRITE_LATENCY -> latency(query, "messages_write_latency", "out", selector, window);
             case ENCODING_LATENCY -> latency(query, "messages_encoding_latency", "out", selector, window);
-            case ROUND_TRIP_TIME -> queryRange(query, timerUnitsPerSecond(query),
-                    "sum by (fix_sg, fix_sn) (rate(session_rtt_sum{%1$s}[%2$s]))"
-                    + " / sum by (fix_sg, fix_sn) (rate(session_rtt_count{%1$s}[%2$s]))",
-                    selector, window);
-            case CLOCK_OFFSET -> queryRange(query, NANOS_PER_SECOND,
-                    "avg by (fix_sg, fix_sn) (session_clock_offset{%1$s})", selector, window);
+            case ROUND_TRIP_TIME -> queryRange(query, timerUnitsPerSecond(query), ROUND_TRIP_TIME_QUERY, selector, window);
+            case CLOCK_OFFSET -> queryRange(query, NANOS_PER_SECOND, CLOCK_OFFSET_QUERY, selector, window);
         };
     }
 
     private List<MetricSeries> latency(MetricQuery query, String timer, String direction, String selector, String window) {
         double quantile = Objects.requireNonNullElse(query.getQuantile(), 0.5);
         return queryRange(query, timerUnitsPerSecond(query),
-                "histogram_quantile(" + quantile + ", sum by (le, fix_msg_type, fix_msg_dir) (rate(" + timer
-                + "_bucket{%1$s,fix_msg_dir=\"" + direction + "\"}[%2$s])))",
+                "histogram_quantile(" + quantile + ", sum by (le, " + BY_MESSAGE + ") (rate(" + timer
+                + "_bucket{%1$s," + DIRECTION + "=\"" + direction + "\"}[%2$s])))",
                 selector, window);
     }
 
     private static String selector(MetricQuery query) {
-        StringBuilder selector = new StringBuilder("fix_eid=").append(quote(query.getEngineId()));
+        StringBuilder selector = new StringBuilder(ENGINE).append('=').append(quote(query.getEngineId()));
         if (query.getGroup() != null) {
-            selector.append(",fix_sg=").append(quote(query.getGroup()));
+            selector.append(',').append(GROUP).append('=').append(quote(query.getGroup()));
         }
         if (query.getSessionId() != null) {
-            selector.append(",fix_sn=").append(quote(query.getSessionId()));
+            selector.append(',').append(SESSION).append('=').append(quote(query.getSessionId()));
         }
         return selector.toString();
     }
