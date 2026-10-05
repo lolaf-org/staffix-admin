@@ -42,6 +42,8 @@ public final class SandboxApplication {
                         new Target(Session.backup("venue-x", "trading-drp", "ALPHA", "VENX_DR"), VENUE_X_DRP_PORT))
                 .initiator("venue-y-trading",
                         new Target(Session.of("venue-y", "trading", "ALPHA", "VENY", new Requester(traffic, quoteInterval)), VENUE_Y_PORT))
+                .initiator("venue-y-fixt-trading",
+                        new Target(Session.fixt("venue-y", "fixt-trading", "ALPHA", "VENY_T", new FixtTraffic.Requester(traffic, quoteInterval)), VENUE_Y_PORT))
                 .initiator("venue-y-market-data",
                         new Target(Session.of("venue-y", "market-data", "ALPHA_MD", "VENY", new Listener(MessageTypes.News)), VENUE_Y_PORT))
                 .acceptor("drop-copy-gateway", ALPHA_BANK_PORT,
@@ -56,6 +58,7 @@ public final class SandboxApplication {
         SandboxEngine venueY = new SandboxEngine("venue-y", settings)
                 .acceptor("venue-y-gateway", VENUE_Y_PORT,
                         Session.of("alpha-bank", "trading", "VENY", "ALPHA", new Quoter()),
+                        Session.fixt("alpha-bank", "fixt-trading", "VENY_T", "ALPHA", new FixtTraffic.Quoter()),
                         Session.of("alpha-bank", "market-data", "VENY", "ALPHA_MD", new Publisher(traffic, newsInterval)),
                         Session.of("alpha-bank", "end-of-day", "VENY", "ALPHA_EOD", new Quoter()).withWindowClosed(),
                         Session.of("gamma-fund", "trading", "VENY", "GAMMA", new Quoter()));

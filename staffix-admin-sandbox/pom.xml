@@ -50,6 +50,11 @@
             <version>${staffix.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.lolaf.staffix</groupId>
+            <artifactId>staffix-fixt-11</artifactId>
+            <version>${staffix.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
         </dependency>
@@ -67,21 +72,39 @@
                 <artifactId>staffix-fix-encoders-generator-maven-plugin</artifactId>
                 <version>${staffix.version}</version>
                 <configuration>
-                    <dictionaryFile>classpath:FIX44.xml</dictionaryFile>
                     <sourcesOutputDirectory>${project.build.directory}/generated-sources/fix</sourcesOutputDirectory>
-                    <packageName>org.lolaf.staffix.admin.sandbox.fix44</packageName>
                 </configuration>
                 <executions>
                     <execution>
+                        <id>fix44</id>
                         <goals>
                             <goal>code-generator</goal>
                         </goals>
+                        <configuration>
+                            <dictionaryFile>classpath:FIX44.xml</dictionaryFile>
+                            <packageName>org.lolaf.staffix.admin.sandbox.fix44</packageName>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>fix50sp2</id>
+                        <goals>
+                            <goal>code-generator</goal>
+                        </goals>
+                        <configuration>
+                            <dictionaryFile>classpath:FIX50SP2.xml</dictionaryFile>
+                            <packageName>org.lolaf.staffix.admin.sandbox.fix50sp2</packageName>
+                        </configuration>
                     </execution>
                 </executions>
                 <dependencies>
                     <dependency>
                         <groupId>org.lolaf.staffix</groupId>
                         <artifactId>staffix-fix-44</artifactId>
+                        <version>${staffix.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.lolaf.staffix</groupId>
+                        <artifactId>staffix-fix-50sp2</artifactId>
                         <version>${staffix.version}</version>
                     </dependency>
                 </dependencies>

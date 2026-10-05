@@ -13,6 +13,7 @@ import org.lolaf.staffix.api.application.FixApplication;
 import org.lolaf.staffix.api.codec.FixFieldsDecoderMapper;
 import org.lolaf.staffix.api.codec.FixMessageDecoder;
 import org.lolaf.staffix.api.fields.FieldsRegistry;
+import org.lolaf.staffix.api.monitoring.Timer;
 import org.lolaf.staffix.api.msg.MessageType;
 import org.lolaf.staffix.api.msg.MessageTypeRegistry;
 import org.lolaf.staffix.api.session.FixSession;
@@ -42,25 +43,27 @@ final class Traffic {
     /**
      * Base for an application that sends on its own every interval while logged in, on the session's thread.
      */
-    private abstract static class Periodic implements FixApplication {
+    abstract static class Periodic implements FixApplication {
 
         private final ScheduledExecutorService scheduler;
         private final Duration interval;
+        private final FixRegularVersion version;
         private ScheduledFuture<?> sending;
 
-        Periodic(ScheduledExecutorService scheduler, Duration interval) {
+        Periodic(ScheduledExecutorService scheduler, Duration interval, FixRegularVersion version) {
             this.scheduler = scheduler;
             this.interval = interval;
+            this.version = version;
         }
 
         @Override
         public FixApiVersion getFixApiVersion() {
-            return FixApiVersion.of(FixRegularVersion.VERSION_44);
+            return FixApiVersion.of(version);
         }
 
         @Override
         public FixDictionaryId getDictionaryId() {
-            return FixDictionaryId.of(FixRegularVersion.VERSION_44);
+            return FixDictionaryId.of(version);
         }
 
         @Override
@@ -89,26 +92,62 @@ final class Traffic {
     static final class Requester extends Periodic {
 
         private final AtomicLong requests = new AtomicLong();
+        private final QuoteRoundTrips roundTrips = new QuoteRoundTrips();
         private QuoteRequestEncoder quoteRequest;
 
         Requester(ScheduledExecutorService scheduler, Duration interval) {
-            super(scheduler, interval);
+            super(scheduler, interval, FixRegularVersion.VERSION_44);
         }
 
         @Override
         public List<FixMessageDecoder> setup(FixSessionSettings settings, FixSession session, Set<MessageType> encodedMessagesTypes) {
             encodedMessagesTypes.add(MessageTypes.QuoteRequest);
             quoteRequest = session.newEncoder(QuoteRequestEncoder.class).asReusable();
-            return List.of(new Ignoring(MessageTypes.Quote));
+            return List.of(new QuoteDecoder(roundTrips));
+        }
+
+        @Override
+        public synchronized void onSessionCreated(FixSession session, FieldsRegistry fieldsRegistry,
+                                                  MessageTypeRegistry messageTypeRegistry, List<FixMessageDecoder> decoders) {
+            roundTrips.onSessionCreated(session);
+            super.onSessionCreated(session, fieldsRegistry, messageTypeRegistry, decoders);
         }
 
         @Override
         void send(FixSession session) {
+            String quoteReqId = session.getFixSessionId().getName() + "-" + requests.incrementAndGet();
             quoteRequest.begin()
-                    .setQuoteReqID(session.getFixSessionId().getName() + "-" + requests.incrementAndGet())
+                    .setQuoteReqID(quoteReqId)
                     .addNoRelatedSym(1)
                     .setSymbol(SYMBOLS.get(ThreadLocalRandom.current().nextInt(SYMBOLS.size())));
+            roundTrips.sent(quoteReqId);
             session.send(quoteRequest, null);
+        }
+
+        @Setter
+        private static final class QuoteDecoder implements FixMessageDecoder {
+
+            private final QuoteRoundTrips roundTrips;
+            private String quoteReqId;
+
+            QuoteDecoder(QuoteRoundTrips roundTrips) {
+                this.roundTrips = roundTrips;
+            }
+
+            @Override
+            public MessageType getMessageType() {
+                return MessageTypes.Quote;
+            }
+
+            @Override
+            public void mapFieldsForDecoding(FixFieldsDecoderMapper mapper, FieldsRegistry fieldsRegistry) {
+                mapper.mapStringField(QuoteReqID.get(), this::setQuoteReqId, null);
+            }
+
+            @Override
+            public void onDecoded(FixSession session, boolean possDupFlag, boolean possResend) {
+                roundTrips.quoted(quoteReqId);
+            }
         }
     }
 
@@ -120,7 +159,7 @@ final class Traffic {
         private NewsEncoder news;
 
         Publisher(ScheduledExecutorService scheduler, Duration interval) {
-            super(scheduler, interval);
+            super(scheduler, interval, FixRegularVersion.VERSION_44);
         }
 
         @Override
@@ -165,6 +204,7 @@ final class Traffic {
         private static final class QuoteRequestDecoder implements FixMessageDecoder {
 
             private final QuoteEncoder quote;
+            private Timer pricing;
             private String quoteReqId;
             private String symbol;
 
@@ -187,6 +227,10 @@ final class Traffic {
 
             @Override
             public void onDecoded(FixSession session, boolean possDupFlag, boolean possResend) {
+                if (pricing == null) {
+                    pricing = QuoteRoundTrips.pricing(session);
+                }
+                pricing.start();
                 double mid = 100 + ThreadLocalRandom.current().nextDouble(10);
                 session.send(quote.begin()
                         .setQuoteReqID(quoteReqId)
@@ -194,6 +238,7 @@ final class Traffic {
                         .setSymbol(symbol)
                         .setBidPx(Math.round((mid - 0.25) * 100) / 100d)
                         .setOfferPx(Math.round((mid + 0.25) * 100) / 100d), null);
+                pricing.stop();
             }
         }
     }

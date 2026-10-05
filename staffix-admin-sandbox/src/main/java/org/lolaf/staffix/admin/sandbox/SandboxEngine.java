@@ -15,6 +15,7 @@ import org.lolaf.staffix.api.session.FixSession.FixSessionType;
 import org.lolaf.staffix.api.session.FixSessionId;
 import org.lolaf.staffix.api.session.FixSessionSettings;
 import org.lolaf.staffix.api.session.FixSessionSettings.SessionScheduleSettings;
+import org.lolaf.staffix.api.version.FixApplVerID;
 import org.lolaf.staffix.api.version.FixRegularVersion;
 import org.lolaf.staffix.application.factories.simple.SimpleApplicationFactorySettings;
 import org.lolaf.staffix.monitoring.micrometer.otlp.OtlpMicrometerMonitoringManagerSettings;
@@ -52,6 +53,11 @@ final class SandboxEngine {
 
         static Session of(String group, String name, String sender, String target, FixApplication application) {
             return new Session(id(group, name, sender, target), application, false);
+        }
+
+        static Session fixt(String group, String name, String sender, String target, FixApplication application) {
+            return new Session(FixSessionId.ofFIXT11(FixApplVerID.FIX50SP2, FixSessionId.FixSessionIdBuilder.builder()
+                    .group(group).name(name).senderCompID(sender).targetCompID(target).build()), application, false);
         }
 
         static Session backup(String group, String name, String sender, String target) {

@@ -34,12 +34,14 @@ engines, Prometheus and Loki as the host does: Linux, or Docker Desktop with hos
 
 | engine | initiates to | accepts from |
 |---|---|---|
-| `alpha-bank` | `venue-x.trading` (backup `trading-drp`, whose address nobody listens on), `venue-y.trading`, `venue-y.market-data` | `venue-x.drop-copy` |
+| `alpha-bank` | `venue-x.trading` (backup `trading-drp`, whose address nobody listens on), `venue-y.trading`, `venue-y.fixt-trading`, `venue-y.market-data` | `venue-x.drop-copy` |
 | `venue-x` | `alpha-bank.drop-copy` | `alpha-bank.trading` |
-| `venue-y` | | `alpha-bank.trading`, `alpha-bank.market-data`, `alpha-bank.end-of-day` (outside its window), `gamma-fund.trading` (never connects) |
+| `venue-y` | | `alpha-bank.trading`, `alpha-bank.fixt-trading`, `alpha-bank.market-data`, `alpha-bank.end-of-day` (outside its window), `gamma-fund.trading` (never connects) |
 
 The bank asks for quotes every 200 ms and the venues answer; `venue-y` publishes News on `market-data` and `venue-x`
-on the drop copy. All three engines share HTTP admin API port 8686. System properties `consoleUrl`,
+on the drop copy. `fixt-trading` is FIXT.1.1 with FIX 5.0 SP2 application messages; every other session is FIX 4.4.
+The applications time their work with staffix's monitoring, as an application's own meters: the bank's
+`quote.round.trip` (a QuoteRequest until its Quote, tag `venue`) and the venues' `quote.pricing`. All three engines share HTTP admin API port 8686. System properties `consoleUrl`,
 `consoleUsername`, `consolePassword`, `adminApiPort` and `otlpUrl` override the defaults.
 
 Both sides of each connection are separate engines: switching `alpha-bank`'s `venue-x.trading` to its backup turns
