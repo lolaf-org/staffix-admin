@@ -40,8 +40,9 @@ engines, Prometheus and Loki as the host does: Linux, or Docker Desktop with hos
 
 The bank asks for quotes every 200 ms and the venues answer; `venue-y` publishes News on `market-data` and `venue-x`
 on the drop copy. `fixt-trading` is FIXT.1.1 with FIX 5.0 SP2 application messages; every other session is FIX 4.4.
-The applications time their work with staffix's monitoring, as an application's own meters: the bank's
-`quote.round.trip` (a QuoteRequest until its Quote, tag `venue`) and the venues' `quote.pricing`. All three engines share HTTP admin API port 8686. System properties `consoleUrl`,
+The applications publish their own meters through staffix's monitoring: the bank times `quote.round.trip` (a
+QuoteRequest until its Quote, tag `venue`) and reads `quotes.pending` from its requests in flight (a gauge read at each
+export); the venues time `quote.pricing` and set `quote.last.mid` on every quote (a gauge they set). All three engines share HTTP admin API port 8686. System properties `consoleUrl`,
 `consoleUsername`, `consolePassword`, `adminApiPort` and `otlpUrl` override the defaults.
 
 Both sides of each connection are separate engines: switching `alpha-bank`'s `venue-x.trading` to its backup turns

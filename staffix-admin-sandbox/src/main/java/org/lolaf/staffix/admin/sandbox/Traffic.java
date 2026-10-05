@@ -13,6 +13,7 @@ import org.lolaf.staffix.api.application.FixApplication;
 import org.lolaf.staffix.api.codec.FixFieldsDecoderMapper;
 import org.lolaf.staffix.api.codec.FixMessageDecoder;
 import org.lolaf.staffix.api.fields.FieldsRegistry;
+import org.lolaf.staffix.api.monitoring.Gauge;
 import org.lolaf.staffix.api.monitoring.Timer;
 import org.lolaf.staffix.api.msg.MessageType;
 import org.lolaf.staffix.api.msg.MessageTypeRegistry;
@@ -205,6 +206,7 @@ final class Traffic {
 
             private final QuoteEncoder quote;
             private Timer pricing;
+            private Gauge lastMid;
             private String quoteReqId;
             private String symbol;
 
@@ -229,6 +231,7 @@ final class Traffic {
             public void onDecoded(FixSession session, boolean possDupFlag, boolean possResend) {
                 if (pricing == null) {
                     pricing = QuoteRoundTrips.pricing(session);
+                    lastMid = QuoteRoundTrips.lastMid(session);
                 }
                 pricing.start();
                 double mid = 100 + ThreadLocalRandom.current().nextDouble(10);
@@ -239,6 +242,7 @@ final class Traffic {
                         .setBidPx(Math.round((mid - 0.25) * 100) / 100d)
                         .setOfferPx(Math.round((mid + 0.25) * 100) / 100d), null);
                 pricing.stop();
+                lastMid.set(mid);
             }
         }
     }

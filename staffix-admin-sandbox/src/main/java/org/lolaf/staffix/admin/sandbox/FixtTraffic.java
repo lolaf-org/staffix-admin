@@ -12,6 +12,7 @@ import org.lolaf.staffix.api.application.FixApplication;
 import org.lolaf.staffix.api.codec.FixFieldsDecoderMapper;
 import org.lolaf.staffix.api.codec.FixMessageDecoder;
 import org.lolaf.staffix.api.fields.FieldsRegistry;
+import org.lolaf.staffix.api.monitoring.Gauge;
 import org.lolaf.staffix.api.monitoring.Timer;
 import org.lolaf.staffix.api.msg.MessageType;
 import org.lolaf.staffix.api.msg.MessageTypeRegistry;
@@ -122,6 +123,7 @@ final class FixtTraffic {
 
             private final QuoteEncoder quote;
             private Timer pricing;
+            private Gauge lastMid;
             private String quoteReqId;
             private String symbol;
 
@@ -146,6 +148,7 @@ final class FixtTraffic {
             public void onDecoded(FixSession session, boolean possDupFlag, boolean possResend) {
                 if (pricing == null) {
                     pricing = QuoteRoundTrips.pricing(session);
+                    lastMid = QuoteRoundTrips.lastMid(session);
                 }
                 pricing.start();
                 double mid = 1 + ThreadLocalRandom.current().nextDouble();
@@ -156,6 +159,7 @@ final class FixtTraffic {
                         .setBidPx(Math.round((mid - 0.0005) * 10_000) / 10_000d)
                         .setOfferPx(Math.round((mid + 0.0005) * 10_000) / 10_000d), null);
                 pricing.stop();
+                lastMid.set(mid);
             }
         }
     }
