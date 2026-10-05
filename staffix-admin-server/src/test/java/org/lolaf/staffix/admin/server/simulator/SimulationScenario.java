@@ -144,7 +144,6 @@ class SimulationScenario {
             sessionId.put("targetCompID", counterparty);
             sessionId.put("toString", fixSessionId);
             settings.put("fixSessionType", type.name());
-            settings.put("dictionaryId", "default");
             settings.putObject("heartBeatInterval").put("seconds", 30);
             settings.put("resetSeqNumOnLogon", (Boolean) null);
             settings.put("desiredSessionState", "LOGGED_IN");

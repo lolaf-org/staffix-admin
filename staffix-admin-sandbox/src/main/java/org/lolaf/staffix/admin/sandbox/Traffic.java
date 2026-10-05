@@ -8,6 +8,7 @@ import org.lolaf.staffix.admin.sandbox.fix44.fields.NoRelatedSym;
 import org.lolaf.staffix.admin.sandbox.fix44.fields.QuoteReqID;
 import org.lolaf.staffix.admin.sandbox.fix44.fields.Symbol;
 import org.lolaf.staffix.admin.sandbox.fix44.msg.MessageTypes;
+import org.lolaf.staffix.api.FixDictionaryId;
 import org.lolaf.staffix.api.application.FixApplication;
 import org.lolaf.staffix.api.codec.FixFieldsDecoderMapper;
 import org.lolaf.staffix.api.codec.FixMessageDecoder;
@@ -55,6 +56,11 @@ final class Traffic {
         @Override
         public FixApiVersion getFixApiVersion() {
             return FixApiVersion.of(FixRegularVersion.VERSION_44);
+        }
+
+        @Override
+        public FixDictionaryId getDictionaryId() {
+            return FixDictionaryId.of(FixRegularVersion.VERSION_44);
         }
 
         @Override
@@ -145,6 +151,11 @@ final class Traffic {
         }
 
         @Override
+        public FixDictionaryId getDictionaryId() {
+            return FixDictionaryId.of(FixRegularVersion.VERSION_44);
+        }
+
+        @Override
         public List<FixMessageDecoder> setup(FixSessionSettings settings, FixSession session, Set<MessageType> encodedMessagesTypes) {
             encodedMessagesTypes.add(MessageTypes.Quote);
             return List.of(new QuoteRequestDecoder(session));
@@ -201,6 +212,11 @@ final class Traffic {
         @Override
         public FixApiVersion getFixApiVersion() {
             return FixApiVersion.of(FixRegularVersion.VERSION_44);
+        }
+
+        @Override
+        public FixDictionaryId getDictionaryId() {
+            return FixDictionaryId.of(FixRegularVersion.VERSION_44);
         }
 
         @Override
