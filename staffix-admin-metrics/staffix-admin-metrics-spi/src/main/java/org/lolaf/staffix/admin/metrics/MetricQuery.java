@@ -33,6 +33,11 @@ public class MetricQuery {
     Instant to;
     Duration step;
     /**
+     * The window rates are averaged over, as asked; null for the step. A source may widen it to hold enough samples.
+     */
+    @Nullable
+    Duration rateWindow;
+    /**
      * The unit the engines' timers are exported in, when the console knows it from their monitoring plugin; null to
      * use the source's own setting.
      */

@@ -37,8 +37,12 @@ class DemoTelemetry {
             "Disconnected: connection reset by peer",
             "Logout received: end of session time");
     private static final long MAX_SECONDS_SCANNED = 200_000;
+    private static final int MAX_NOISE_SAMPLES_PER_WINDOW = 12;
 
-    record Series(Map<String, String> labels, List<Point> points) {
+    /**
+     * {@code rateWindow} in seconds, null when the kind is not a rate.
+     */
+    record Series(Map<String, String> labels, List<Point> points, @Nullable Long rateWindow) {
     }
 
     record Point(Instant timestamp, double value) {
@@ -47,17 +51,23 @@ class DemoTelemetry {
     record Entry(Instant timestamp, String group, String sessionId, String type, String line) {
     }
 
-    List<Series> metrics(List<SimulatedSession> sessions, String kind, @Nullable Double quantile, Instant from, Instant to, Duration step) {
+    /**
+     * A rate's noise is averaged over {@code rateWindow} (the step when null), so a narrow window shows a noisier chart
+     * as a real backend would.
+     */
+    List<Series> metrics(List<SimulatedSession> sessions, String kind, @Nullable Double quantile, Instant from, Instant to,
+                         Duration step, @Nullable Duration rateWindow) {
+        Duration window = kind.equals("CLOCK_OFFSET") ? null : rateWindow == null ? step : rateWindow;
         List<Series> series = new ArrayList<>();
         if (PER_MESSAGE_TYPE.contains(kind)) {
             MESSAGES_PER_SECOND.keySet().stream().sorted().forEach(type -> DIRECTIONS.forEach(direction ->
-                    series.add(series(Map.of("messageType", type, "direction", direction), from, to, step,
+                    series.add(series(Map.of("messageType", type, "direction", direction), from, to, step, window,
                             t -> sessions.stream()
-                                    .mapToDouble(s -> value(kind, quantile, step, key(s) + type + direction, type, t))
+                                    .mapToDouble(s -> value(kind, quantile, window, key(s) + type + direction, type, t))
                                     .reduce(0, kind.equals("MESSAGE_RATE") ? Double::sum : Math::max)))));
         } else {
-            sessions.forEach(s -> series.add(series(Map.of("group", s.group(), "sessionId", s.name()), from, to, step,
-                    t -> value(kind, quantile, step, key(s), null, t))));
+            sessions.forEach(s -> series.add(series(Map.of("group", s.group(), "sessionId", s.name()), from, to, step, window,
+                    t -> value(kind, quantile, window, key(s), null, t))));
         }
         return series;
     }
@@ -84,19 +94,21 @@ class DemoTelemetry {
         return entries;
     }
 
-    private static Series series(Map<String, String> labels, Instant from, Instant to, Duration step, ToDoubleFunction<Instant> value) {
+    private static Series series(Map<String, String> labels, Instant from, Instant to, Duration step, @Nullable Duration rateWindow,
+                                 ToDoubleFunction<Instant> value) {
         List<Point> points = new ArrayList<>();
         long seconds = step.toSeconds();
         for (long second = from.getEpochSecond() / seconds * seconds; second <= to.getEpochSecond(); second += seconds) {
             Instant t = Instant.ofEpochSecond(second);
             points.add(new Point(t, value.applyAsDouble(t)));
         }
-        return new Series(new LinkedHashMap<>(labels), points);
+        return new Series(new LinkedHashMap<>(labels), points, rateWindow == null ? null : rateWindow.toSeconds());
     }
 
-    private static double value(String kind, @Nullable Double quantile, Duration step, String key, @Nullable String messageType, Instant t) {
+    private static double value(String kind, @Nullable Double quantile, @Nullable Duration rateWindow, String key,
+                                @Nullable String messageType, Instant t) {
         long second = t.getEpochSecond();
-        double random = noise(key, second / step.toSeconds());
+        double random = rateWindow == null ? noise(key, second) : averageNoise(key, second, rateWindow.toSeconds());
         double wave = 1 + 0.5 * Math.sin(2 * Math.PI * second / 7200.0 + key.hashCode());
         return switch (kind) {
             case "MESSAGE_RATE" -> MESSAGES_PER_SECOND.get(messageType) * wave * (0.8 + 0.4 * random);
@@ -155,6 +167,15 @@ class DemoTelemetry {
 
     private static Entry entry(SimulatedSession session, Instant t, String type, String line) {
         return new Entry(t, session.group(), session.name(), type, line);
+    }
+
+    private static double averageNoise(String key, long lastSecond, long windowSeconds) {
+        int samples = (int) Math.max(1, Math.min(windowSeconds, MAX_NOISE_SAMPLES_PER_WINDOW));
+        double sum = 0;
+        for (int i = 0; i < samples; i++) {
+            sum += noise(key, lastSecond - i * windowSeconds / samples);
+        }
+        return sum / samples;
     }
 
     private static double noise(String key, long epochSecond) {

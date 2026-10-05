@@ -48,6 +48,33 @@ class TelemetryControllersTest {
     }
 
     @Test
+    void reportsTheRateWindowAskedFor() throws Exception {
+        mockMvc.perform(get("/api/metrics?engineId=nyc-uat&kind=ROUND_TRIP_TIME&rateWindow=PT20S" + LAST_HOUR))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rateWindow").value("PT20S"));
+    }
+
+    @Test
+    void ratesOverTheStepByDefault() throws Exception {
+        mockMvc.perform(get("/api/metrics?engineId=nyc-uat&kind=MESSAGE_RATE" + LAST_HOUR))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rateWindow").value("PT15S"));
+    }
+
+    @Test
+    void reportsNoRateWindowForAGauge() throws Exception {
+        mockMvc.perform(get("/api/metrics?engineId=nyc-uat&kind=CLOCK_OFFSET&rateWindow=PT20S" + LAST_HOUR))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rateWindow").doesNotExist());
+    }
+
+    @Test
+    void rejectsANonPositiveRateWindow() throws Exception {
+        mockMvc.perform(get("/api/metrics?engineId=nyc-uat&kind=ROUND_TRIP_TIME&rateWindow=PT0S" + LAST_HOUR))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void rejectsAnInvertedTimeRange() throws Exception {
         mockMvc.perform(get("/api/metrics?engineId=nyc-uat&kind=ROUND_TRIP_TIME&from=" + TO + "&to=" + TO.minusSeconds(60)))
                 .andExpect(status().isBadRequest());

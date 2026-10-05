@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.ToDoubleFunction;
 
 import static org.lolaf.staffix.admin.server.simulator.SimulatedTelemetry.noise;
@@ -45,7 +46,10 @@ class SimulatedMetricsSource implements MetricsSource {
     }
 
     private static MetricSeries series(MetricQuery query, Map<String, String> labels, ToDoubleFunction<Instant> value) {
-        MetricSeries.MetricSeriesBuilder series = MetricSeries.builder().labels(labels);
+        MetricSeries.MetricSeriesBuilder series = MetricSeries.builder()
+                .labels(labels)
+                .rateWindow(query.getKind() == MetricKind.CLOCK_OFFSET ? null
+                        : Objects.requireNonNullElse(query.getRateWindow(), query.getStep()));
         long step = query.getStep().toSeconds();
         long start = query.getFrom().getEpochSecond() / step * step;
         for (long second = start; second <= query.getTo().getEpochSecond(); second += step) {

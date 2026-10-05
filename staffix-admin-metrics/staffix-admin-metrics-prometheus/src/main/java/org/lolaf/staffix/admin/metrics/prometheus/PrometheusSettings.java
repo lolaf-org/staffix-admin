@@ -17,13 +17,14 @@ public class PrometheusSettings {
     @Description("The engines' micrometer baseTimeUnit, for engines that do not report their monitoring plugin's: the "
             + "exported timers carry no unit Prometheus keeps. Micrometer's OTLP registry defaults to milliseconds.")
     TimeUnit timerBaseUnit;
-    @Description("The shortest window a rate is computed over: a few scrape intervals, so every window holds enough samples.")
+    @Description("The shortest window a rate is computed over, whatever a chart asks: at least two scrape or export "
+            + "intervals, so every window holds enough samples.")
     Duration minRateWindow;
 
     public PrometheusSettings(URI url,
                               @DefaultValue("10s") Duration timeout,
                               @DefaultValue("milliseconds") TimeUnit timerBaseUnit,
-                              @DefaultValue("1m") Duration minRateWindow) {
+                              @DefaultValue("20s") Duration minRateWindow) {
         this.url = url;
         this.timeout = timeout;
         this.timerBaseUnit = timerBaseUnit;

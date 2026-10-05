@@ -13,15 +13,22 @@ import org.lolaf.staffix.admin.metrics.MetricsSourceException;
 import org.lolaf.staffix.admin.server.connectors.TelemetrySources;
 import org.lolaf.staffix.admin.server.web.TelemetryProblems;
 import org.lolaf.staffix.admin.server.web.TimeRange;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.ErrorResponseException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 import java.util.function.DoubleBinaryOperator;
 
@@ -32,9 +39,6 @@ public class MetricsController {
 
     private final TelemetrySources telemetrySources;
 
-    /**
-     * Per message type kinds give one series per type and direction, the others one series per session.
-     */
     /**
      * The kinds the monitoring plugins of the scope's sessions measure, so a chart of a meter that is off is not
      * offered; every kind when the engine does not say.
@@ -47,6 +51,10 @@ public class MetricsController {
         return List.copyOf(telemetrySources.metricKinds(engineId, group, sessionId));
     }
 
+    /**
+     * Per message type kinds give one series per type and direction, the others one series per session. A rate is
+     * averaged over {@code rateWindow}, else the step; a backend may widen it, and the result says to what.
+     */
     @GetMapping("/api/metrics")
     public MetricsResult queryMetrics(@RequestParam String engineId,
                                            @RequestParam(required = false) @Nullable String group,
@@ -54,8 +62,10 @@ public class MetricsController {
                                            @RequestParam MetricKind kind,
                                            @RequestParam(defaultValue = "0.99") @DecimalMin("0") @DecimalMax("1") double quantile,
                                            @RequestParam Instant from,
-                                           @RequestParam Instant to) {
+                                           @RequestParam Instant to,
+                                           @RequestParam(required = false) @Nullable Duration rateWindow) {
         TelemetryProblems.requireGroupForSession(group, sessionId);
+        requirePositive(rateWindow);
         TelemetrySources.Resolved<MetricsSource> resolved = resolve(engineId, group, sessionId);
         TimeRange range = TimeRange.of(from, to);
         MetricQuery query = MetricQuery.builder()
@@ -67,6 +77,7 @@ public class MetricsController {
                 .from(range.getFrom())
                 .to(range.getTo())
                 .step(range.chartStep())
+                .rateWindow(rateWindow)
                 .build();
         try {
             List<MetricSeries> series = resolved.sources().stream()
@@ -75,9 +86,17 @@ public class MetricsController {
             return MetricsResult.builder()
                     .series(resolved.sources().size() == 1 ? series : combineSameLabels(series, kind))
                     .notCollected(resolved.notCollected())
+                    .rateWindow(widestRateWindow(series))
                     .build();
         } catch (MetricsSourceException e) {
             throw TelemetryProblems.backendFailed("metrics", e);
+        }
+    }
+
+    private static void requirePositive(@Nullable Duration rateWindow) {
+        if (rateWindow != null && !rateWindow.isPositive()) {
+            throw new ErrorResponseException(HttpStatus.BAD_REQUEST, ProblemDetail.forStatusAndDetail(
+                    HttpStatus.BAD_REQUEST, "'rateWindow' must be positive"), null);
         }
     }
 
@@ -87,19 +106,30 @@ public class MetricsController {
      */
     private static List<MetricSeries> combineSameLabels(List<MetricSeries> series, MetricKind kind) {
         DoubleBinaryOperator combine = kind.isLatency() ? Math::max : Double::sum;
-        Map<Map<String, String>, Map<Instant, Double>> byLabels = new LinkedHashMap<>();
-        series.forEach(one -> {
-            Map<Instant, Double> points = byLabels.computeIfAbsent(one.getLabels(), labels -> new TreeMap<>());
-            one.getPoints().forEach(point -> points.merge(point.getTimestamp(), point.getValue(), combine::applyAsDouble));
-        });
+        Map<Map<String, String>, List<MetricSeries>> byLabels = new LinkedHashMap<>();
+        series.forEach(one -> byLabels.computeIfAbsent(one.getLabels(), labels -> new ArrayList<>()).add(one));
         return byLabels.entrySet().stream()
-                .map(entry -> MetricSeries.builder()
-                        .labels(entry.getKey())
-                        .points(entry.getValue().entrySet().stream()
-                                .map(point -> new MetricPoint(point.getKey(), point.getValue()))
-                                .toList())
-                        .build())
+                .map(entry -> {
+                    Map<Instant, Double> points = new TreeMap<>();
+                    entry.getValue().forEach(one -> one.getPoints()
+                            .forEach(point -> points.merge(point.getTimestamp(), point.getValue(), combine::applyAsDouble)));
+                    return MetricSeries.builder()
+                            .labels(entry.getKey())
+                            .points(points.entrySet().stream()
+                                    .map(point -> new MetricPoint(point.getKey(), point.getValue()))
+                                    .toList())
+                            .rateWindow(widestRateWindow(entry.getValue()))
+                            .build();
+                })
                 .toList();
+    }
+
+    private static @Nullable Duration widestRateWindow(List<MetricSeries> series) {
+        return series.stream()
+                .map(MetricSeries::getRateWindow)
+                .filter(Objects::nonNull)
+                .max(Comparator.naturalOrder())
+                .orElse(null);
     }
 
     private TelemetrySources.Resolved<MetricsSource> resolve(String engineId, @Nullable String group, @Nullable String sessionId) {

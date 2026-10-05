@@ -57,7 +57,8 @@ final class DemoServer {
                 case "/demo/health" -> null;
                 case "/demo/metrics" -> DemoTelemetry.metrics(sessions(query), query.get("kind"),
                         query.containsKey("quantile") ? Double.valueOf(query.get("quantile")) : null,
-                        Instant.parse(query.get("from")), Instant.parse(query.get("to")), Duration.ofSeconds(Long.parseLong(query.get("step"))));
+                        Instant.parse(query.get("from")), Instant.parse(query.get("to")), Duration.ofSeconds(Long.parseLong(query.get("step"))),
+                        query.containsKey("rateWindow") ? Duration.ofSeconds(Long.parseLong(query.get("rateWindow"))) : null);
                 case "/demo/logs" -> DemoTelemetry.logs(sessions(query), Instant.parse(query.get("from")), Instant.parse(query.get("to")),
                         query.get("text"), values(query.get("types")), values(query.get("msgTypes")), Integer.parseInt(query.get("limit")));
                 default -> throw new NotFound("No resource " + exchange.getRequestURI().getPath());

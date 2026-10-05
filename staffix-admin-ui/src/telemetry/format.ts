@@ -17,6 +17,10 @@ export function formatClock(epochMillis: number): string {
   return new Date(epochMillis).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
+export function formatClockSeconds(epochMillis: number): string {
+  return new Date(epochMillis).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
+
 export function formatDateTime(epochMillis: number): string {
   return new Date(epochMillis).toLocaleString([], { dateStyle: 'short', timeStyle: 'medium' })
 }

@@ -7,6 +7,7 @@ import org.lolaf.staffix.admin.metrics.MetricsSource;
 import org.lolaf.staffix.admin.metrics.MetricsSourceException;
 import tools.jackson.databind.JsonNode;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,6 +33,7 @@ final class DemoMetricsSource implements MetricsSource {
         parameters.put("from", query.getFrom());
         parameters.put("to", query.getTo());
         parameters.put("step", query.getStep().toSeconds());
+        parameters.put("rateWindow", query.getRateWindow() == null ? null : query.getRateWindow().toSeconds());
         JsonNode response = client.get("/demo/metrics", parameters, MetricsSourceException::new);
         return StreamSupport.stream(response.spliterator(), false).map(DemoMetricsSource::series).toList();
     }
@@ -43,6 +45,9 @@ final class DemoMetricsSource implements MetricsSource {
 
     private static MetricSeries series(JsonNode json) {
         MetricSeries.MetricSeriesBuilder series = MetricSeries.builder();
+        if (json.path("rateWindow").isNumber()) {
+            series.rateWindow(Duration.ofSeconds(json.path("rateWindow").asLong()));
+        }
         json.path("labels").properties().forEach(label -> series.label(label.getKey(), label.getValue().asString()));
         json.path("points").forEach(point -> series.point(new MetricPoint(Instant.parse(point.path("timestamp").asString()),
                 point.path("value").asDouble())));

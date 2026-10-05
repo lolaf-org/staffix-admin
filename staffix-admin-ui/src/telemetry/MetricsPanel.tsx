@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Alert, Empty, Flex, Segmented, Select, Skeleton, Typography } from 'antd'
 import { useEffect } from 'react'
 import { AreaChartOutlined, TableOutlined } from '@ant-design/icons'
-import { useMessageTypes, useMetricKinds, useMetrics, type MetricKind, type MetricScope } from '../api/queries'
+import { useMessageTypes, useMetricKinds, useMetrics, type FixedPeriod, type MetricKind, type MetricScope } from '../api/queries'
 import { isNotCollected, type Schemas } from '../api/client'
 import { NotCollectedNotice } from './NotCollectedNotice'
 import { formatRateValue, formatSeconds } from './format'
@@ -11,6 +11,7 @@ import { MetricTable } from './MetricTable'
 import { messageTypeName, plottedMessageTypes, rankedMessageTypes, SERIES_COUNT, seriesColors } from './series'
 import { useThemeMode } from '../theme/ThemeMode'
 import { TIME_WINDOWS } from './timeWindows'
+import { parseDuration } from '../settings/duration'
 
 /**
  * RTT and clock offset are per session: over a group or an engine they would draw one line per session.
@@ -40,16 +41,24 @@ interface Facet {
 interface Props {
   scope: MetricScope
   chartHeight?: number
+  /**
+   * Replaces the time window picker; unset for the last minutes, refreshed.
+   */
+  period?: FixedPeriod
+  /**
+   * An instant, in epoch milliseconds, marked on every chart.
+   */
+  marker?: number
 }
 
-export function MetricsPanel({ scope, chartHeight }: Props) {
+export function MetricsPanel({ scope, chartHeight, period, marker }: Props) {
   const [kind, setKind] = useState<MetricKind>('MESSAGE_RATE')
   const [quantile, setQuantile] = useState(0.99)
   const [minutes, setMinutes] = useState(60)
   const [view, setView] = useState<'chart' | 'table'>('chart')
   const [pickedTypes, setPickedTypes] = useState<string[]>([])
   const sessionScoped = scope.sessionId !== undefined
-  const metrics = useMetrics(scope, kind, quantile, minutes)
+  const metrics = useMetrics(scope, kind, quantile, period ?? minutes)
   const measured = useMetricKinds(scope).data
   const isMeasured = (k: MetricKind) => measured === undefined || measured.includes(k)
   const colors = seriesColors(useThemeMode().dark)
@@ -109,7 +118,7 @@ export function MetricsPanel({ scope, chartHeight }: Props) {
             title={`Up to ${SERIES_COUNT} message types; cleared, the ${SERIES_COUNT} first by order flow`}
           />
         )}
-        <Segmented options={TIME_WINDOWS} value={minutes} onChange={setMinutes} />
+        {!period && <Segmented options={TIME_WINDOWS} value={minutes} onChange={setMinutes} />}
         <Segmented
           value={view}
           onChange={setView}
@@ -123,6 +132,11 @@ export function MetricsPanel({ scope, chartHeight }: Props) {
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
           Over every session of the {scope.group ? `group ${scope.group}` : `engine ${scope.engineId}`}: rates are summed, latencies
           are the worst session's.
+        </Typography.Text>
+      )}
+      {metrics.data?.rateWindow && (
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          Rates over {rateWindowLabel(metrics.data.rateWindow)}.
         </Typography.Text>
       )}
       {metrics.isPending && <Skeleton active />}
@@ -141,7 +155,7 @@ export function MetricsPanel({ scope, chartHeight }: Props) {
             <SeriesLegend series={facets[0]!.series} />
             <Flex wrap gap={16}>
               {facets.map((facet) => (
-                <MetricChart key={facet.title} title={facet.title} series={facet.series} format={format} yTicks={yTicks} height={chartHeight} />
+                <MetricChart key={facet.title} title={facet.title} series={facet.series} format={format} yTicks={yTicks} height={chartHeight} marker={marker} />
               ))}
             </Flex>
           </Flex>
@@ -149,6 +163,11 @@ export function MetricsPanel({ scope, chartHeight }: Props) {
       })()}
     </Flex>
   )
+}
+
+function rateWindowLabel(iso: string): string {
+  const duration = parseDuration(iso)
+  return duration ? `${duration.amount} ${duration.unit}` : iso
 }
 
 function toFacets(series: Schemas['MetricSeries'][], title: string, colors: string[], types: string[],

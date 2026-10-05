@@ -192,11 +192,24 @@ export interface MetricScope {
   sessionId?: string
 }
 
-export function useMetrics(scope: MetricScope, kind: MetricKind, quantile: number, minutes: number) {
+/**
+ * A period in the past, so not refreshed; `rateWindow` is an ISO duration a backend may widen.
+ */
+export interface FixedPeriod {
+  from: string
+  to: string
+  rateWindow?: string
+}
+
+/**
+ * `period` is the last minutes, refreshed, or a fixed period.
+ */
+export function useMetrics(scope: MetricScope, kind: MetricKind, quantile: number, period: number | FixedPeriod) {
+  const live = typeof period === 'number'
   return useQuery({
-    queryKey: ['metrics', scope, kind, quantile, minutes],
-    queryFn: () => call(api.GET('/api/metrics', { params: { query: { ...scope, kind, quantile, ...window(minutes) } } })),
-    refetchInterval: 15_000,
+    queryKey: ['metrics', scope, kind, quantile, period],
+    queryFn: () => call(api.GET('/api/metrics', { params: { query: { ...scope, kind, quantile, ...(live ? window(period) : period) } } })),
+    refetchInterval: live ? 15_000 : false,
     placeholderData: (previous) => previous,
   })
 }
@@ -254,6 +267,10 @@ export interface DecodeTarget {
   ref: SessionRef
   message: string
   separator: string
+  /**
+   * When the message was logged, to show the session's metrics around it; unset for a message not sent yet.
+   */
+  timestamp?: string
 }
 
 export function useDecodedMessage(target: DecodeTarget | undefined) {

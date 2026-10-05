@@ -11,8 +11,10 @@ import org.lolaf.staffix.admin.metrics.MetricsSource;
 import org.lolaf.staffix.admin.server.connectors.TelemetrySources;
 import org.lolaf.staffix.admin.server.logs.LogsController;
 import org.lolaf.staffix.admin.server.metrics.MetricsController;
+import org.lolaf.staffix.admin.server.metrics.MetricsResult;
 import org.springframework.web.ErrorResponseException;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,12 +47,20 @@ class TelemetryResolutionTest {
         return series.build();
     }
 
+    private static MetricSeries rate(String messageType, Duration rateWindow) {
+        return MetricSeries.builder()
+                .label(MetricSeries.MESSAGE_TYPE, messageType)
+                .point(new MetricPoint(FROM, 1))
+                .rateWindow(rateWindow)
+                .build();
+    }
+
     @Test
     void saysAScopeWithoutConnectorIsNotCollected() {
         when(sources.metrics("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(), List.of(), Map.of()));
         when(sources.logs("alpha", "beta", "trading")).thenReturn(new TelemetrySources.Resolved<>(List.of(), List.of(), Map.of()));
 
-        assertThatThrownBy(() -> metricsController.queryMetrics("alpha", null, null, MetricKind.MESSAGE_RATE, 0.99, FROM, TO))
+        assertThatThrownBy(() -> metricsController.queryMetrics("alpha", null, null, MetricKind.MESSAGE_RATE, 0.99, FROM, TO, null))
                 .isInstanceOfSatisfying(ErrorResponseException.class, e -> {
                     assertThat(e.getStatusCode().value()).isEqualTo(404);
                     assertThat(e.getBody().getDetail())
@@ -104,9 +114,26 @@ class TelemetryResolutionTest {
         when(sources.metrics("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(source), List.of(),
                 Map.of(source, TimeUnit.MICROSECONDS)));
 
-        metricsController.queryMetrics("alpha", null, null, MetricKind.READ_LATENCY, 0.99, FROM, TO);
+        metricsController.queryMetrics("alpha", null, null, MetricKind.READ_LATENCY, 0.99, FROM, TO, null);
 
         assertThat(queries).singleElement().extracting(MetricQuery::getTimerBaseUnit).isEqualTo(TimeUnit.MICROSECONDS);
+    }
+
+    @Test
+    void reportsTheWidestRateWindowOfTheSourcesItCombines() {
+        List<MetricQuery> queries = new ArrayList<>();
+        MetricsSource initiators = query -> {
+            queries.add(query);
+            return List.of(rate("D", Duration.ofSeconds(20)));
+        };
+        MetricsSource clients = query -> List.of(rate("D", Duration.ofMinutes(1)));
+        when(sources.metrics("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(initiators, clients), List.of(), Map.of()));
+
+        MetricsResult result = metricsController.queryMetrics("alpha", null, null, MetricKind.MESSAGE_RATE, 0.99, FROM, TO, Duration.ofSeconds(20));
+
+        assertThat(queries).singleElement().extracting(MetricQuery::getRateWindow).isEqualTo(Duration.ofSeconds(20));
+        assertThat(result.getSeries()).singleElement().extracting(MetricSeries::getRateWindow).isEqualTo(Duration.ofMinutes(1));
+        assertThat(result.getRateWindow()).isEqualTo(Duration.ofMinutes(1));
     }
 
     @Test
@@ -115,7 +142,7 @@ class TelemetryResolutionTest {
         MetricsSource clients = query -> List.of(series("D", 10, 20));
         when(sources.metrics("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(initiators, clients), List.of(), Map.of()));
 
-        List<MetricSeries> merged = metricsController.queryMetrics("alpha", null, null, MetricKind.MESSAGE_RATE, 0.99, FROM, TO).getSeries();
+        List<MetricSeries> merged = metricsController.queryMetrics("alpha", null, null, MetricKind.MESSAGE_RATE, 0.99, FROM, TO, null).getSeries();
 
         assertThat(merged).containsExactly(series("D", 11, 22), series("8", 5));
     }
@@ -126,7 +153,7 @@ class TelemetryResolutionTest {
         MetricsSource clients = query -> List.of(series("D", 0.005, 0.001));
         when(sources.metrics("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(initiators, clients), List.of(), Map.of()));
 
-        assertThat(metricsController.queryMetrics("alpha", null, null, MetricKind.READ_LATENCY, 0.99, FROM, TO).getSeries())
+        assertThat(metricsController.queryMetrics("alpha", null, null, MetricKind.READ_LATENCY, 0.99, FROM, TO, null).getSeries())
                 .containsExactly(series("D", 0.005, 0.009));
     }
 }

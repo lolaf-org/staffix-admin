@@ -1,6 +1,6 @@
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipContentProps, type TooltipValueType } from 'recharts'
 import { Flex, Typography, theme } from 'antd'
-import { formatClock, formatDateTime } from './format'
+import { formatClock, formatClockSeconds, formatDateTime } from './format'
 
 export interface ChartSeries {
   key: string
@@ -18,11 +18,18 @@ interface Props {
    */
   yTicks?: number[]
   height?: number
+  /**
+   * An instant, in epoch milliseconds, drawn as a vertical line.
+   */
+  marker?: number
 }
 
-export function MetricChart({ title, series, format, yTicks, height = 220 }: Props) {
+const MINUTE_TICKS_FROM_MS = 10 * 60_000
+
+export function MetricChart({ title, series, format, yTicks, height = 220, marker }: Props) {
   const { token } = theme.useToken()
   const rows = mergeByTimestamp(series)
+  const span = rows.length > 1 ? rows[rows.length - 1]!['t']! - rows[0]!['t']! : 0
   const signed = yTicks === undefined && series.some((s) => s.points.some((p) => p.value < 0))
   const axis = { stroke: token.colorBorder, tick: { fill: token.colorTextSecondary, fontSize: 12 } }
 
@@ -32,7 +39,7 @@ export function MetricChart({ title, series, format, yTicks, height = 220 }: Pro
       <ResponsiveContainer width="100%" height={height}>
         <LineChart data={rows} margin={{ top: 12, right: 16, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} stroke={token.colorBorderSecondary} />
-          <XAxis dataKey="t" type="number" scale="time" domain={['dataMin', 'dataMax']} tickFormatter={formatClock} minTickGap={40} {...axis} />
+          <XAxis dataKey="t" type="number" scale="time" domain={['dataMin', 'dataMax']} tickFormatter={span < MINUTE_TICKS_FROM_MS ? formatClockSeconds : formatClock} minTickGap={40} {...axis} />
           <YAxis
             tickFormatter={format}
             width={64}
@@ -42,6 +49,7 @@ export function MetricChart({ title, series, format, yTicks, height = 220 }: Pro
             {...axis}
           />
           {signed && <ReferenceLine y={0} stroke={token.colorTextTertiary} />}
+          {marker !== undefined && <ReferenceLine x={marker} stroke={token.colorPrimary} strokeDasharray="4 3" />}
           <Tooltip content={(props) => <ChartTooltip {...props} series={series} format={format} />} />
           {series.map((s) => (
             <Line

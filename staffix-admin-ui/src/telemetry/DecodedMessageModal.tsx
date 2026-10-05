@@ -1,24 +1,33 @@
 import { Alert, Flex, Modal, Segmented, Skeleton, Table, Tag, Typography, theme } from 'antd'
 import { useState } from 'react'
 import type { Schemas } from '../api/client'
-import { useDecodedMessage, type DecodeTarget } from '../api/queries'
+import { useDecodedMessage, type DecodeTarget, type FixedPeriod } from '../api/queries'
+import { MetricsPanel } from './MetricsPanel'
 
 type DecodedField = Schemas['DecodedField']
 
 const SECTION_LABELS: Record<DecodedField['section'], string> = { HEADER: 'header', BODY: 'body', TRAILER: 'trailer' }
+const METRICS_AROUND_MS = 60_000
+/**
+ * The Prometheus connector's default minimum, two 10 s OTLP pushes; a backend widens it if it needs more.
+ */
+const METRICS_RATE_WINDOW = 'PT20S'
 
 /**
- * A raw FIX message, each tag named with the dictionary of the session config it went through.
+ * A raw FIX message, each tag named with the dictionary of the session config it went through, and for a logged one
+ * the session's metrics around it.
  */
 export function DecodedMessageModal({ target, onClose }: { target: DecodeTarget | undefined; onClose: () => void }) {
   const decoded = useDecodedMessage(target)
-  const [view, setView] = useState<'decoded' | 'raw'>('decoded')
+  const [view, setView] = useState<'decoded' | 'raw' | 'metrics'>('decoded')
+  const loggedAt = target?.timestamp === undefined ? undefined : Date.parse(target.timestamp)
   const { token } = theme.useToken()
 
   return (
     <Modal
       open={target !== undefined}
       onCancel={onClose}
+      afterClose={() => setView('decoded')}
       footer={null}
       width={960}
       title={
@@ -45,10 +54,13 @@ export function DecodedMessageModal({ target, onClose }: { target: DecodeTarget 
             options={[
               { value: 'decoded', label: 'Decoded' },
               { value: 'raw', label: 'Raw' },
+              ...(loggedAt === undefined ? [] : [{ value: 'metrics' as const, label: 'Metrics' }]),
             ]}
             style={{ alignSelf: 'flex-start' }}
           />
-          {view === 'raw' ? (
+          {view === 'metrics' && target && loggedAt !== undefined ? (
+            <MetricsPanel scope={target.ref} period={periodAround(loggedAt)} marker={loggedAt} chartHeight={180} />
+          ) : view === 'raw' ? (
             <Typography.Paragraph copyable={{ text: target?.message }} style={{ margin: 0 }}>
               <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0 }}>{target?.message}</pre>
             </Typography.Paragraph>
@@ -59,6 +71,14 @@ export function DecodedMessageModal({ target, onClose }: { target: DecodeTarget 
       )}
     </Modal>
   )
+}
+
+function periodAround(epochMillis: number): FixedPeriod {
+  return {
+    from: new Date(epochMillis - METRICS_AROUND_MS).toISOString(),
+    to: new Date(epochMillis + METRICS_AROUND_MS).toISOString(),
+    rateWindow: METRICS_RATE_WINDOW,
+  }
 }
 
 function FieldsTable({ fields }: { fields: DecodedField[] }) {

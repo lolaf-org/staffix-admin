@@ -39,7 +39,7 @@ class DemoSourcesTest {
         simulator.createContext("/demo/", exchange -> {
             query = exchange.getRequestURI().getQuery();
             String body = switch (exchange.getRequestURI().getPath()) {
-                case "/demo/metrics" -> "[{\"labels\":{\"messageType\":\"D\",\"direction\":\"in\"},\"points\":[{\"timestamp\":\"2026-10-03T08:00:00Z\",\"value\":12.5}]}]";
+                case "/demo/metrics" -> "[{\"labels\":{\"messageType\":\"D\",\"direction\":\"in\"},\"points\":[{\"timestamp\":\"2026-10-03T08:00:00Z\",\"value\":12.5}],\"rateWindow\":20}]";
                 case "/demo/logs" -> "[{\"timestamp\":\"2026-10-03T08:00:01Z\",\"group\":\"alpha\",\"sessionId\":\"trading\",\"type\":\"OUT\",\"line\":\"8=FIX.4.4|35=D|\"}]";
                 default -> "{\"status\":404,\"detail\":\"Unknown engine 'omega'\"}";
             };
@@ -63,13 +63,14 @@ class DemoSourcesTest {
     void readsTheSimulatorsSeries() {
         List<MetricSeries> series = new DemoMetricsSourceFactory(RestClient.builder()).create(settings).query(MetricQuery.builder()
                 .engineId("paris-prod").group("alpha").kind(MetricKind.MESSAGE_RATE).from(FROM).to(FROM.plusSeconds(60))
-                .step(Duration.ofSeconds(5)).build());
+                .step(Duration.ofSeconds(5)).rateWindow(Duration.ofSeconds(20)).build());
 
         assertThat(series).singleElement().satisfies(one -> {
             assertThat(one.getLabels()).containsEntry("messageType", "D").containsEntry("direction", "in");
             assertThat(one.getPoints()).containsExactly(new MetricPoint(FROM, 12.5));
+            assertThat(one.getRateWindow()).isEqualTo(Duration.ofSeconds(20));
         });
-        assertThat(query).contains("engineId=paris-prod", "group=alpha", "kind=MESSAGE_RATE", "step=5");
+        assertThat(query).contains("engineId=paris-prod", "group=alpha", "kind=MESSAGE_RATE", "step=5", "rateWindow=20");
     }
 
     @Test

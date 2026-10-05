@@ -85,7 +85,12 @@ export function LogsPanel({ engineId, group, sessionId }: Props) {
           decodable(entry)
             ? {
                 onClick: () =>
-                  setDecoding({ ref: { engineId, group: entry.group!, sessionId: entry.sessionId! }, message: entry.line, separator: '|' }),
+                  setDecoding({
+                    ref: { engineId, group: entry.group!, sessionId: entry.sessionId! },
+                    message: entry.line,
+                    separator: '|',
+                    timestamp: entry.timestamp,
+                  }),
                 style: { cursor: 'pointer' },
               }
             : {}

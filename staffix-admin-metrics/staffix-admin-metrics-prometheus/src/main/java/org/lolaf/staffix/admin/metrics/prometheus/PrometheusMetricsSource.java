@@ -1,5 +1,6 @@
 package org.lolaf.staffix.admin.metrics.prometheus;
 
+import org.jspecify.annotations.Nullable;
 import org.lolaf.staffix.admin.metrics.MetricPoint;
 import org.lolaf.staffix.admin.metrics.MetricQuery;
 import org.lolaf.staffix.admin.metrics.MetricSeries;
@@ -92,7 +93,7 @@ public class PrometheusMetricsSource implements MetricsSource {
     @Override
     public List<MetricSeries> query(MetricQuery query) {
         String selector = selector(query);
-        String window = window(query);
+        Duration window = rateWindow(query);
         return switch (query.getKind()) {
             case MESSAGE_RATE -> queryRange(query, 1, MESSAGE_RATE_QUERY, selector, window);
             case READ_LATENCY -> latency(query, "messages_read_latency", "in", selector, window);
@@ -100,11 +101,11 @@ public class PrometheusMetricsSource implements MetricsSource {
             case WRITE_LATENCY -> latency(query, "messages_write_latency", "out", selector, window);
             case ENCODING_LATENCY -> latency(query, "messages_encoding_latency", "out", selector, window);
             case ROUND_TRIP_TIME -> queryRange(query, timerUnitsPerSecond(query), ROUND_TRIP_TIME_QUERY, selector, window);
-            case CLOCK_OFFSET -> queryRange(query, NANOS_PER_SECOND, CLOCK_OFFSET_QUERY, selector, window);
+            case CLOCK_OFFSET -> queryRange(query, NANOS_PER_SECOND, CLOCK_OFFSET_QUERY, selector, null);
         };
     }
 
-    private List<MetricSeries> latency(MetricQuery query, String timer, String direction, String selector, String window) {
+    private List<MetricSeries> latency(MetricQuery query, String timer, String direction, String selector, Duration window) {
         double quantile = Objects.requireNonNullElse(query.getQuantile(), 0.5);
         return queryRange(query, timerUnitsPerSecond(query),
                 "histogram_quantile(" + quantile + ", sum by (le, " + BY_MESSAGE + ") (rate(" + timer
@@ -127,18 +128,19 @@ public class PrometheusMetricsSource implements MetricsSource {
         return '"' + labelValue.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + '"';
     }
 
-    private String window(MetricQuery query) {
-        Duration window = query.getStep().compareTo(minRateWindow) > 0 ? query.getStep() : minRateWindow;
-        return window.toSeconds() + "s";
+    private Duration rateWindow(MetricQuery query) {
+        Duration asked = Objects.requireNonNullElse(query.getRateWindow(), query.getStep());
+        return asked.compareTo(minRateWindow) > 0 ? asked : minRateWindow;
     }
 
     private double timerUnitsPerSecond(MetricQuery query) {
         return query.getTimerBaseUnit() == null ? timerUnitsPerSecond : query.getTimerBaseUnit().convert(1, TimeUnit.SECONDS);
     }
 
-    private List<MetricSeries> queryRange(MetricQuery query, double unitsPerSecond, String promQl, String selector, String window) {
+    private List<MetricSeries> queryRange(MetricQuery query, double unitsPerSecond, String promQl, String selector,
+                                          @Nullable Duration rateWindow) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-        form.add("query", promQl.formatted(selector, window));
+        form.add("query", promQl.formatted(selector, rateWindow == null ? "" : rateWindow.toSeconds() + "s"));
         form.add("start", Long.toString(query.getFrom().getEpochSecond()));
         form.add("end", Long.toString(query.getTo().getEpochSecond()));
         form.add("step", query.getStep().toSeconds() + "s");
@@ -157,7 +159,7 @@ public class PrometheusMetricsSource implements MetricsSource {
         } catch (ResourceAccessException e) {
             throw new MetricsSourceException("Prometheus at " + queryRangeUrl + " did not answer", e);
         }
-        return series(Objects.requireNonNull(response, "Prometheus answered no body"), unitsPerSecond);
+        return series(Objects.requireNonNull(response, "Prometheus answered no body"), unitsPerSecond, rateWindow);
     }
 
     private String error(byte[] body) {
@@ -168,10 +170,10 @@ public class PrometheusMetricsSource implements MetricsSource {
         }
     }
 
-    private static List<MetricSeries> series(JsonNode response, double unitsPerSecond) {
+    private static List<MetricSeries> series(JsonNode response, double unitsPerSecond, @Nullable Duration rateWindow) {
         return response.path("data").path("result").valueStream()
                 .map(result -> {
-                    MetricSeries.MetricSeriesBuilder series = MetricSeries.builder();
+                    MetricSeries.MetricSeriesBuilder series = MetricSeries.builder().rateWindow(rateWindow);
                     result.path("metric").properties().forEach(label -> {
                         String name = SERIES_LABELS.get(label.getKey());
                         if (name != null) {
