@@ -233,7 +233,10 @@ export interface LogSearch {
    * A config id; needs the group.
    */
   sessionId?: string
-  minutes: number
+  /**
+   * The last minutes up to now, or a fixed period.
+   */
+  period: number | FixedPeriod
   text?: string
   types: LogType[]
   msgTypes: string[]
@@ -255,7 +258,7 @@ export function useLogs(search: LogSearch, enabled: boolean) {
               types: search.types,
               msgTypes: search.msgTypes,
               limit: search.limit,
-              ...window(search.minutes),
+              ...(typeof search.period === 'number' ? window(search.period) : { from: search.period.from, to: search.period.to }),
             },
           },
         }),

@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { Alert, Checkbox, Flex, Input, Segmented, Select, Table, Tag, Tooltip, Typography } from 'antd'
+import { Alert, Checkbox, Flex, Input, Select, Table, Tag, Tooltip, Typography } from 'antd'
 import { ArrowDownOutlined, ArrowUpOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import { isNotCollected, type Schemas } from '../api/client'
 import { NotCollectedNotice } from './NotCollectedNotice'
 import { useLogs, useMessageTypes, type DecodeTarget, type LogType } from '../api/queries'
 import { DecodedMessageModal } from './DecodedMessageModal'
 import { formatDateTime, formatLogTime } from './format'
-import { TIME_WINDOWS } from './timeWindows'
+import { TimeRangeSelector, type Period } from './TimeRangeSelector'
 
 const TYPES: { value: LogType; label: string; icon: React.ReactNode }[] = [
   { value: 'IN', label: 'in', icon: <ArrowDownOutlined /> },
@@ -24,14 +24,14 @@ interface Props {
 }
 
 export function LogsPanel({ engineId, group, sessionId }: Props) {
-  const [minutes, setMinutes] = useState(15)
+  const [period, setPeriod] = useState<Period>(15)
   const [text, setText] = useState('')
   const [types, setTypes] = useState<LogType[]>([])
   const [msgTypes, setMsgTypes] = useState<string[]>([])
   const messageTypes = useMessageTypes({ engineId, group, sessionId })
   const [limit, setLimit] = useState(500)
   const [decoding, setDecoding] = useState<DecodeTarget>()
-  const logs = useLogs({ engineId, group, sessionId, minutes, text, types, msgTypes, limit }, engineId !== '')
+  const logs = useLogs({ engineId, group, sessionId, period, text, types, msgTypes, limit }, engineId !== '')
 
   return (
     <Flex vertical gap={12}>
@@ -61,7 +61,7 @@ export function LogsPanel({ engineId, group, sessionId }: Props) {
           onChange={(values) => setTypes(values as LogType[])}
           options={TYPES.map((t) => ({ value: t.value, label: t.label }))}
         />
-        <Segmented options={TIME_WINDOWS} value={minutes} onChange={setMinutes} />
+        <TimeRangeSelector value={period} onChange={setPeriod} />
         <Select
           value={limit}
           onChange={setLimit}

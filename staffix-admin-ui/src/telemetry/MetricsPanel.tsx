@@ -10,7 +10,7 @@ import { MetricChart, SeriesLegend, niceTicks, type ChartSeries } from './Metric
 import { MetricTable } from './MetricTable'
 import { messageTypeName, plottedMessageTypes, rankedMessageTypes, SERIES_COUNT, seriesColors } from './series'
 import { useThemeMode } from '../theme/ThemeMode'
-import { TIME_WINDOWS } from './timeWindows'
+import { TimeRangeSelector, type Period } from './TimeRangeSelector'
 import { parseDuration } from '../settings/duration'
 
 /**
@@ -42,7 +42,7 @@ interface Props {
   scope: MetricScope
   chartHeight?: number
   /**
-   * Replaces the time window picker; unset for the last minutes, refreshed.
+   * Replaces the time range selector, e.g. around a logged message.
    */
   period?: FixedPeriod
   /**
@@ -54,11 +54,11 @@ interface Props {
 export function MetricsPanel({ scope, chartHeight, period, marker }: Props) {
   const [kind, setKind] = useState<MetricKind>('MESSAGE_RATE')
   const [quantile, setQuantile] = useState(0.99)
-  const [minutes, setMinutes] = useState(60)
+  const [selectedPeriod, setSelectedPeriod] = useState<Period>(60)
   const [view, setView] = useState<'chart' | 'table'>('chart')
   const [pickedTypes, setPickedTypes] = useState<string[]>([])
   const sessionScoped = scope.sessionId !== undefined
-  const metrics = useMetrics(scope, kind, quantile, period ?? minutes)
+  const metrics = useMetrics(scope, kind, quantile, period ?? selectedPeriod)
   const measured = useMetricKinds(scope).data
   const isMeasured = (k: MetricKind) => measured === undefined || measured.includes(k)
   const colors = seriesColors(useThemeMode().dark)
@@ -118,7 +118,7 @@ export function MetricsPanel({ scope, chartHeight, period, marker }: Props) {
             title={`Up to ${SERIES_COUNT} message types; cleared, the ${SERIES_COUNT} first by order flow`}
           />
         )}
-        {!period && <Segmented options={TIME_WINDOWS} value={minutes} onChange={setMinutes} />}
+        {!period && <TimeRangeSelector value={selectedPeriod} onChange={setSelectedPeriod} />}
         <Segmented
           value={view}
           onChange={setView}
