@@ -125,8 +125,18 @@ class SimulatedEngineGateway implements EngineGateway {
     }
 
     @Override
-    public void sendMessage(SessionRef session, String message, char separator, boolean possDup) {
-        engine(session.getEngineId()).sendMessage(session, message, separator, possDup);
+    public void sendMessages(SessionRef session, List<String> messages, char separator, boolean possDup) {
+        for (int i = 0; i < messages.size(); i++) {
+            try {
+                engine(session.getEngineId()).sendMessage(session, messages.get(i), separator, possDup);
+            } catch (GatewayException e) {
+                if (messages.size() == 1) {
+                    throw e;
+                }
+                String detail = "Message " + (i + 1) + " of " + messages.size() + ": " + e.getBody().getDetail();
+                throw e.getStatusCode().value() == 400 ? GatewayException.invalid(detail) : GatewayException.rejected(detail);
+            }
+        }
     }
 
     @Override

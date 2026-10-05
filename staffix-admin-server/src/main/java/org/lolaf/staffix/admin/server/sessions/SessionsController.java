@@ -135,10 +135,10 @@ public class SessionsController {
     @PreAuthorize(WRITER)
     @PostMapping(SESSION + "/messages")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void sendMessage(@PathVariable String engineId, @PathVariable String group, @PathVariable String sessionId,
-                            @Valid @RequestBody SendMessageRequest request) {
+    public void sendMessages(@PathVariable String engineId, @PathVariable String group, @PathVariable String sessionId,
+                             @Valid @RequestBody SendMessageRequest request) {
         SessionRef session = SessionRef.of(engineId, group, sessionId);
-        auditLog.record(session, "send possDup=" + request.isPossDup() + " message=" + request.getMessage(),
-                () -> gateway.sendMessage(session, request.getMessage(), request.getSeparator(), request.isPossDup()));
+        auditLog.record(session, "send possDup=" + request.isPossDup() + " messages=" + request.getMessages(),
+                () -> gateway.sendMessages(session, request.getMessages(), request.getSeparator(), request.isPossDup()));
     }
 }

@@ -172,9 +172,9 @@ class HttpEngineGateway implements EngineGateway {
     }
 
     @Override
-    public void sendMessage(SessionRef session, String message, char separator, boolean possDup) {
+    public void sendMessages(SessionRef session, List<String> messages, char separator, boolean possDup) {
         operate(session, HttpMethod.POST, sessionPath(session, "messages"),
-                Map.of("message", message, "separator", String.valueOf(separator), "possDup", possDup));
+                Map.of("messages", messages, "separator", String.valueOf(separator), "possDup", possDup));
     }
 
     @Override

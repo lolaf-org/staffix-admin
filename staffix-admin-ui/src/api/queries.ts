@@ -147,13 +147,14 @@ export function useAddSession(engineId: string) {
 /**
  * A state-changing call on an engine: reports the outcome to the operator and refreshes that engine's sessions.
  */
-export function useEngineMutation<V>(engineId: string, mutationFn: (variables: V) => Promise<unknown>, success: string) {
+export function useEngineMutation<V>(engineId: string, mutationFn: (variables: V) => Promise<unknown>,
+                                     success: string | ((variables: V) => string)) {
   const queryClient = useQueryClient()
   const { message } = App.useApp()
   return useMutation({
     mutationFn,
-    onSuccess: () => {
-      message.success(success)
+    onSuccess: (_, variables) => {
+      message.success(typeof success === 'string' ? success : success(variables))
       return queryClient.invalidateQueries({ queryKey: ['groups', engineId] })
     },
     onError: (error) => message.error(error.message),

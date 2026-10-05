@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Alert, Button, Checkbox, Flex, Form, Input, Radio, Typography } from 'antd'
+import type { TextAreaRef } from 'antd/es/input/TextArea'
 import { api, call, type Schemas } from '../api/client'
 import { sessionPath, useEngineMutation, type DecodeTarget, type SessionRef } from '../api/queries'
 import { DecodedMessageModal } from '../telemetry/DecodedMessageModal'
@@ -8,29 +9,45 @@ import { WriteButton } from './WriteButton'
 const SOH = '\u0001'
 
 interface MessageForm {
-  message: string
+  messages: string
   separator: string
   possDup: boolean
 }
 
+type SendRequest = Omit<MessageForm, 'messages'> & { messages: string[] }
+
 export function SendMessageTab({ sessionRef, summary }: { sessionRef: SessionRef; summary: Schemas['SessionSummary'] }) {
   const [form] = Form.useForm<MessageForm>()
   const [decoding, setDecoding] = useState<DecodeTarget>()
+  const textArea = useRef<TextAreaRef>(null)
+  const messages = messageLines(Form.useWatch('messages', form) ?? '')
   const send = useEngineMutation(
     sessionRef.engineId,
-    (body: MessageForm) => call(api.POST('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/messages', { ...sessionPath(sessionRef), body })),
-    'Message sent',
+    (body: SendRequest) => call(api.POST('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/messages', { ...sessionPath(sessionRef), body })),
+    (body) => (body.messages.length === 1 ? 'Message sent' : `${body.messages.length} messages sent`),
   )
+  const where = `${summary.group}.${summary.id}, config ${summary.runningConfigId}`
 
   return (
-    <Form<MessageForm> form={form} layout="vertical" initialValues={{ message: '', separator: '|', possDup: false }}>
-      {!summary.loggedIn && <Alert type="warning" title="The session is not logged in: the engine will refuse the message." style={{ marginBottom: 16 }} />}
+    <Form<MessageForm> form={form} layout="vertical" initialValues={{ messages: '', separator: '|', possDup: false }}>
+      {!summary.loggedIn && <Alert type="warning" title="The session is not logged in: the engine will refuse the messages." style={{ marginBottom: 16 }} />}
       <Typography.Paragraph type="secondary">
-        The engine fills in the header (BeginString, BodyLength, MsgSeqNum, SenderCompID, TargetCompID, SendingTime)
-        and the trailer.
+        One message per line, sent in order; the engine stops at the first it refuses, those before it being sent. It
+        fills in the header (BeginString, BodyLength, MsgSeqNum, SenderCompID, TargetCompID, SendingTime) and the
+        trailer.
       </Typography.Paragraph>
-      <Form.Item name="message" label="Message" rules={[{ required: true, whitespace: true }]}>
-        <Input.TextArea rows={6} placeholder="35=D|11=ORDER-1|55=AAPL|54=1|38=100|40=1" style={{ fontFamily: 'monospace' }} />
+      <Form.Item
+        name="messages"
+        label="Messages"
+        rules={[{ required: true, whitespace: true }]}
+        extra={messages.length > 1 ? `${messages.length} messages` : undefined}
+      >
+        <Input.TextArea
+          ref={textArea}
+          rows={6}
+          placeholder={'35=D|11=ORDER-1|55=AAPL|54=1|38=100|40=1\n35=D|11=ORDER-2|55=MSFT|54=2|38=50|40=1'}
+          style={{ fontFamily: 'monospace' }}
+        />
       </Form.Item>
       <Form.Item name="separator" label="Field separator">
         <Radio.Group
@@ -41,16 +58,17 @@ export function SendMessageTab({ sessionRef, summary }: { sessionRef: SessionRef
           ]}
         />
       </Form.Item>
-      <Form.Item name="possDup" valuePropName="checked" extra="Sends it as a duplicate: its SendingTime(52) becomes OrigSendingTime(122).">
+      <Form.Item name="possDup" valuePropName="checked" extra="Sends them as possible duplicates: each SendingTime(52) becomes OrigSendingTime(122).">
         <Checkbox>PossDup</Checkbox>
       </Form.Item>
       <Flex gap={8}>
         <Button
+          title={messages.length > 1 ? 'Decodes the message on the line under the cursor' : undefined}
           onClick={() =>
-            form.validateFields(['message']).then(() =>
+            form.validateFields(['messages']).then(() =>
               setDecoding({
                 ref: { ...sessionRef, sessionId: summary.runningConfigId },
-                message: form.getFieldValue('message'),
+                message: lineAtCursor(form.getFieldValue('messages'), textArea.current?.resizableTextArea?.textArea.selectionStart ?? 0),
                 separator: form.getFieldValue('separator'),
               }),
             )
@@ -61,8 +79,8 @@ export function SendMessageTab({ sessionRef, summary }: { sessionRef: SessionRef
         <WriteButton
           type="primary"
           loading={send.isPending}
-          confirm={`Send this message on ${summary.group}.${summary.id}, config ${summary.runningConfigId}?`}
-          onConfirm={() => form.validateFields().then((values) => send.mutate(values))}
+          confirm={messages.length > 1 ? `Send these ${messages.length} messages on ${where}, in order?` : `Send this message on ${where}?`}
+          onConfirm={() => form.validateFields().then((values) => send.mutate({ ...values, messages: messageLines(values.messages) }))}
         >
           Send
         </WriteButton>
@@ -70,4 +88,15 @@ export function SendMessageTab({ sessionRef, summary }: { sessionRef: SessionRef
       <DecodedMessageModal target={decoding} onClose={() => setDecoding(undefined)} />
     </Form>
   )
+}
+
+function messageLines(text: string): string[] {
+  return text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== '')
+}
+
+function lineAtCursor(text: string, cursor: number): string {
+  const start = text.lastIndexOf('\n', cursor - 1) + 1
+  const end = text.indexOf('\n', cursor)
+  const line = text.substring(start, end === -1 ? text.length : end).trim()
+  return line !== '' ? line : messageLines(text)[0]!
 }

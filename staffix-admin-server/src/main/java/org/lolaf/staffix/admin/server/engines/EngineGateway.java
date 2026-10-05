@@ -72,7 +72,10 @@ public interface EngineGateway {
 
     void setSeqNums(SessionRef session, @Nullable Long incoming, @Nullable Long outgoing);
 
-    void sendMessage(SessionRef session, String message, char separator, boolean possDup);
+    /**
+     * Sends the messages in order, stopping at the first the engine refuses: those before it are sent.
+     */
+    void sendMessages(SessionRef session, List<String> messages, char separator, boolean possDup);
 
     /**
      * The dictionaries a config decodes with: one, or for FIXT the transport's then the application's. Unlike the

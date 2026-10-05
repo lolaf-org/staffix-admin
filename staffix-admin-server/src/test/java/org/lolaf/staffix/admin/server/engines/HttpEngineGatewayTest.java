@@ -208,7 +208,7 @@ class HttpEngineGatewayTest {
         gateway.logon(trading());
         gateway.reset(trading(), ResetMode.RESET_SEQUENCE);
         gateway.setSeqNums(trading(), null, 42L);
-        gateway.sendMessage(trading(), "35=B|", '|', true);
+        gateway.sendMessages(trading(), List.of("35=B|", "35=B|148=again|"), '|', true);
         gateway.activate(trading(), "trading");
 
         assertThat(requests).filteredOn(request -> !request.startsWith("GET ")).containsExactly(
@@ -221,7 +221,7 @@ class HttpEngineGatewayTest {
         assertThat(bodies.get("POST sessions/alpha/trading/reset")).isEqualTo("{\"mode\":\"RESET_SEQUENCE\"}");
         assertThat(bodies.get("PUT sessions/alpha/trading/seqnums")).isEqualTo("{\"outgoing\":42}");
         assertThat(bodies.get("POST sessions/alpha/trading/messages"))
-                .contains("\"message\":\"35=B|\"", "\"separator\":\"|\"", "\"possDup\":true");
+                .contains("\"messages\":[\"35=B|\",\"35=B|148=again|\"]", "\"separator\":\"|\"", "\"possDup\":true");
     }
 
     @Test
@@ -277,7 +277,7 @@ class HttpEngineGatewayTest {
     void anEngineRefusalKeepsItsStatusAndReason() {
         statuses.put("POST sessions/alpha/trading/messages", 409);
 
-        assertThatThrownBy(() -> gateway.sendMessage(trading(), "35=B|", '|', false))
+        assertThatThrownBy(() -> gateway.sendMessages(trading(), List.of("35=B|"), '|', false))
                 .isInstanceOfSatisfying(GatewayException.class, e -> {
                     assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
                     assertThat(e.getBody().getDetail()).isEqualTo("trading is not logged in");
