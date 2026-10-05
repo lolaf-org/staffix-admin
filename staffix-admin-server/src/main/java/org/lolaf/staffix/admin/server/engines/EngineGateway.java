@@ -6,6 +6,7 @@ import org.lolaf.staffix.admin.server.sessions.ApplicationSetting;
 import org.lolaf.staffix.admin.server.sessions.ResetMode;
 import org.lolaf.staffix.admin.server.sessions.SessionDetail;
 import org.lolaf.staffix.admin.server.sessions.SessionGroup;
+import org.lolaf.staffix.admin.server.sessions.SessionComponents;
 import org.lolaf.staffix.admin.server.sessions.SessionSettingsStore;
 import tools.jackson.databind.JsonNode;
 
@@ -50,6 +51,8 @@ public interface EngineGateway {
     JsonNode getSessionSettingsSchema(String engineId);
 
     List<SessionSettingsStore> listSessionSettingsStores(String engineId);
+
+    SessionComponents getSessionComponents(String engineId);
 
     List<ApplicationSetting> getApplicationSettings(SessionRef session);
 

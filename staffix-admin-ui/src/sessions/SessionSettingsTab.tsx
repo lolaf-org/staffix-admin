@@ -4,6 +4,7 @@ import { ApiError, type Schemas } from '../api/client'
 import {
   useApplicationSettings,
   useCanWrite,
+  useSessionComponents,
   useSessionSettings,
   useSessionSettingsSchema,
   useSessionSettingsStores,
@@ -13,6 +14,7 @@ import {
 import { ApplicationSettingsEditor } from '../settings/ApplicationSettingsEditor'
 import { SchemaForm } from '../settings/SchemaForm'
 import { problems, type JsonObject, type JsonSchema } from '../settings/schema'
+import { sessionComponentOverrides } from './sessionComponentFields'
 
 interface Props {
   sessionRef: SessionRef
@@ -24,6 +26,7 @@ export function SessionSettingsTab({ sessionRef, detail }: Props) {
   const schema = useSessionSettingsSchema(sessionRef.engineId)
   const stores = useSessionSettingsStores(sessionRef.engineId)
   const declared = useApplicationSettings(sessionRef)
+  const components = useSessionComponents(sessionRef.engineId)
   const update = useUpdateSessionSettings(sessionRef)
   const canWrite = useCanWrite()
   const [draft, setDraft] = useState<JsonObject>()
@@ -85,6 +88,7 @@ export function SessionSettingsTab({ sessionRef, detail }: Props) {
         disabled={!editable}
         readOnly={acceptor ? ['fixSessionType'] : ['fixSessionType', 'fixSessionId']}
         overrides={{
+          ...sessionComponentOverrides(components.data, current),
           fixApplicationSessionSettings: ({ value, onChange }) => (
             <ApplicationSettingsEditor
               value={value}

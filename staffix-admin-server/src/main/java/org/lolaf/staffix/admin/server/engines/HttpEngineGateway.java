@@ -13,6 +13,7 @@ import org.lolaf.staffix.admin.server.sessions.SessionGroup;
 import org.lolaf.staffix.admin.server.sessions.SessionHealth;
 import org.lolaf.staffix.admin.server.sessions.SessionState;
 import org.lolaf.staffix.admin.server.sessions.SessionSummary;
+import org.lolaf.staffix.admin.server.sessions.SessionComponents;
 import org.lolaf.staffix.admin.server.sessions.SessionSettingsStore;
 import org.lolaf.staffix.admin.server.sessions.SessionType;
 import org.springframework.boot.ssl.SslBundles;
@@ -126,6 +127,11 @@ class HttpEngineGateway implements EngineGateway {
     @Override
     public List<SessionSettingsStore> listSessionSettingsStores(String engineId) {
         return List.of(call(engineId, HttpMethod.GET, List.of("session-settings-stores"), null, SessionSettingsStore[].class));
+    }
+
+    @Override
+    public SessionComponents getSessionComponents(String engineId) {
+        return call(engineId, HttpMethod.GET, List.of("session-components"), null, SessionComponents.class);
     }
 
     @Override

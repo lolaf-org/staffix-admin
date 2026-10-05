@@ -5,6 +5,7 @@ import {
   fetchSessionSettings,
   useAddSession,
   useApplicationSettings,
+  useSessionComponents,
   useSessionSettingsSchema,
   useSessionSettingsStores,
   type SessionRef,
@@ -12,6 +13,7 @@ import {
 import { ApplicationSettingsEditor } from '../settings/ApplicationSettingsEditor'
 import { SchemaForm } from '../settings/SchemaForm'
 import { problems, SECRET_MASK, type JsonObject, type JsonSchema } from '../settings/schema'
+import { sessionComponentOverrides } from './sessionComponentFields'
 
 const NEW_ACCEPTOR: JsonObject = { fixSessionType: 'ACCEPTOR', fixSessionId: {} }
 
@@ -35,6 +37,7 @@ export function AddSessionModal({ engineId, open, onClose, groups }: Props) {
   const [store, setStore] = useState<string>()
   const [source, setSource] = useState<SessionRef>()
   const declared = useApplicationSettings(source)
+  const components = useSessionComponents(engineId)
   const [draft, setDraft] = useState<JsonObject>(NEW_ACCEPTOR)
   const [secretsDropped, setSecretsDropped] = useState(false)
   const [invalid, setInvalid] = useState<string[]>([])
@@ -130,6 +133,7 @@ export function AddSessionModal({ engineId, open, onClose, groups }: Props) {
             onChange={setDraft}
             readOnly={['fixSessionType']}
             overrides={{
+              ...sessionComponentOverrides(components.data, draft),
               fixApplicationSessionSettings: ({ value, onChange }) => (
                 <ApplicationSettingsEditor value={value} onChange={onChange} declared={source ? (declared.data ?? []) : []} />
               ),

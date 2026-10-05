@@ -158,13 +158,18 @@ class SessionsControllerTest {
     }
 
     @Test
-    void servesTheEnginesSchemaAndSettingsStores() throws Exception {
+    void servesTheEnginesSchemaSettingsStoresAndSessionComponents() throws Exception {
         mockMvc.perform(get("/api/engines/london-prod/schemas/session-settings")).andExpect(status().isOk());
         mockMvc.perform(get("/api/engines/london-prod/session-settings-stores"))
                 .andExpect(jsonPath("$[0].instanceId").value("simulated"))
                 .andExpect(jsonPath("$[0].persistent").value(false));
         mockMvc.perform(get("/api/engines/london-prod/groups/fund-beta/sessions/trading"))
                 .andExpect(jsonPath("$.sessionSettingsStore").value("simulated"));
+        mockMvc.perform(get("/api/engines/paris-prod/session-components"))
+                .andExpect(jsonPath("$.applicationFactories[0].applicationIds[0]").value("default"))
+                .andExpect(jsonPath("$.messagesStores[0]").value("default"))
+                .andExpect(jsonPath("$.messagesLoggers").isNotEmpty())
+                .andExpect(jsonPath("$.sessionsPlugins[0].pluginTypes[0]").value("org.lolaf.staffix.api.monitoring.FixSessionsMonitoringManager"));
     }
 
     @Test

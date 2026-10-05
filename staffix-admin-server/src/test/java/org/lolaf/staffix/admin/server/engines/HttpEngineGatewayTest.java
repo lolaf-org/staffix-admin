@@ -18,6 +18,7 @@ import org.lolaf.staffix.admin.server.sessions.SessionGroup;
 import org.lolaf.staffix.admin.server.sessions.SessionHealth;
 import org.lolaf.staffix.admin.server.sessions.SessionState;
 import org.lolaf.staffix.admin.server.sessions.SessionSummary;
+import org.lolaf.staffix.admin.server.sessions.SessionComponents;
 import org.lolaf.staffix.admin.server.sessions.SessionSettingsStore;
 import org.lolaf.staffix.admin.server.TestTls;
 import org.springframework.boot.ssl.DefaultSslBundleRegistry;
@@ -46,6 +47,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class HttpEngineGatewayTest {
+
+    private static final String SESSION_COMPONENTS = """
+            {"applicationFactories":[{"instanceId":"default","applicationIds":["orders"]}],"messagesStores":["default"],
+             "messagesLoggers":["otlp"],
+             "sessionsPlugins":[{"instanceId":"metrics","pluginTypes":["org.lolaf.staffix.api.monitoring.FixSessionsMonitoringManager"]}]}
+            """;
 
     private static final String SESSIONS = """
             {"instanceId":"alpha-engine","version":"v1","sessions":[
@@ -113,6 +120,7 @@ class HttpEngineGatewayTest {
             case "sessions" -> SESSIONS.getBytes(StandardCharsets.UTF_8);
             case "dictionaries/default-FIX.4.4" -> "<fix/>".getBytes(StandardCharsets.UTF_8);
             case "session-settings-stores" -> "[{\"instanceId\":\"main\",\"persistent\":true}]".getBytes(StandardCharsets.UTF_8);
+            case "session-components" -> SESSION_COMPONENTS.getBytes(StandardCharsets.UTF_8);
             case "schemas/session-settings" -> "{\"type\":\"object\"}".getBytes(StandardCharsets.UTF_8);
             case "sessions/alpha/trading/application-settings" ->
                     "[{\"id\":\"logon.password\",\"secret\":true}]".getBytes(StandardCharsets.UTF_8);
@@ -369,6 +377,13 @@ class HttpEngineGatewayTest {
         assertThat(gateway.listSessionSettingsStores("alpha-engine"))
                 .containsExactly(SessionSettingsStore.builder().instanceId("main").persistent(true).build());
         assertThat(gateway.getSessionSettingsSchema("alpha-engine").path("type").asString()).isEqualTo("object");
+        assertThat(gateway.getSessionComponents("alpha-engine")).isEqualTo(SessionComponents.builder()
+                .applicationFactory(SessionComponents.ApplicationFactory.builder().instanceId("default").applicationId("orders").build())
+                .messagesStore("default")
+                .messagesLogger("otlp")
+                .sessionsPlugin(SessionComponents.SessionsPlugin.builder()
+                        .instanceId("metrics").pluginType("org.lolaf.staffix.api.monitoring.FixSessionsMonitoringManager").build())
+                .build());
         assertThat(gateway.getApplicationSettings(trading()))
                 .containsExactly(ApplicationSetting.builder().id("logon.password").secret(true).build());
     }

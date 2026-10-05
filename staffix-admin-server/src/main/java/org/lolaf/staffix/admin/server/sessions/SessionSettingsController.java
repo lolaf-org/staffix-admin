@@ -47,6 +47,11 @@ public class SessionSettingsController {
         return gateway.listSessionSettingsStores(engineId);
     }
 
+    @GetMapping("/session-components")
+    public SessionComponents getSessionComponents(@PathVariable String engineId) {
+        return gateway.getSessionComponents(engineId);
+    }
+
     /**
      * Acceptor sessions only: an initiator's sessions are the targets it was built with.
      */

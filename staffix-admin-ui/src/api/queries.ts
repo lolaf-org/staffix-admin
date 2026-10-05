@@ -90,6 +90,20 @@ export function useSessionSettingsStores(engineId: string) {
   })
 }
 
+export type SessionComponents = Schemas['SessionComponents']
+
+/**
+ * What a session's settings can name in its engine; an engine not serving it leaves those fields as free text.
+ */
+export function useSessionComponents(engineId: string) {
+  return useQuery({
+    queryKey: ['sessionComponents', engineId],
+    queryFn: () => call(api.GET('/api/engines/{engineId}/session-components', { params: { path: { engineId } } })),
+    staleTime: Infinity,
+    retry: false,
+  })
+}
+
 /**
  * Those the session's application declares, with their descriptions and which are secret.
  */

@@ -1,9 +1,11 @@
 package org.lolaf.staffix.admin.simulator;
 
 import org.lolaf.staffix.api.FixInitiatorTarget;
+import org.lolaf.staffix.api.InstanceProvider;
 import org.lolaf.staffix.api.admin.AdminApi;
 import org.lolaf.staffix.api.admin.FixAcceptorSessions;
 import org.lolaf.staffix.api.admin.FixInitiatorTargets;
+import org.lolaf.staffix.api.admin.FixSessionComponents;
 import org.lolaf.staffix.api.application.FixApplicationSessionSettingDescriptor;
 import org.lolaf.staffix.api.logging.FixMessagesLoggerSettings;
 import org.lolaf.staffix.api.session.FixSession;
@@ -230,6 +232,23 @@ final class SimulatedEngine implements AdminApi {
     @Override
     public List<FixSessionsPluginSettings<?>> getFixSessionsPluginsSettings() {
         return plugins;
+    }
+
+    @Override
+    public FixSessionComponents getFixSessionComponents() {
+        FixSessionComponents.FixSessionComponentsBuilder components = FixSessionComponents.builder()
+                .applicationFactory(FixSessionComponents.ApplicationFactory.builder()
+                        .instanceId(InstanceProvider.DEFAULT_INSTANCE_ID)
+                        .applicationId(InstanceProvider.DEFAULT_INSTANCE_ID)
+                        .applicationId("drop-copy")
+                        .build())
+                .messagesStore(InstanceProvider.DEFAULT_INSTANCE_ID);
+        loggers.forEach(logger -> components.messagesLogger(logger.getInstanceId()));
+        plugins.forEach(plugin -> components.sessionsPlugin(FixSessionComponents.SessionsPlugin.builder()
+                .instanceId(plugin.getInstanceId())
+                .pluginTypes(plugin.getPluginTypes())
+                .build()));
+        return components.build();
     }
 
     @Override

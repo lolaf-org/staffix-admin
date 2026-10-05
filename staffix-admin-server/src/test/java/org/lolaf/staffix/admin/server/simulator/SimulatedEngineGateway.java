@@ -9,6 +9,7 @@ import org.lolaf.staffix.admin.server.sessions.ApplicationSetting;
 import org.lolaf.staffix.admin.server.sessions.ResetMode;
 import org.lolaf.staffix.admin.server.sessions.SessionDetail;
 import org.lolaf.staffix.admin.server.sessions.SessionGroup;
+import org.lolaf.staffix.admin.server.sessions.SessionComponents;
 import org.lolaf.staffix.admin.server.sessions.SessionSettingsStore;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -21,6 +22,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 class SimulatedEngineGateway implements EngineGateway {
+
+    private static final String MONITORING_PLUGIN_TYPE = "org.lolaf.staffix.api.monitoring.FixSessionsMonitoringManager";
 
     private final Map<String, SimulatedEngine> engines;
     private final SimulatedDictionary dictionary = new SimulatedDictionary();
@@ -86,6 +89,20 @@ class SimulatedEngineGateway implements EngineGateway {
     public List<SessionSettingsStore> listSessionSettingsStores(String engineId) {
         engine(engineId);
         return List.of(SessionSettingsStore.builder().instanceId(SimulatedEngine.SETTINGS_STORE).build());
+    }
+
+    @Override
+    public SessionComponents getSessionComponents(String engineId) {
+        JsonNode emitters = getEmitters(engineId);
+        SessionComponents.SessionComponentsBuilder components = SessionComponents.builder()
+                .applicationFactory(SessionComponents.ApplicationFactory.builder().instanceId("default").applicationId("default").build())
+                .messagesStore("default");
+        emitters.path("messagesLoggers").forEach(logger -> components.messagesLogger(logger.path("instanceId").asString()));
+        emitters.path("sessionsPlugins").forEach(plugin -> components.sessionsPlugin(SessionComponents.SessionsPlugin.builder()
+                .instanceId(plugin.path("instanceId").asString())
+                .pluginType(MONITORING_PLUGIN_TYPE)
+                .build()));
+        return components.build();
     }
 
     @Override
