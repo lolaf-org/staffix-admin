@@ -1,7 +1,6 @@
 package org.lolaf.staffix.admin.server.connectors;
 
 import org.junit.jupiter.api.Test;
-import org.lolaf.staffix.admin.metrics.MetricKind;
 import org.lolaf.staffix.admin.server.engines.EngineGateway;
 import org.lolaf.staffix.admin.server.engines.GatewayException;
 import tools.jackson.databind.json.JsonMapper;
@@ -66,17 +65,15 @@ class EngineEmitterSettingsTest {
         assertThat(monitor.types()).containsExactly("AsyncFixSessionsPluginSettings", "OtlpMicrometerMonitoringManagerSettings");
         assertThat(monitor.timerBaseUnit()).isEqualTo(TimeUnit.MICROSECONDS);
         assertThat(monitor.otlpEndpoint()).isEqualTo("http://collector:4318");
-        assertThat(monitor.kinds()).containsExactlyInAnyOrder(MetricKind.READ_LATENCY, MetricKind.MESSAGE_RATE, MetricKind.DECODING_LATENCY);
         assertThat(monitor.exportStep()).isEqualTo(Duration.ofSeconds(5));
     }
 
     @Test
-    void assumesEveryMetricOfAMonitoringPluginThatDoesNotSay() {
+    void knowsNothingMoreOfAMonitoringPluginThatDoesNotSay() {
         EngineEmitterSettings.Monitor monitor = settings.monitor("alpha", "custom").orElseThrow();
 
         assertThat(monitor.timerBaseUnit()).isNull();
         assertThat(monitor.exportStep()).isNull();
-        assertThat(monitor.kinds()).containsExactlyInAnyOrder(MetricKind.values());
     }
 
     @Test

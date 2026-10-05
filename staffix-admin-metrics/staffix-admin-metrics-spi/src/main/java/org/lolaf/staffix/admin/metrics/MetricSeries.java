@@ -12,14 +12,8 @@ import java.util.Map;
 @Value
 @Builder
 public class MetricSeries {
-    public static final String MESSAGE_TYPE = "messageType";
-    public static final String DIRECTION = "direction";
-    public static final String GROUP = "group";
-    public static final String SESSION_ID = "sessionId";
-
     /**
-     * Among {@link #MESSAGE_TYPE}, {@link #DIRECTION} ({@code in} or {@code out}), {@link #GROUP} and
-     * {@link #SESSION_ID}.
+     * The values of the query's {@link MetricQuery#getSplitBy() split tags}, by tag key.
      */
     @Singular
     Map<String, String> labels;

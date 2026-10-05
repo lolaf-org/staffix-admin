@@ -4,13 +4,14 @@ import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.lolaf.staffix.admin.metrics.MetricKind;
 import org.lolaf.staffix.admin.metrics.MetricPoint;
 import org.lolaf.staffix.admin.metrics.MetricQuery;
 import org.lolaf.staffix.admin.metrics.MetricSeries;
+import org.lolaf.staffix.admin.metrics.MetricStatistic;
 import org.lolaf.staffix.admin.metrics.MetricsSource;
 import org.lolaf.staffix.admin.metrics.MetricsSourceException;
 import org.lolaf.staffix.admin.server.connectors.TelemetrySources;
+import org.lolaf.staffix.admin.server.engines.EngineGateway;
 import org.lolaf.staffix.admin.server.web.TelemetryProblems;
 import org.lolaf.staffix.admin.server.web.TimeRange;
 import org.springframework.http.HttpStatus;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.DoubleBinaryOperator;
 
 @RestController
@@ -37,66 +39,120 @@ import java.util.function.DoubleBinaryOperator;
 @RequiredArgsConstructor
 public class MetricsController {
 
+    private static final String MESSAGE_TYPE = "fix.msg.type";
+    private static final String DIRECTION = "fix.msg.dir";
+    private static final String READ = "messages.read.latency";
+    private static final String WRITE = "messages.write.latency";
+    /**
+     * staffix registers each message timer for both directions but records it in one only.
+     */
+    private static final Map<String, String> RECORDED_DIRECTION = Map.of(
+            READ, "in",
+            "messages.decoding.latency", "in",
+            WRITE, "out",
+            "messages.encoding.latency", "out");
+
     private final TelemetrySources telemetrySources;
+    private final EngineGateway gateway;
 
     /**
-     * The kinds the monitoring plugins of the scope's sessions measure, so a chart of a meter that is off is not
-     * offered; every kind when the engine does not say.
+     * Every meter the scope's running sessions publish, as their engine describes it; a meter several sessions publish
+     * once.
      */
-    @GetMapping("/api/metrics/kinds")
-    public List<MetricKind> getMetricKinds(@RequestParam String engineId,
-                                           @RequestParam(required = false) @Nullable String group,
-                                           @RequestParam(required = false) @Nullable String sessionId) {
+    @GetMapping("/api/metrics/meters")
+    public List<Meter> getMeters(@RequestParam String engineId,
+                                 @RequestParam(required = false) @Nullable String group,
+                                 @RequestParam(required = false) @Nullable String sessionId) {
         TelemetryProblems.requireGroupForSession(group, sessionId);
-        return List.copyOf(telemetrySources.metricKinds(engineId, group, sessionId));
+        Map<String, Meter> byName = new LinkedHashMap<>();
+        gateway.getMeters(engineId).stream()
+                .filter(session -> group == null || session.getGroup().equals(group))
+                .filter(session -> sessionId == null || session.getName().equals(sessionId))
+                .flatMap(session -> session.getMeters().stream())
+                .forEach(meter -> byName.merge(meter.getName(), meter, Meter::merge));
+        return List.copyOf(byName.values());
     }
 
     /**
-     * Per message type kinds give one series per type and direction, the others one series per session. A rate is
-     * averaged over {@code rateWindow}, else the step, widened to hold two of the engines' exports and to the
-     * backend's own minimum; the result says to what.
+     * One series per combination of the {@code splitBy} tags' values. A rate is averaged over {@code rateWindow},
+     * else the step, widened to hold two of the engines' exports and to the backend's own minimum; the result says to
+     * what.
      */
     @GetMapping("/api/metrics")
     public MetricsResult queryMetrics(@RequestParam String engineId,
+                                      @RequestParam(required = false) @Nullable String group,
+                                      @RequestParam(required = false) @Nullable String sessionId,
+                                      @RequestParam String meter,
+                                      @RequestParam MetricStatistic statistic,
+                                      @RequestParam(defaultValue = "0.99") @DecimalMin("0") @DecimalMax("1") double quantile,
+                                      @RequestParam(required = false) @Nullable List<String> splitBy,
+                                      @RequestParam(required = false) @Nullable TimeUnit gaugeUnit,
+                                      @RequestParam Instant from,
+                                      @RequestParam Instant to,
+                                      @RequestParam(required = false) @Nullable Duration rateWindow) {
+        MetricQuery.MetricQueryBuilder query = MetricQuery.builder()
+                .meter(meter)
+                .statistic(statistic)
+                .quantile(statistic == MetricStatistic.QUANTILE ? quantile : null)
+                .splitBy(Objects.requireNonNullElse(splitBy, List.of()))
+                .gaugeUnit(gaugeUnit);
+        if (RECORDED_DIRECTION.containsKey(meter)) {
+            query.tagFilter(DIRECTION, RECORDED_DIRECTION.get(meter));
+        }
+        return query(engineId, group, sessionId, from, to, rateWindow, statistic, List.of(query));
+    }
+
+    /**
+     * Messages per second, one series per message type and direction: received ones counted by the read timer,
+     * sent ones by the write timer.
+     */
+    @GetMapping("/api/metrics/messages")
+    public MetricsResult queryMessageRates(@RequestParam String engineId,
                                            @RequestParam(required = false) @Nullable String group,
                                            @RequestParam(required = false) @Nullable String sessionId,
-                                           @RequestParam MetricKind kind,
-                                           @RequestParam(defaultValue = "0.99") @DecimalMin("0") @DecimalMax("1") double quantile,
                                            @RequestParam Instant from,
                                            @RequestParam Instant to,
                                            @RequestParam(required = false) @Nullable Duration rateWindow) {
+        return query(engineId, group, sessionId, from, to, rateWindow, MetricStatistic.RATE, List.of(
+                messageRate(READ, "in"),
+                messageRate(WRITE, "out")));
+    }
+
+    private static MetricQuery.MetricQueryBuilder messageRate(String timer, String direction) {
+        return MetricQuery.builder()
+                .meter(timer)
+                .statistic(MetricStatistic.RATE)
+                .splitBy(MESSAGE_TYPE)
+                .splitBy(DIRECTION)
+                .tagFilter(DIRECTION, direction);
+    }
+
+    private MetricsResult query(String engineId, @Nullable String group, @Nullable String sessionId, Instant from, Instant to,
+                                @Nullable Duration rateWindow, MetricStatistic statistic, List<MetricQuery.MetricQueryBuilder> queries) {
         TelemetryProblems.requireGroupForSession(group, sessionId);
         requirePositive(rateWindow);
         TelemetrySources.Resolved<MetricsSource> resolved = resolve(engineId, group, sessionId);
         TimeRange range = TimeRange.of(from, to);
-        MetricQuery query = MetricQuery.builder()
-                .engineId(engineId)
-                .group(group)
-                .sessionId(sessionId)
-                .kind(kind)
-                .quantile(kind.isLatency() ? quantile : null)
-                .from(range.getFrom())
-                .to(range.getTo())
-                .step(range.chartStep())
-                .rateWindow(rateWindow)
-                .build();
+        Duration step = range.chartStep();
         try {
-            List<MetricSeries> series = resolved.sources().stream()
-                    .flatMap(source -> source.query(query.toBuilder()
+            List<MetricSeries> series = queries.stream()
+                    .map(query -> query.engineId(engineId).group(group).sessionId(sessionId)
+                            .from(range.getFrom()).to(range.getTo()).step(step).rateWindow(rateWindow).build())
+                    .flatMap(query -> resolved.sources().stream().flatMap(source -> source.query(query.toBuilder()
                             .timerBaseUnit(resolved.timerBaseUnits().get(source))
                             .rateWindow(rateWindowFor(query, resolved.exportSteps().get(source)))
-                            .build()).stream())
+                            .build()).stream()))
                     .toList();
             Duration minRateWindow = resolved.sources().stream()
                     .map(source -> longest(source.getMinRateWindow(), twoExports(resolved.exportSteps().get(source))))
                     .max(Comparator.naturalOrder())
                     .orElse(Duration.ZERO);
             return MetricsResult.builder()
-                    .series(resolved.sources().size() == 1 ? series : combineSameLabels(series, kind))
+                    .series(resolved.sources().size() == 1 ? series : combineSameLabels(series, statistic))
                     .notCollected(resolved.notCollected())
                     .rateWindow(widestRateWindow(series))
                     .minRateWindow(minRateWindow.isZero() ? null : minRateWindow)
-                    .step(query.getStep())
+                    .step(step)
                     .build();
         } catch (MetricsSourceException e) {
             throw TelemetryProblems.backendFailed("metrics", e);
@@ -129,11 +185,11 @@ public class MetricsController {
     }
 
     /**
-     * Backends aggregate a per message type kind over their own sessions only. A rate adds up; a quantile cannot be
-     * combined, so the highest one is kept, an upper bound of the true one.
+     * Backends aggregate over their own sessions only. A rate adds up; anything else cannot be combined, so the
+     * highest is kept, an upper bound of the true one.
      */
-    private static List<MetricSeries> combineSameLabels(List<MetricSeries> series, MetricKind kind) {
-        DoubleBinaryOperator combine = kind.isLatency() ? Math::max : Double::sum;
+    private static List<MetricSeries> combineSameLabels(List<MetricSeries> series, MetricStatistic statistic) {
+        DoubleBinaryOperator combine = statistic == MetricStatistic.RATE ? Double::sum : Math::max;
         Map<Map<String, String>, List<MetricSeries>> byLabels = new LinkedHashMap<>();
         series.forEach(one -> byLabels.computeIfAbsent(one.getLabels(), labels -> new ArrayList<>()).add(one));
         return byLabels.entrySet().stream()

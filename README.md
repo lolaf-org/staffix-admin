@@ -159,12 +159,18 @@ engines:
 ```
 
 The console also reads how each engine emits (staffix's `GET components`): the timer unit of its monitoring plugin
-and how often it exports, the meters it has on (charts of the others are not offered), and whether a messages logger exports anything a
-backend reads (a slf4j or file logger does not, so its sessions' logs show as not collected).
+and how often it exports, and whether a messages logger exports anything a backend reads (a slf4j or file logger does
+not, so its sessions' logs show as not collected).
+
+The Metrics tab offers the meters the scope's running sessions publish, as their engine describes them (staffix's
+`GET meters`), each with what it measures: staffix's own (message latencies, round-trip time, clock offset, logon
+state) and the timers the session's application created with `FixSessionsMonitoringContext.getTimer`, split by their
+own tags. An application's timer shows once the application asked for it in that session. A timer reads as a
+quantile (when it publishes its percentile histogram), a mean or a rate; a gauge as its value.
 
 **Prometheus** charts read the engines' micrometer meters received through the OpenTelemetry collector with
-`translation_strategy: UnderscoreEscapingWithoutSuffixes` (as in `staffix-admin-sandbox/docker`). The engines must
-publish percentile histograms for the latency charts; RTT and clock offset need staffix's RTT measurement enabled.
+`translation_strategy: UnderscoreEscapingWithoutSuffixes` (as in `staffix-admin-sandbox/docker`): a meter or a tag
+named with dots or dashes reads with underscores. RTT and clock offset need staffix's RTT measurement enabled.
 
 A rate needs two samples in the window it is averaged over, so the data sets the finest window a chart can show:
 twice the engine's OTLP export `step` (staffix default 10 s), and twice the Prometheus scrape interval when

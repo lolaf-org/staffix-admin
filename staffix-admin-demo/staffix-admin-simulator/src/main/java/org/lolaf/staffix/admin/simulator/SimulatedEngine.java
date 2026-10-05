@@ -8,6 +8,8 @@ import org.lolaf.staffix.api.admin.FixInitiatorTargets;
 import org.lolaf.staffix.api.admin.FixSessionComponents;
 import org.lolaf.staffix.api.application.FixApplicationSessionSettingDescriptor;
 import org.lolaf.staffix.api.logging.FixMessagesLoggerSettings;
+import org.lolaf.staffix.api.monitoring.FixMeterDescriptor;
+import org.lolaf.staffix.api.monitoring.FixSessionsMonitoringContext;
 import org.lolaf.staffix.api.session.FixSession;
 import org.lolaf.staffix.api.session.FixSession.FixSessionType;
 import org.lolaf.staffix.api.session.FixSessionId;
@@ -38,6 +40,7 @@ final class SimulatedEngine implements AdminApi {
     private final List<SimulatedConnection> connections;
     private final List<FixMessagesLoggerSettings> loggers;
     private final List<FixSessionsPluginSettings<?>> plugins;
+    private final SimulatedMonitoring monitoring;
 
     SimulatedEngine(String engineId, List<SimulatedConnection> connections, List<FixMessagesLoggerSettings> loggers,
                     List<FixSessionsPluginSettings<?>> plugins) {
@@ -45,6 +48,7 @@ final class SimulatedEngine implements AdminApi {
         this.connections = new ArrayList<>(connections);
         this.loggers = List.copyOf(loggers);
         this.plugins = List.copyOf(plugins);
+        this.monitoring = new SimulatedMonitoring(engineId, plugins);
     }
 
     synchronized void tick(Random random) {
@@ -221,7 +225,9 @@ final class SimulatedEngine implements AdminApi {
 
     @Override
     public synchronized List<FixSession> getManagedFixSessions() {
-        return runningConfigs().stream().map(session -> SimulatedFixSession.of(session, this)).toList();
+        return runningConfigs().stream()
+                .map(session -> SimulatedFixSession.of(session, this, () -> monitoring.context(session, this)))
+                .toList();
     }
 
     @Override
@@ -232,6 +238,12 @@ final class SimulatedEngine implements AdminApi {
     @Override
     public List<FixSessionsPluginSettings<?>> getFixSessionsPluginsSettings() {
         return plugins;
+    }
+
+    @Override
+    public synchronized List<FixMeterDescriptor> getFixSessionMeters(FixSessionId fixSessionId) {
+        SimulatedSession session = running(fixSessionId);
+        return monitoring.context(session, this).map(FixSessionsMonitoringContext::getMeterDescriptors).orElse(List.of());
     }
 
     @Override

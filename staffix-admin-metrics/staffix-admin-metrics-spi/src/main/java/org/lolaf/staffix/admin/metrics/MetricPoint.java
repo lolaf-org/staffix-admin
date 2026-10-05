@@ -8,7 +8,7 @@ import java.time.Instant;
 public class MetricPoint {
     Instant timestamp;
     /**
-     * In the kind's {@link MetricKind#getUnit() unit}.
+     * Per second for a rate, in seconds for a timer or a gauge with a unit.
      */
     double value;
 }

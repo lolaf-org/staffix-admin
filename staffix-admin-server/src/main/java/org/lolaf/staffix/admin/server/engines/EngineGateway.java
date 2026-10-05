@@ -6,6 +6,7 @@ import org.lolaf.staffix.admin.server.sessions.ApplicationSetting;
 import org.lolaf.staffix.admin.server.sessions.ResetMode;
 import org.lolaf.staffix.admin.server.sessions.SessionDetail;
 import org.lolaf.staffix.admin.server.sessions.SessionGroup;
+import org.lolaf.staffix.admin.server.metrics.SessionMeters;
 import org.lolaf.staffix.admin.server.sessions.SessionComponents;
 import org.lolaf.staffix.admin.server.sessions.SessionSettingsStore;
 import tools.jackson.databind.JsonNode;
@@ -53,6 +54,11 @@ public interface EngineGateway {
     List<SessionSettingsStore> listSessionSettingsStores(String engineId);
 
     SessionComponents getSessionComponents(String engineId);
+
+    /**
+     * Every running session's meters, by the name of the config it runs.
+     */
+    List<SessionMeters> getMeters(String engineId);
 
     List<ApplicationSetting> getApplicationSettings(SessionRef session);
 

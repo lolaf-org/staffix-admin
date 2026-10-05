@@ -32,38 +32,58 @@ class TelemetryControllersTest {
     private MockMvc mockMvc;
 
     @Test
-    void givesOneSeriesPerMessageTypeAndDirection() throws Exception {
-        mockMvc.perform(get("/api/metrics?engineId=paris-prod&group=acme&sessionId=trading&kind=READ_LATENCY&quantile=0.99" + LAST_HOUR))
+    void givesOneSeriesPerMessageTypeInTheDirectionTheTimerIsRecorded() throws Exception {
+        mockMvc.perform(get("/api/metrics?engineId=paris-prod&group=acme&sessionId=trading&meter=messages.read.latency&statistic=QUANTILE"
+                        + "&quantile=0.99&splitBy=fix.msg.type&splitBy=fix.msg.dir" + LAST_HOUR))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.series", hasSize(6)))
-                .andExpect(jsonPath("$.series[0].labels.messageType").exists())
+                .andExpect(jsonPath("$.series", hasSize(3)))
+                .andExpect(jsonPath("$.series[*].labels['fix.msg.dir']", everyItem(is("in"))))
                 .andExpect(jsonPath("$.series[0].points", hasSize(241)));
     }
 
     @Test
     void givesOneSeriesPerSessionForSessionWideKinds() throws Exception {
-        mockMvc.perform(get("/api/metrics?engineId=nyc-uat&kind=ROUND_TRIP_TIME" + LAST_HOUR))
+        mockMvc.perform(get("/api/metrics?engineId=nyc-uat&meter=session.rtt&statistic=MEAN&splitBy=fix.sg&splitBy=fix.sn" + LAST_HOUR))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.series[*].labels.group", hasSize(3)));
+                .andExpect(jsonPath("$.series[*].labels['fix.sg']", hasSize(3)));
+    }
+
+    @Test
+    void listsTheMetersOfTheScopeCustomOnesIncluded() throws Exception {
+        mockMvc.perform(get("/api/metrics/meters?engineId=paris-prod&group=alpha&sessionId=trading"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("messages.read.latency"))
+                .andExpect(jsonPath("$[?(@.name == 'orders.pricing')].custom").value(true))
+                .andExpect(jsonPath("$[?(@.name == 'session.clock.offset')].unit").value("NANOSECONDS"));
+        mockMvc.perform(get("/api/metrics/meters?engineId=nyc-uat"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    void splitsACustomTimerByItsOwnTags() throws Exception {
+        mockMvc.perform(get("/api/metrics?engineId=paris-prod&group=alpha&sessionId=trading&meter=orders.pricing&statistic=QUANTILE&splitBy=venue" + LAST_HOUR))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.series[*].labels.venue", hasSize(2)));
     }
 
     @Test
     void reportsTheRateWindowAskedFor() throws Exception {
-        mockMvc.perform(get("/api/metrics?engineId=nyc-uat&kind=ROUND_TRIP_TIME&rateWindow=PT20S" + LAST_HOUR))
+        mockMvc.perform(get("/api/metrics?engineId=nyc-uat&meter=session.rtt&statistic=MEAN&rateWindow=PT20S" + LAST_HOUR))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rateWindow").value("PT20S"));
     }
 
     @Test
     void ratesOverTheStepByDefault() throws Exception {
-        mockMvc.perform(get("/api/metrics?engineId=nyc-uat&kind=MESSAGE_RATE" + LAST_HOUR))
+        mockMvc.perform(get("/api/metrics/messages?engineId=nyc-uat" + LAST_HOUR))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rateWindow").value("PT15S"));
     }
 
     @Test
     void widensARateWindowToTwoOfTheEnginesExports() throws Exception {
-        mockMvc.perform(get("/api/metrics?engineId=paris-prod&group=acme&sessionId=trading&kind=ROUND_TRIP_TIME&rateWindow=PT2S" + LAST_HOUR))
+        mockMvc.perform(get("/api/metrics?engineId=paris-prod&group=acme&sessionId=trading&meter=session.rtt&statistic=MEAN&rateWindow=PT2S" + LAST_HOUR))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rateWindow").value("PT10S"))
                 .andExpect(jsonPath("$.minRateWindow").value("PT10S"))
@@ -72,20 +92,20 @@ class TelemetryControllersTest {
 
     @Test
     void reportsNoRateWindowForAGauge() throws Exception {
-        mockMvc.perform(get("/api/metrics?engineId=nyc-uat&kind=CLOCK_OFFSET&rateWindow=PT20S" + LAST_HOUR))
+        mockMvc.perform(get("/api/metrics?engineId=nyc-uat&meter=session.clock.offset&statistic=VALUE&gaugeUnit=NANOSECONDS&rateWindow=PT20S" + LAST_HOUR))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rateWindow").doesNotExist());
     }
 
     @Test
     void rejectsANonPositiveRateWindow() throws Exception {
-        mockMvc.perform(get("/api/metrics?engineId=nyc-uat&kind=ROUND_TRIP_TIME&rateWindow=PT0S" + LAST_HOUR))
+        mockMvc.perform(get("/api/metrics?engineId=nyc-uat&meter=session.rtt&statistic=MEAN&rateWindow=PT0S" + LAST_HOUR))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void rejectsAnInvertedTimeRange() throws Exception {
-        mockMvc.perform(get("/api/metrics?engineId=nyc-uat&kind=ROUND_TRIP_TIME&from=" + TO + "&to=" + TO.minusSeconds(60)))
+        mockMvc.perform(get("/api/metrics?engineId=nyc-uat&meter=session.rtt&statistic=MEAN&from=" + TO + "&to=" + TO.minusSeconds(60)))
                 .andExpect(status().isBadRequest());
     }
 

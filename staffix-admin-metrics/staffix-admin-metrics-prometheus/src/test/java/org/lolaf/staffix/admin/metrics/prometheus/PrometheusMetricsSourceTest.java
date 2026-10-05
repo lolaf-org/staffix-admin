@@ -4,10 +4,10 @@ import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.lolaf.staffix.admin.metrics.MetricKind;
 import org.lolaf.staffix.admin.metrics.MetricPoint;
 import org.lolaf.staffix.admin.metrics.MetricQuery;
 import org.lolaf.staffix.admin.metrics.MetricSeries;
+import org.lolaf.staffix.admin.metrics.MetricStatistic;
 import org.lolaf.staffix.admin.metrics.MetricsSourceException;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.json.JsonMapper;
@@ -72,16 +72,15 @@ class PrometheusMetricsSourceTest {
     }
 
     @Test
-    void readsMessageRatesOfBothDirectionsAndDropsMissingPoints() {
-        List<MetricSeries> series = source(TimeUnit.MICROSECONDS).query(query(MetricKind.MESSAGE_RATE, Duration.ofSeconds(5)));
+    void readsATimersRateSplitAndFilteredByItsTagsAndDropsMissingPoints() {
+        List<MetricSeries> series = source(TimeUnit.MICROSECONDS).query(messages(MetricStatistic.RATE, "messages.read.latency", "in", Duration.ofSeconds(5)));
 
         assertThat(form.get("query")).isEqualTo(
-                "sum by (fix_msg_type, fix_msg_dir) (rate(messages_read_latency_count{fix_eid=\"alpha\",fix_sg=\"beta\",fix_sn=\"trading\",fix_msg_dir=\"in\"}[20s]))"
-                + " or sum by (fix_msg_type, fix_msg_dir) (rate(messages_write_latency_count{fix_eid=\"alpha\",fix_sg=\"beta\",fix_sn=\"trading\",fix_msg_dir=\"out\"}[20s]))");
+                "sum by (fix_msg_type, fix_msg_dir) (rate(messages_read_latency_count{fix_eid=\"alpha\",fix_sg=\"beta\",fix_sn=\"trading\",fix_msg_dir=\"in\"}[20s]))");
         assertThat(form).containsEntry("start", "1790928000").containsEntry("end", "1790928600").containsEntry("step", "5s");
         assertThat(series).containsExactly(MetricSeries.builder()
-                .label(MetricSeries.DIRECTION, "in")
-                .label(MetricSeries.MESSAGE_TYPE, "R")
+                .label("fix.msg.dir", "in")
+                .label("fix.msg.type", "R")
                 .point(new MetricPoint(FROM, 250))
                 .point(new MetricPoint(FROM.plusSeconds(10), 500))
                 .rateWindow(Duration.ofSeconds(20))
@@ -90,7 +89,7 @@ class PrometheusMetricsSourceTest {
 
     @Test
     void ratesOverTheRequestedWindow() {
-        List<MetricSeries> series = source(TimeUnit.MILLISECONDS).query(query(MetricKind.MESSAGE_RATE, Duration.ofSeconds(5))
+        List<MetricSeries> series = source(TimeUnit.MILLISECONDS).query(messages(MetricStatistic.RATE, "messages.read.latency", "in", Duration.ofSeconds(5))
                 .toBuilder().rateWindow(Duration.ofSeconds(30)).build());
 
         assertThat(form.get("query")).contains("[30s]").doesNotContain("[20s]");
@@ -99,7 +98,7 @@ class PrometheusMetricsSourceTest {
 
     @Test
     void widensARequestedWindowToTheMinimum() {
-        List<MetricSeries> series = source(TimeUnit.MILLISECONDS).query(query(MetricKind.MESSAGE_RATE, Duration.ofSeconds(5))
+        List<MetricSeries> series = source(TimeUnit.MILLISECONDS).query(messages(MetricStatistic.RATE, "messages.read.latency", "in", Duration.ofSeconds(5))
                 .toBuilder().rateWindow(Duration.ofSeconds(10)).build());
 
         assertThat(form.get("query")).contains("[20s]").doesNotContain("[10s]");
@@ -113,7 +112,7 @@ class PrometheusMetricsSourceTest {
 
     @Test
     void readsLatencyQuantilesInSeconds() {
-        List<MetricSeries> series = source(TimeUnit.MICROSECONDS).query(query(MetricKind.WRITE_LATENCY, Duration.ofMinutes(2)));
+        List<MetricSeries> series = source(TimeUnit.MICROSECONDS).query(messages(MetricStatistic.QUANTILE, "messages.write.latency", "out", Duration.ofMinutes(2)));
 
         assertThat(form.get("query")).isEqualTo("histogram_quantile(0.99, sum by (le, fix_msg_type, fix_msg_dir) (rate("
                 + "messages_write_latency_bucket{fix_eid=\"alpha\",fix_sg=\"beta\",fix_sn=\"trading\",fix_msg_dir=\"out\"}[120s])))");
@@ -123,7 +122,7 @@ class PrometheusMetricsSourceTest {
 
     @Test
     void prefersTheTimerUnitTheQueryKnowsFromTheEngine() {
-        List<MetricSeries> series = source(TimeUnit.MICROSECONDS).query(query(MetricKind.WRITE_LATENCY, Duration.ofMinutes(2))
+        List<MetricSeries> series = source(TimeUnit.MICROSECONDS).query(messages(MetricStatistic.QUANTILE, "messages.write.latency", "out", Duration.ofMinutes(2))
                 .toBuilder().timerBaseUnit(TimeUnit.MILLISECONDS).build());
 
         assertThat(series.getFirst().getPoints()).extracting(MetricPoint::getValue).containsExactly(0.25, 0.5);
@@ -136,21 +135,78 @@ class PrometheusMetricsSourceTest {
                  {"metric":{"fix_sg":"beta","fix_sn":"trading"},"values":[[1790928000,"-1500"]]}]}}
                 """;
 
-        List<MetricSeries> series = source(TimeUnit.MILLISECONDS).query(query(MetricKind.CLOCK_OFFSET, Duration.ofSeconds(5)));
+        List<MetricSeries> series = source(TimeUnit.MILLISECONDS).query(perSession("session.clock.offset", MetricStatistic.VALUE)
+                .toBuilder().gaugeUnit(TimeUnit.NANOSECONDS).build());
 
         assertThat(form.get("query")).isEqualTo("avg by (fix_sg, fix_sn) (session_clock_offset{fix_eid=\"alpha\",fix_sg=\"beta\",fix_sn=\"trading\"})");
         assertThat(series).containsExactly(MetricSeries.builder()
-                .label(MetricSeries.GROUP, "beta")
-                .label(MetricSeries.SESSION_ID, "trading")
+                .label("fix.sg", "beta")
+                .label("fix.sn", "trading")
                 .point(new MetricPoint(FROM, -1.5e-6))
                 .build());
+    }
+
+    @Test
+    void readsAGaugeWithoutUnitAsIs() {
+        response = """
+                {"status":"success","data":{"resultType":"matrix","result":[
+                 {"metric":{"fix_sg":"beta","fix_sn":"trading"},"values":[[1790928000,"1"]]}]}}
+                """;
+
+        List<MetricSeries> series = source(TimeUnit.MILLISECONDS).query(perSession("session.logon.state", MetricStatistic.VALUE));
+
+        assertThat(series.getFirst().getPoints()).extracting(MetricPoint::getValue).containsExactly(1.0);
+        assertThat(series.getFirst().getRateWindow()).isNull();
+    }
+
+    @Test
+    void readsACustomTimersMeanNamingItsTagsAsPrometheusDoes() {
+        response = """
+                {"status":"success","data":{"resultType":"matrix","result":[
+                 {"metric":{"trade_venue":"xpar"},"values":[[1790928000,"2000"]]}]}}
+                """;
+
+        List<MetricSeries> series = source(TimeUnit.MICROSECONDS).query(MetricQuery.builder()
+                .engineId("alpha")
+                .meter("orders.pricing-time")
+                .statistic(MetricStatistic.MEAN)
+                .splitBy("trade-venue")
+                .from(FROM)
+                .to(FROM.plusSeconds(600))
+                .step(Duration.ofMinutes(1))
+                .build());
+
+        assertThat(form.get("query")).isEqualTo("sum by (trade_venue) (rate(orders_pricing_time_sum{fix_eid=\"alpha\"}[60s]))"
+                + " / sum by (trade_venue) (rate(orders_pricing_time_count{fix_eid=\"alpha\"}[60s]))");
+        assertThat(series).singleElement().satisfies(one -> {
+            assertThat(one.getLabels()).containsExactly(Map.entry("trade-venue", "xpar"));
+            assertThat(one.getPoints()).extracting(MetricPoint::getValue).containsExactly(2e-3);
+        });
+    }
+
+    @Test
+    void readsAQuantileOverTheWholeScopeWithoutSplit() {
+        source(TimeUnit.MICROSECONDS).query(MetricQuery.builder()
+                .engineId("alpha")
+                .meter("session.rtt")
+                .statistic(MetricStatistic.QUANTILE)
+                .quantile(0.5)
+                .from(FROM)
+                .to(FROM.plusSeconds(600))
+                .step(Duration.ofMinutes(1))
+                .build());
+
+        assertThat(form.get("query")).isEqualTo("histogram_quantile(0.5, sum by (le) (rate(session_rtt_bucket{fix_eid=\"alpha\"}[60s])))");
     }
 
     @Test
     void escapesLabelValues() {
         source(TimeUnit.MILLISECONDS).query(MetricQuery.builder()
                 .engineId("al\"pha\\")
-                .kind(MetricKind.CLOCK_OFFSET)
+                .meter("session.clock.offset")
+                .statistic(MetricStatistic.VALUE)
+                .splitBy("fix.sg")
+                .splitBy("fix.sn")
                 .from(FROM)
                 .to(FROM.plusSeconds(600))
                 .step(Duration.ofSeconds(5))
@@ -164,7 +220,7 @@ class PrometheusMetricsSourceTest {
         status = 400;
         response = "{\"status\":\"error\",\"errorType\":\"bad_data\",\"error\":\"parse error\"}";
 
-        assertThatThrownBy(() -> source(TimeUnit.MILLISECONDS).query(query(MetricKind.MESSAGE_RATE, Duration.ofSeconds(5))))
+        assertThatThrownBy(() -> source(TimeUnit.MILLISECONDS).query(perSession("session.rtt", MetricStatistic.MEAN)))
                 .isInstanceOf(MetricsSourceException.class)
                 .hasMessage("Prometheus answered 400: parse error");
     }
@@ -193,7 +249,7 @@ class PrometheusMetricsSourceTest {
         PrometheusMetricsSource unreachable = new PrometheusMetricsSource(properties(URI.create("http://127.0.0.1:" + closedPort), TimeUnit.MILLISECONDS),
                 RestClient.builder(), JsonMapper.builder().build());
 
-        assertThatThrownBy(() -> unreachable.query(query(MetricKind.MESSAGE_RATE, Duration.ofSeconds(5))))
+        assertThatThrownBy(() -> unreachable.query(perSession("session.rtt", MetricStatistic.MEAN)))
                 .isInstanceOf(MetricsSourceException.class)
                 .hasMessageContaining("did not answer");
     }
@@ -207,16 +263,35 @@ class PrometheusMetricsSourceTest {
         return new PrometheusSettings(url, Duration.ofSeconds(2), timerBaseUnit, Duration.ofSeconds(20));
     }
 
-    private static MetricQuery query(MetricKind kind, Duration step) {
+    private static MetricQuery messages(MetricStatistic statistic, String meter, String direction, Duration step) {
         return MetricQuery.builder()
                 .engineId("alpha")
                 .group("beta")
                 .sessionId("trading")
-                .kind(kind)
-                .quantile(kind.isLatency() ? 0.99 : null)
+                .meter(meter)
+                .statistic(statistic)
+                .quantile(statistic == MetricStatistic.QUANTILE ? 0.99 : null)
+                .splitBy("fix.msg.type")
+                .splitBy("fix.msg.dir")
+                .tagFilter("fix.msg.dir", direction)
                 .from(FROM)
                 .to(FROM.plusSeconds(600))
                 .step(step)
+                .build();
+    }
+
+    private static MetricQuery perSession(String meter, MetricStatistic statistic) {
+        return MetricQuery.builder()
+                .engineId("alpha")
+                .group("beta")
+                .sessionId("trading")
+                .meter(meter)
+                .statistic(statistic)
+                .splitBy("fix.sg")
+                .splitBy("fix.sn")
+                .from(FROM)
+                .to(FROM.plusSeconds(600))
+                .step(Duration.ofSeconds(5))
                 .build();
     }
 }

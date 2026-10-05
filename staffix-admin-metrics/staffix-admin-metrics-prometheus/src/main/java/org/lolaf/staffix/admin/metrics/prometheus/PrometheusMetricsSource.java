@@ -21,37 +21,25 @@ import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Reads staffix's micrometer meters as Prometheus names them when they arrive through the OpenTelemetry collector
  * with {@code UnderscoreEscapingWithoutSuffixes}: {@code messages_read_latency_bucket}, {@code session_rtt_sum}...
- * Latencies are quantiles of the timers' histograms, so the engines must publish percentile histograms.
+ * Quantiles come from the timers' histograms, so only a timer publishing its percentile histogram has them.
  */
 public class PrometheusMetricsSource implements MetricsSource {
 
     private static final String ENGINE = PrometheusLabel.FIX_EID.label();
     private static final String GROUP = PrometheusLabel.FIX_SG.label();
     private static final String SESSION = PrometheusLabel.FIX_SN.label();
-    private static final String MESSAGE_TYPE = PrometheusLabel.FIX_MSG_TYPE.label();
-    private static final String DIRECTION = PrometheusLabel.FIX_MSG_DIR.label();
-    private static final Map<String, String> SERIES_LABELS = Map.of(
-            MESSAGE_TYPE, MetricSeries.MESSAGE_TYPE,
-            DIRECTION, MetricSeries.DIRECTION,
-            GROUP, MetricSeries.GROUP,
-            SESSION, MetricSeries.SESSION_ID);
-    private static final String BY_MESSAGE = MESSAGE_TYPE + ", " + DIRECTION;
-    private static final String BY_SESSION = GROUP + ", " + SESSION;
-    private static final String MESSAGE_RATE_QUERY =
-            "sum by (" + BY_MESSAGE + ") (rate(messages_read_latency_count{%1$s," + DIRECTION + "=\"in\"}[%2$s]))"
-            + " or sum by (" + BY_MESSAGE + ") (rate(messages_write_latency_count{%1$s," + DIRECTION + "=\"out\"}[%2$s]))";
-    private static final String ROUND_TRIP_TIME_QUERY = "sum by (" + BY_SESSION + ") (rate(session_rtt_sum{%1$s}[%2$s]))"
-            + " / sum by (" + BY_SESSION + ") (rate(session_rtt_count{%1$s}[%2$s]))";
-    private static final String CLOCK_OFFSET_QUERY = "avg by (" + BY_SESSION + ") (session_clock_offset{%1$s})";
-    private static final double NANOS_PER_SECOND = TimeUnit.SECONDS.toNanos(1);
+    private static final Pattern NOT_IN_A_NAME = Pattern.compile("[^a-zA-Z0-9_:]");
 
     private final RestClient client;
     private final URI queryRangeUrl;
@@ -92,16 +80,23 @@ public class PrometheusMetricsSource implements MetricsSource {
 
     @Override
     public List<MetricSeries> query(MetricQuery query) {
+        String meter = name(query.getMeter());
         String selector = selector(query);
+        Map<String, String> tagsByLabel = query.getSplitBy().stream().collect(Collectors.toMap(PrometheusMetricsSource::name, tag -> tag, (one, other) -> one, LinkedHashMap::new));
+        String by = String.join(", ", tagsByLabel.keySet());
         Duration window = rateWindow(query);
-        return switch (query.getKind()) {
-            case MESSAGE_RATE -> queryRange(query, 1, MESSAGE_RATE_QUERY, selector, window);
-            case READ_LATENCY -> latency(query, "messages_read_latency", "in", selector, window);
-            case DECODING_LATENCY -> latency(query, "messages_decoding_latency", "in", selector, window);
-            case WRITE_LATENCY -> latency(query, "messages_write_latency", "out", selector, window);
-            case ENCODING_LATENCY -> latency(query, "messages_encoding_latency", "out", selector, window);
-            case ROUND_TRIP_TIME -> queryRange(query, timerUnitsPerSecond(query), ROUND_TRIP_TIME_QUERY, selector, window);
-            case CLOCK_OFFSET -> queryRange(query, NANOS_PER_SECOND, CLOCK_OFFSET_QUERY, selector, null);
+        String range = window.toSeconds() + "s";
+        return switch (query.getStatistic()) {
+            case RATE -> queryRange(query, 1, tagsByLabel, window,
+                    "sum by (" + by + ") (rate(" + meter + "_count{" + selector + "}[" + range + "]))");
+            case QUANTILE -> queryRange(query, timerUnitsPerSecond(query), tagsByLabel, window,
+                    "histogram_quantile(" + Objects.requireNonNullElse(query.getQuantile(), 0.5) + ", sum by (le" + (by.isEmpty() ? "" : ", " + by)
+                    + ") (rate(" + meter + "_bucket{" + selector + "}[" + range + "])))");
+            case MEAN -> queryRange(query, timerUnitsPerSecond(query), tagsByLabel, window,
+                    "sum by (" + by + ") (rate(" + meter + "_sum{" + selector + "}[" + range + "]))"
+                    + " / sum by (" + by + ") (rate(" + meter + "_count{" + selector + "}[" + range + "]))");
+            case VALUE -> queryRange(query, query.getGaugeUnit() == null ? 1 : query.getGaugeUnit().convert(1, TimeUnit.SECONDS),
+                    tagsByLabel, null, "avg by (" + by + ") (" + meter + "{" + selector + "})");
         };
     }
 
@@ -110,12 +105,12 @@ public class PrometheusMetricsSource implements MetricsSource {
         return minRateWindow;
     }
 
-    private List<MetricSeries> latency(MetricQuery query, String timer, String direction, String selector, Duration window) {
-        double quantile = Objects.requireNonNullElse(query.getQuantile(), 0.5);
-        return queryRange(query, timerUnitsPerSecond(query),
-                "histogram_quantile(" + quantile + ", sum by (le, " + BY_MESSAGE + ") (rate(" + timer
-                + "_bucket{%1$s," + DIRECTION + "=\"" + direction + "\"}[%2$s])))",
-                selector, window);
+    /**
+     * As the collector's {@code UnderscoreEscapingWithoutSuffixes} writes a meter or a tag: every character Prometheus
+     * does not allow in a name becomes an underscore.
+     */
+    static String name(String staffixName) {
+        return NOT_IN_A_NAME.matcher(staffixName).replaceAll("_");
     }
 
     private static String selector(MetricQuery query) {
@@ -126,6 +121,7 @@ public class PrometheusMetricsSource implements MetricsSource {
         if (query.getSessionId() != null) {
             selector.append(',').append(SESSION).append('=').append(quote(query.getSessionId()));
         }
+        query.getTagFilters().forEach((tag, value) -> selector.append(',').append(name(tag)).append('=').append(quote(value)));
         return selector.toString();
     }
 
@@ -142,10 +138,10 @@ public class PrometheusMetricsSource implements MetricsSource {
         return query.getTimerBaseUnit() == null ? timerUnitsPerSecond : query.getTimerBaseUnit().convert(1, TimeUnit.SECONDS);
     }
 
-    private List<MetricSeries> queryRange(MetricQuery query, double unitsPerSecond, String promQl, String selector,
-                                          @Nullable Duration rateWindow) {
+    private List<MetricSeries> queryRange(MetricQuery query, double unitsPerSecond, Map<String, String> tagsByLabel,
+                                          @Nullable Duration rateWindow, String promQl) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-        form.add("query", promQl.formatted(selector, rateWindow == null ? "" : rateWindow.toSeconds() + "s"));
+        form.add("query", promQl);
         form.add("start", Long.toString(query.getFrom().getEpochSecond()));
         form.add("end", Long.toString(query.getTo().getEpochSecond()));
         form.add("step", query.getStep().toSeconds() + "s");
@@ -164,7 +160,7 @@ public class PrometheusMetricsSource implements MetricsSource {
         } catch (ResourceAccessException e) {
             throw new MetricsSourceException("Prometheus at " + queryRangeUrl + " did not answer", e);
         }
-        return series(Objects.requireNonNull(response, "Prometheus answered no body"), unitsPerSecond, rateWindow);
+        return series(Objects.requireNonNull(response, "Prometheus answered no body"), unitsPerSecond, tagsByLabel, rateWindow);
     }
 
     private String error(byte[] body) {
@@ -175,14 +171,15 @@ public class PrometheusMetricsSource implements MetricsSource {
         }
     }
 
-    private static List<MetricSeries> series(JsonNode response, double unitsPerSecond, @Nullable Duration rateWindow) {
+    private static List<MetricSeries> series(JsonNode response, double unitsPerSecond, Map<String, String> tagsByLabel,
+                                             @Nullable Duration rateWindow) {
         return response.path("data").path("result").valueStream()
                 .map(result -> {
                     MetricSeries.MetricSeriesBuilder series = MetricSeries.builder().rateWindow(rateWindow);
                     result.path("metric").properties().forEach(label -> {
-                        String name = SERIES_LABELS.get(label.getKey());
-                        if (name != null) {
-                            series.label(name, label.getValue().asString());
+                        String tag = tagsByLabel.get(label.getKey());
+                        if (tag != null) {
+                            series.label(tag, label.getValue().asString());
                         }
                     });
                     result.path("values").valueStream().forEach(sample -> {

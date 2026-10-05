@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 final class DemoMetricsSource implements MetricsSource {
@@ -28,7 +29,12 @@ final class DemoMetricsSource implements MetricsSource {
         parameters.put("engineId", query.getEngineId());
         parameters.put("group", query.getGroup());
         parameters.put("sessionId", query.getSessionId());
-        parameters.put("kind", query.getKind().name());
+        parameters.put("meter", query.getMeter());
+        parameters.put("statistic", query.getStatistic().name());
+        parameters.put("splitBy", String.join(",", query.getSplitBy()));
+        parameters.put("tagFilters", query.getTagFilters().entrySet().stream()
+                .map(filter -> filter.getKey() + "=" + filter.getValue())
+                .collect(Collectors.joining(",")));
         parameters.put("quantile", query.getQuantile());
         parameters.put("from", query.getFrom());
         parameters.put("to", query.getTo());

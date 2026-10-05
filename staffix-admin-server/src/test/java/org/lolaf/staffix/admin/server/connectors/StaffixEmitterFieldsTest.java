@@ -36,7 +36,6 @@ class StaffixEmitterFieldsTest {
     @Test
     void readsPropertiesStaffixSettingsHave() throws Exception {
         assertThat(properties(OtlpMessagesLoggerSettings.class)).contains("otlpEndpointUrl", "instanceId");
-        assertThat(properties(OtlpMicrometerMonitoringManagerSettings.class)).contains("otlpEndpointUrl", "instanceId", "baseTimeUnit", "step")
-                .containsAll(EngineEmitterSettings.METERS.keySet());
+        assertThat(properties(OtlpMicrometerMonitoringManagerSettings.class)).contains("otlpEndpointUrl", "instanceId", "baseTimeUnit", "step");
     }
 }

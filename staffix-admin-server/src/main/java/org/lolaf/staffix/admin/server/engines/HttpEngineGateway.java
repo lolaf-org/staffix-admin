@@ -13,6 +13,7 @@ import org.lolaf.staffix.admin.server.sessions.SessionGroup;
 import org.lolaf.staffix.admin.server.sessions.SessionHealth;
 import org.lolaf.staffix.admin.server.sessions.SessionState;
 import org.lolaf.staffix.admin.server.sessions.SessionSummary;
+import org.lolaf.staffix.admin.server.metrics.SessionMeters;
 import org.lolaf.staffix.admin.server.sessions.SessionComponents;
 import org.lolaf.staffix.admin.server.sessions.SessionSettingsStore;
 import org.lolaf.staffix.admin.server.sessions.SessionType;
@@ -127,6 +128,11 @@ class HttpEngineGateway implements EngineGateway {
     @Override
     public List<SessionSettingsStore> listSessionSettingsStores(String engineId) {
         return List.of(call(engineId, HttpMethod.GET, List.of("session-settings-stores"), null, SessionSettingsStore[].class));
+    }
+
+    @Override
+    public List<SessionMeters> getMeters(String engineId) {
+        return List.of(call(engineId, HttpMethod.GET, List.of("meters"), null, SessionMeters[].class));
     }
 
     @Override

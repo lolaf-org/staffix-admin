@@ -55,8 +55,9 @@ final class DemoServer {
             Map<String, String> query = query(exchange.getRequestURI().getRawQuery());
             Object body = switch (exchange.getRequestURI().getPath()) {
                 case "/demo/health" -> null;
-                case "/demo/metrics" -> DemoTelemetry.metrics(sessions(query), query.get("kind"),
+                case "/demo/metrics" -> DemoTelemetry.metrics(sessions(query), query.get("meter"), query.get("statistic"),
                         query.containsKey("quantile") ? Double.valueOf(query.get("quantile")) : null,
+                        List.copyOf(values(query.get("splitBy"))), filters(query.get("tagFilters")),
                         Instant.parse(query.get("from")), Instant.parse(query.get("to")), Duration.ofSeconds(Long.parseLong(query.get("step"))),
                         query.containsKey("rateWindow") ? Duration.ofSeconds(Long.parseLong(query.get("rateWindow"))) : null);
                 case "/demo/logs" -> DemoTelemetry.logs(sessions(query), Instant.parse(query.get("from")), Instant.parse(query.get("to")),
@@ -103,6 +104,12 @@ final class DemoServer {
             }
         }
         return query;
+    }
+
+    private static Map<String, String> filters(String commaSeparated) {
+        Map<String, String> filters = new HashMap<>();
+        values(commaSeparated).forEach(filter -> filters.put(filter.substring(0, filter.indexOf('=')), filter.substring(filter.indexOf('=') + 1)));
+        return filters;
     }
 
     private static Set<String> values(String commaSeparated) {

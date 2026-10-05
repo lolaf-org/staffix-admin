@@ -1,8 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Alert, Empty, Flex, Segmented, Select, Skeleton, Typography } from 'antd'
-import { useEffect } from 'react'
 import { AreaChartOutlined, TableOutlined } from '@ant-design/icons'
-import { useMessageTypes, useMetricKinds, useMetrics, type FixedPeriod, type MetricKind, type MetricScope } from '../api/queries'
+import {
+  useMessageTypes,
+  useMeters,
+  useMetrics,
+  type FixedPeriod,
+  type Meter,
+  type MetricRequest,
+  type MetricScope,
+} from '../api/queries'
 import { isNotCollected, type Schemas } from '../api/client'
 import { NotCollectedNotice } from './NotCollectedNotice'
 import { formatRateValue, formatSeconds } from './format'
@@ -13,23 +20,34 @@ import { useThemeMode } from '../theme/ThemeMode'
 import { TimeRangeSelector, type Period } from './TimeRangeSelector'
 import { durationSeconds, parseDuration } from '../settings/duration'
 
+const MESSAGES = 'messages'
+const MESSAGE_TYPE = 'fix.msg.type'
+const DIRECTION = 'fix.msg.dir'
+const READ = 'messages.read.latency'
+const WRITE = 'messages.write.latency'
 /**
- * RTT and clock offset are per session: over a group or an engine they would draw one line per session.
+ * staffix's own meters, in the order operators read them, with short labels; any other meter is the application's.
  */
-const KINDS: { value: MetricKind; label: string; title: string; perSession?: boolean }[] = [
-  { value: 'MESSAGE_RATE', label: 'Rate', title: 'Messages per second' },
-  { value: 'READ_LATENCY', label: 'Read', title: 'Read latency' },
-  { value: 'WRITE_LATENCY', label: 'Write', title: 'Write latency' },
-  { value: 'DECODING_LATENCY', label: 'Decoding', title: 'Decoding latency' },
-  { value: 'ENCODING_LATENCY', label: 'Encoding', title: 'Encoding latency' },
-  { value: 'ROUND_TRIP_TIME', label: 'RTT', title: 'Round-trip time', perSession: true },
-  { value: 'CLOCK_OFFSET', label: 'Clock offset', title: 'Clock offset, remote minus local', perSession: true },
-]
+const BUILT_IN: Record<string, { label: string; title: string }> = {
+  [READ]: { label: 'Read', title: 'Read latency' },
+  [WRITE]: { label: 'Write', title: 'Write latency' },
+  'messages.decoding.latency': { label: 'Decoding', title: 'Decoding latency' },
+  'messages.encoding.latency': { label: 'Encoding', title: 'Encoding latency' },
+  'session.rtt': { label: 'RTT', title: 'Round-trip time' },
+  'session.clock.offset': { label: 'Clock offset', title: 'Clock offset, remote minus local' },
+}
+/**
+ * The logon state is what the session status already shows; charted, it says nothing more.
+ */
+const NOT_CHARTED = ['session.logon.state']
+const MESSAGE_RATE_DESCRIPTION =
+  'FIX messages per second, per message type: received ones counted by the read timer, sent ones by the write timer.'
 
 const QUANTILES = [0.5, 0.9, 0.99, 0.999]
+const MEAN = 'mean'
+const RATE = 'rate'
 const AUTO = 'auto'
 const RATE_WINDOWS = ['PT1S', 'PT2S', 'PT5S', 'PT10S', 'PT30S', 'PT1M', 'PT5M']
-const LATENCIES: MetricKind[] = ['READ_LATENCY', 'WRITE_LATENCY', 'DECODING_LATENCY', 'ENCODING_LATENCY']
 const DIRECTIONS = [
   { value: 'in', title: 'incoming' },
   { value: 'out', title: 'outgoing' },
@@ -54,56 +72,70 @@ interface Props {
 }
 
 export function MetricsPanel({ scope, chartHeight, period, marker }: Props) {
-  const [kind, setKind] = useState<MetricKind>('MESSAGE_RATE')
-  const [quantile, setQuantile] = useState(0.99)
+  const meters = useMeters(scope).data
+  const [selected, setSelected] = useState(MESSAGES)
+  const [statistic, setStatistic] = useState(String(0.99))
   const [selectedPeriod, setSelectedPeriod] = useState<Period>(60)
   const [rateWindow, setRateWindow] = useState(AUTO)
   const [view, setView] = useState<'chart' | 'table'>('chart')
   const [pickedTypes, setPickedTypes] = useState<string[]>([])
   const sessionScoped = scope.sessionId !== undefined
-  const metrics = useMetrics(scope, kind, quantile, period ?? selectedPeriod, rateWindow === AUTO ? undefined : rateWindow)
+  const ordered = orderedMeters(meters ?? [])
+  const hasMessageRate = ordered.some((m) => m.name === READ || m.name === WRITE)
+  const meter = ordered.find((m) => m.name === selected)
+  useEffect(() => {
+    if (meters === undefined) return
+    if (selected === MESSAGES ? !hasMessageRate : meter === undefined) {
+      const first = hasMessageRate ? MESSAGES : ordered[0]?.name
+      if (first) choose(first)
+    }
+  }, [meters, selected])
+  const request = requestOf(selected, meter, statistic)
+  const metrics = useMetrics(scope, request, period ?? selectedPeriod, rateWindow === AUTO ? undefined : rateWindow)
   const minRateWindow = metrics.data?.minRateWindow ? durationSeconds(metrics.data.minRateWindow) ?? 0 : 0
-  const measured = useMetricKinds(scope).data
-  const isMeasured = (k: MetricKind) => measured === undefined || measured.includes(k)
   const colors = seriesColors(useThemeMode().dark)
   const dictionaryTypes = useMessageTypes(scope).data
   const typeName = (code: string) => messageTypeName(code, dictionaryTypes?.find((t) => t.msgType === code)?.name)
-  const typesWithData = metrics.data?.series.flatMap((s) => (s.labels['messageType'] ? [s.labels['messageType']] : [])) ?? []
+  const typesWithData = metrics.data?.series.flatMap((s) => (s.labels[MESSAGE_TYPE] ? [s.labels[MESSAGE_TYPE]] : [])) ?? []
   const plottedTypes = plottedMessageTypes(typesWithData, pickedTypes)
-  useEffect(() => {
-    if (!sessionScoped && KINDS.find((k) => k.value === kind)?.perSession) {
-      setKind('MESSAGE_RATE')
-    } else if (!isMeasured(kind)) {
-      const first = KINDS.find((k) => isMeasured(k.value) && (sessionScoped || !k.perSession))
-      if (first) setKind(first.value)
-    }
-  }, [sessionScoped, kind, measured])
-  const format = kind === 'MESSAGE_RATE' ? formatRateValue : formatSeconds
-  const selected = KINDS.find((k) => k.value === kind)!
-  const title = LATENCIES.includes(kind) ? `${selected.title}, p${quantile * 100}` : selected.title
+  const format = formatOf(request, meter)
+  const title = titleOf(selected, meter, statistic)
+
+  function choose(name: string) {
+    setSelected(name)
+    setStatistic(defaultStatistic(ordered.find((m) => m.name === name)))
+  }
+
+  if (meters !== undefined && ordered.length === 0) {
+    return <Empty description="No session of this scope publishes metrics: none runs, or none has a monitoring plugin" />
+  }
 
   return (
     <Flex vertical gap={16}>
-      <Segmented<MetricKind>
-        options={KINDS.map((k) => ({
-          value: k.value,
-          label: k.label,
-          disabled: (k.perSession && !sessionScoped) || !isMeasured(k.value),
-          title: !isMeasured(k.value)
-            ? "Not measured: this meter is off in the sessions' monitoring plugin"
-            : k.perSession && !sessionScoped ? 'Pick a session' : k.title,
-        }))}
-        value={kind}
-        onChange={setKind}
+      <Segmented<string>
+        options={[
+          ...(hasMessageRate ? [{ value: MESSAGES, label: 'Rate', title: MESSAGE_RATE_DESCRIPTION }] : []),
+          ...ordered.map((m) => ({
+            value: m.name,
+            label: BUILT_IN[m.name]?.label ?? readableName(m.name),
+            title: BUILT_IN[m.name] ? m.description : `${m.name}: ${m.description}`,
+          })),
+        ]}
+        value={selected}
+        onChange={choose}
       />
       <Flex wrap gap={8}>
-        {LATENCIES.includes(kind) && (
+        {meter?.type === 'TIMER' && (
           <Select
-            value={quantile}
-            onChange={setQuantile}
-            options={QUANTILES.map((q) => ({ value: q, label: `p${q * 100}` }))}
-            style={{ width: 90 }}
-            aria-label="Quantile"
+            value={statistic}
+            onChange={setStatistic}
+            options={[
+              ...(meter.percentiles ? QUANTILES.map((q) => ({ value: String(q), label: `p${q * 100}` })) : []),
+              { value: MEAN, label: 'mean' },
+              { value: RATE, label: 'per second' },
+            ]}
+            style={{ width: 120 }}
+            aria-label="Statistic"
           />
         )}
         {typesWithData.length > 0 && (
@@ -123,7 +155,7 @@ export function MetricsPanel({ scope, chartHeight, period, marker }: Props) {
           />
         )}
         {!period && <TimeRangeSelector value={selectedPeriod} onChange={setSelectedPeriod} />}
-        {kind !== 'CLOCK_OFFSET' && (
+        {request?.kind !== 'meter' || request.statistic !== 'VALUE' ? (
           <Select
             value={rateWindow}
             onChange={setRateWindow}
@@ -144,7 +176,7 @@ export function MetricsPanel({ scope, chartHeight, period, marker }: Props) {
             style={{ width: 170 }}
             aria-label="Rate window"
           />
-        )}
+        ) : null}
         <Segmented
           value={view}
           onChange={setView}
@@ -199,16 +231,65 @@ function durationLabel(iso: string): string {
   return duration ? `${duration.amount} ${duration.unit}` : iso
 }
 
+function orderedMeters(meters: Meter[]): Meter[] {
+  const builtIn = Object.keys(BUILT_IN)
+  const rank = (m: Meter) => (builtIn.includes(m.name) ? builtIn.indexOf(m.name) : builtIn.length)
+  return meters.filter((m) => !NOT_CHARTED.includes(m.name)).sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
+}
+
+function readableName(id: string): string {
+  const words = id.split(/[._-]+/).filter((word) => word !== '').join(' ')
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
+/**
+ * The RTT is already smoothed by the engine, so its mean reads best; other timers their p99 when they have one.
+ */
+function defaultStatistic(meter: Meter | undefined): string {
+  return meter?.type !== 'TIMER' || meter.name === 'session.rtt' || !meter.percentiles ? MEAN : String(0.99)
+}
+
+function requestOf(selected: string, meter: Meter | undefined, statistic: string): MetricRequest | undefined {
+  if (selected === MESSAGES) return { kind: 'messages' }
+  if (!meter) return undefined
+  if (meter.type === 'GAUGE') return { kind: 'meter', meter: meter.name, statistic: 'VALUE', splitBy: meter.tagKeys, gaugeUnit: meter.unit }
+  if (statistic === MEAN || statistic === RATE) {
+    return { kind: 'meter', meter: meter.name, statistic: statistic === MEAN ? 'MEAN' : 'RATE', splitBy: meter.tagKeys }
+  }
+  return { kind: 'meter', meter: meter.name, statistic: 'QUANTILE', quantile: Number(statistic), splitBy: meter.tagKeys }
+}
+
+function formatOf(request: MetricRequest | undefined, meter: Meter | undefined): (value: number) => string {
+  if (request?.kind !== 'meter' || request.statistic === 'RATE') return formatRateValue
+  if (request.statistic === 'VALUE' && !meter?.unit) return (value) => String(Number(value.toFixed(3)))
+  return formatSeconds
+}
+
+function titleOf(selected: string, meter: Meter | undefined, statistic: string): string {
+  if (selected === MESSAGES) return 'Messages per second'
+  const name = BUILT_IN[selected]?.title ?? readableName(selected)
+  if (meter?.type !== 'TIMER') return name
+  return statistic === MEAN ? `${name}, mean` : statistic === RATE ? `${name}, per second` : `${name}, p${Number(statistic) * 100}`
+}
+
 function toFacets(series: Schemas['MetricSeries'][], title: string, colors: string[], types: string[],
                   typeName: (code: string) => string): Facet[] {
-  const perMessageType = series.some((s) => s.labels['messageType'])
-  if (!perMessageType) {
-    return [{ title, series: series.map((s, i) => ({ key: `s${i}`, name: title, color: colors[0]!, points: s.points })) }]
+  if (!series.some((s) => s.labels[MESSAGE_TYPE])) {
+    return [{
+      title,
+      series: series.slice(0, SERIES_COUNT).map((s, slot) => ({
+        key: `s${slot}`,
+        name: Object.values(s.labels).join(', ') || title,
+        color: colors[slot]!,
+        points: s.points,
+      })),
+    }]
   }
-  return DIRECTIONS.map((direction) => ({
+  const directions = DIRECTIONS.filter((direction) => series.some((s) => s.labels[DIRECTION] === direction.value))
+  return directions.map((direction) => ({
     title: `${title}, ${direction.title}`,
     series: types.flatMap((type, slot): ChartSeries[] => {
-      const match = series.find((s) => s.labels['messageType'] === type && s.labels['direction'] === direction.value)
+      const match = series.find((s) => s.labels[MESSAGE_TYPE] === type && s.labels[DIRECTION] === direction.value)
       return match ? [{ key: `t${type}`, name: typeName(type), color: colors[slot]!, points: match.points }] : []
     }),
   }))

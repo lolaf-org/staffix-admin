@@ -9,6 +9,7 @@ import org.lolaf.staffix.admin.server.sessions.ApplicationSetting;
 import org.lolaf.staffix.admin.server.sessions.ResetMode;
 import org.lolaf.staffix.admin.server.sessions.SessionDetail;
 import org.lolaf.staffix.admin.server.sessions.SessionGroup;
+import org.lolaf.staffix.admin.server.metrics.SessionMeters;
 import org.lolaf.staffix.admin.server.sessions.SessionComponents;
 import org.lolaf.staffix.admin.server.sessions.SessionSettingsStore;
 import tools.jackson.databind.JsonNode;
@@ -89,6 +90,11 @@ class SimulatedEngineGateway implements EngineGateway {
     public List<SessionSettingsStore> listSessionSettingsStores(String engineId) {
         engine(engineId);
         return List.of(SessionSettingsStore.builder().instanceId(SimulatedEngine.SETTINGS_STORE).build());
+    }
+
+    @Override
+    public List<SessionMeters> getMeters(String engineId) {
+        return engine(engineId).meters();
     }
 
     @Override

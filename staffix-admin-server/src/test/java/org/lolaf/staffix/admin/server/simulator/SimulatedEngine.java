@@ -2,6 +2,7 @@ package org.lolaf.staffix.admin.server.simulator;
 
 import org.lolaf.staffix.admin.server.engines.GatewayException;
 import org.lolaf.staffix.admin.server.engines.SessionRef;
+import org.lolaf.staffix.admin.server.metrics.SessionMeters;
 import org.lolaf.staffix.admin.server.sessions.ResetMode;
 import org.lolaf.staffix.admin.server.sessions.SessionDetail;
 import org.lolaf.staffix.admin.server.sessions.SessionGroup;
@@ -52,6 +53,16 @@ class SimulatedEngine {
     /**
      * Only running configs exchange traffic, so they are what the simulated metrics and logs show.
      */
+    synchronized List<SessionMeters> meters() {
+        return connections.stream()
+                .map(connection -> SessionMeters.builder()
+                        .group(connection.running().group)
+                        .name(connection.running().id)
+                        .meters(SimulatedMeters.of(connection.emitters().monitoring()))
+                        .build())
+                .toList();
+    }
+
     synchronized List<SimulatedSession> runningConfigs() {
         return connections.stream().map(SimulatedConnection::running).toList();
     }

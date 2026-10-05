@@ -3,7 +3,6 @@ package org.lolaf.staffix.admin.server.connectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.lolaf.staffix.admin.logs.LogsSource;
-import org.lolaf.staffix.admin.metrics.MetricKind;
 import org.lolaf.staffix.admin.metrics.MetricsSource;
 import org.lolaf.staffix.admin.server.engines.EngineGateway;
 import org.lolaf.staffix.admin.server.engines.GatewayException;
@@ -14,7 +13,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -65,25 +63,6 @@ public class TelemetrySources {
     public Resolved<LogsSource> logs(String engineId, @Nullable String group, @Nullable String sessionId) {
         return resolve(engineId, group, sessionId, emitters -> exportsLogs(engineId, emitters) ? telemetry.logs(engineId, List.of(emitters)) : List.of(),
                 () -> telemetry.allLogs(engineId), emitters -> Optional.empty());
-    }
-
-    /**
-     * The kinds the monitoring plugins of the scope's sessions measure; every kind when they are unknown.
-     *
-     * @param sessionId a config id: an initiator's backup reads as its session
-     */
-    public Set<MetricKind> metricKinds(String engineId, @Nullable String group, @Nullable String sessionId) {
-        Map<Emitters, List<String>> sessionsByEmitters = sessionsByEmitters(engineId, group, sessionId);
-        if (sessionsByEmitters.isEmpty()) {
-            return EnumSet.allOf(MetricKind.class);
-        }
-        Set<MetricKind> kinds = EnumSet.noneOf(MetricKind.class);
-        sessionsByEmitters.keySet().stream()
-                .filter(emitters -> emitters.monitoring() != null)
-                .forEach(emitters -> kinds.addAll(monitor(engineId, emitters)
-                        .map(EngineEmitterSettings.Monitor::kinds)
-                        .orElse(EnumSet.allOf(MetricKind.class))));
-        return kinds;
     }
 
     private Optional<EngineEmitterSettings.Monitor> monitor(String engineId, Emitters emitters) {

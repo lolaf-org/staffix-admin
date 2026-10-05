@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.lolaf.staffix.api.FixDictionaryId;
 import org.lolaf.staffix.api.admin.AdminApi;
 import org.lolaf.staffix.api.admin.FixInitiatorTargets;
+import org.lolaf.staffix.api.monitoring.FixMeterDescriptor;
+import org.lolaf.staffix.api.monitoring.FixSessionsMonitoringContext;
 import org.lolaf.staffix.api.session.FixSession.FixSessionType;
 import org.lolaf.staffix.api.session.FixSession;
 import org.lolaf.staffix.api.session.FixSessionId;
@@ -33,6 +35,20 @@ class SimulatedEngineTest {
         for (int i = 0; i < count; i++) {
             paris.tick(random);
         }
+    }
+
+    @Test
+    void describesASessionsMetersAsStaffixMonitoringDoesTheApplicationsPricingTimerIncluded() {
+        FixSessionId trading = session("alpha", "trading").getFixSessionId();
+
+        List<FixMeterDescriptor> meters = paris.getFixSessionMeters(trading);
+
+        assertThat(meters).extracting(FixMeterDescriptor::getName)
+                .contains("messages.read.latency", "messages.write.latency", "session.logon.state", SimulatedMonitoring.PRICING_TIMER);
+        assertThat(meters).filteredOn(FixMeterDescriptor::isCustom).singleElement()
+                .satisfies(pricing -> assertThat(pricing.getTagKeys()).containsExactly(SimulatedMonitoring.VENUE));
+        assertThat(session("alpha", "trading").getPluginContext(FixSessionsMonitoringContext.class)).get()
+                .extracting(FixSessionsMonitoringContext::getMeterDescriptors).isEqualTo(meters);
     }
 
     @Test

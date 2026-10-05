@@ -190,7 +190,8 @@ export async function logout(): Promise<void> {
   await fetch('/api/logout', { method: 'POST', headers: csrfHeader() })
 }
 
-export type MetricKind = paths['/api/metrics']['get']['parameters']['query']['kind']
+export type Meter = Schemas['Meter']
+export type MetricStatistic = paths['/api/metrics']['get']['parameters']['query']['statistic']
 export type LogType = NonNullable<Schemas['LogEntry']['type']>
 
 function window(minutes: number) {
@@ -216,27 +217,54 @@ export interface FixedPeriod {
 }
 
 /**
+ * What a chart reads: the message rate, or one meter's statistic split by its tags.
+ */
+export type MetricRequest =
+  | { kind: 'messages' }
+  | { kind: 'meter'; meter: string; statistic: MetricStatistic; quantile?: number; splitBy: string[]; gaugeUnit?: Meter['unit'] }
+
+/**
  * `period` is the last minutes, refreshed, or a fixed period; `rateWindow` an ISO duration the console may widen,
  * the step when unset.
  */
-export function useMetrics(scope: MetricScope, kind: MetricKind, quantile: number, period: number | FixedPeriod, rateWindow?: string) {
+export function useMetrics(scope: MetricScope, request: MetricRequest | undefined, period: number | FixedPeriod, rateWindow?: string) {
   const live = typeof period === 'number'
   return useQuery({
-    queryKey: ['metrics', scope, kind, quantile, period, rateWindow],
-    queryFn: () =>
-      call(api.GET('/api/metrics', { params: { query: { ...scope, kind, quantile, rateWindow, ...(live ? window(period) : period) } } })),
+    queryKey: ['metrics', scope, request, period, rateWindow],
+    queryFn: () => {
+      const range = live ? window(period) : period
+      return request!.kind === 'messages'
+        ? call(api.GET('/api/metrics/messages', { params: { query: { ...scope, rateWindow, ...range } } }))
+        : call(
+            api.GET('/api/metrics', {
+              params: {
+                query: {
+                  ...scope,
+                  meter: request!.meter,
+                  statistic: request!.statistic,
+                  quantile: request!.quantile,
+                  splitBy: request!.splitBy,
+                  gaugeUnit: request!.gaugeUnit ?? undefined,
+                  rateWindow,
+                  ...range,
+                },
+              },
+            }),
+          )
+    },
+    enabled: request !== undefined,
     refetchInterval: live ? 15_000 : false,
     placeholderData: (previous) => previous,
   })
 }
 
 /**
- * The kinds the monitoring plugins of the scope's sessions measure.
+ * The meters the scope's running sessions publish, as their engine describes them.
  */
-export function useMetricKinds(scope: MetricScope) {
+export function useMeters(scope: MetricScope) {
   return useQuery({
-    queryKey: ['metricKinds', scope],
-    queryFn: () => call(api.GET('/api/metrics/kinds', { params: { query: scope } })),
+    queryKey: ['meters', scope],
+    queryFn: () => call(api.GET('/api/metrics/meters', { params: { query: scope } })),
     staleTime: 60_000,
   })
 }

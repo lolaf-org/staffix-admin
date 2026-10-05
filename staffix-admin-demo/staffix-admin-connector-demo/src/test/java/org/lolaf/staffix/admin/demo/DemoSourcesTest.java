@@ -8,10 +8,10 @@ import org.lolaf.staffix.admin.logs.LogEntry;
 import org.lolaf.staffix.admin.logs.LogQuery;
 import org.lolaf.staffix.admin.logs.LogType;
 import org.lolaf.staffix.admin.logs.LogsSourceException;
-import org.lolaf.staffix.admin.metrics.MetricKind;
 import org.lolaf.staffix.admin.metrics.MetricPoint;
 import org.lolaf.staffix.admin.metrics.MetricQuery;
 import org.lolaf.staffix.admin.metrics.MetricSeries;
+import org.lolaf.staffix.admin.metrics.MetricStatistic;
 import org.springframework.web.client.RestClient;
 
 import java.net.InetAddress;
@@ -62,7 +62,8 @@ class DemoSourcesTest {
     @Test
     void readsTheSimulatorsSeries() {
         List<MetricSeries> series = new DemoMetricsSourceFactory(RestClient.builder()).create(settings).query(MetricQuery.builder()
-                .engineId("paris-prod").group("alpha").kind(MetricKind.MESSAGE_RATE).from(FROM).to(FROM.plusSeconds(60))
+                .engineId("paris-prod").group("alpha").meter("messages.read.latency").statistic(MetricStatistic.RATE)
+                .splitBy("fix.msg.type").tagFilter("fix.msg.dir", "in").from(FROM).to(FROM.plusSeconds(60))
                 .step(Duration.ofSeconds(5)).rateWindow(Duration.ofSeconds(20)).build());
 
         assertThat(series).singleElement().satisfies(one -> {
@@ -70,7 +71,7 @@ class DemoSourcesTest {
             assertThat(one.getPoints()).containsExactly(new MetricPoint(FROM, 12.5));
             assertThat(one.getRateWindow()).isEqualTo(Duration.ofSeconds(20));
         });
-        assertThat(query).contains("engineId=paris-prod", "group=alpha", "kind=MESSAGE_RATE", "step=5", "rateWindow=20");
+        assertThat(query).contains("engineId=paris-prod", "group=alpha", "meter=messages.read.latency", "statistic=RATE", "splitBy=fix.msg.type", "tagFilters=fix.msg.dir=in", "step=5", "rateWindow=20");
     }
 
     @Test

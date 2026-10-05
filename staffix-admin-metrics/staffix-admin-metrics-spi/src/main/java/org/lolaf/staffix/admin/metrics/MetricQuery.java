@@ -1,13 +1,20 @@
 package org.lolaf.staffix.admin.metrics;
 
 import lombok.Builder;
+import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * One meter of staffix's monitoring, read for an engine, a group or a session. Tags are named as staffix's
+ * monitoring names them ({@code fix.msg.type}, {@code fix.sg}...), whatever the backend calls them.
+ */
 @Value
 @Builder(toBuilder = true)
 public class MetricQuery {
@@ -23,12 +30,31 @@ public class MetricQuery {
      */
     @Nullable
     String sessionId;
-    MetricKind kind;
     /**
-     * For latencies, e.g. 0.99; ignored by the other kinds.
+     * As the monitoring publishes it, such as {@code messages.read.latency}.
+     */
+    String meter;
+    MetricStatistic statistic;
+    /**
+     * For {@link MetricStatistic#QUANTILE}, e.g. 0.99.
      */
     @Nullable
     Double quantile;
+    /**
+     * The tags giving one series per combination of their values; none for a single series over the scope.
+     */
+    @Singular("splitBy")
+    List<String> splitBy;
+    /**
+     * Only the meter's series with these tag values, such as {@code fix.msg.dir=in}.
+     */
+    @Singular
+    Map<String, String> tagFilters;
+    /**
+     * A gauge's unit, its values then read in seconds; null for a gauge read as is.
+     */
+    @Nullable
+    TimeUnit gaugeUnit;
     Instant from;
     Instant to;
     Duration step;

@@ -3,10 +3,13 @@ package org.lolaf.staffix.admin.simulator;
 import lombok.experimental.UtilityClass;
 import org.lolaf.staffix.api.FixDictionaryId;
 import org.lolaf.staffix.api.application.FixApplication;
+import org.lolaf.staffix.api.monitoring.FixSessionsMonitoringContext;
 import org.lolaf.staffix.api.session.FixSession;
 import org.lolaf.staffix.api.version.FixRegularVersion;
 
 import java.lang.reflect.Proxy;
+import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * A running config seen as the {@link FixSession} staffix's HTTP connector reads its state from. It answers what the
@@ -28,13 +31,14 @@ class SimulatedFixSession {
     /**
      * @param lock what the session's state is changed under
      */
-    FixSession of(SimulatedSession session, Object lock) {
+    FixSession of(SimulatedSession session, Object lock, Supplier<Optional<FixSessionsMonitoringContext>> monitoring) {
         return (FixSession) Proxy.newProxyInstance(FixSession.class.getClassLoader(), new Class<?>[]{FixSession.class}, (proxy, method, args) -> {
             synchronized (lock) {
                 return switch (method.getName()) {
                     case "getFixSessionId" -> session.fixSessionId();
                     case "getFixSessionSettings" -> session.settings;
                     case "getApplication" -> FIX_44_APPLICATION;
+                    case "getPluginContext" -> args[0] == FixSessionsMonitoringContext.class ? monitoring.get() : Optional.empty();
                     case "isLoggedIn", "isConnected" -> session.loggedIn;
                     case "isWithinSessionTime" -> session.withinSessionTime;
                     case "getDesiredState" -> session.desiredState;
