@@ -1,6 +1,7 @@
 package org.lolaf.staffix.admin.simulator;
 
 import org.junit.jupiter.api.Test;
+import org.lolaf.staffix.api.FixDictionaryId;
 import org.lolaf.staffix.api.admin.AdminApi;
 import org.lolaf.staffix.api.admin.FixInitiatorTargets;
 import org.lolaf.staffix.api.session.FixSession.FixSessionType;
@@ -32,6 +33,12 @@ class SimulatedEngineTest {
         for (int i = 0; i < count; i++) {
             paris.tick(random);
         }
+    }
+
+    @Test
+    void answersTheDictionaryOfEachSessionsApplication() {
+        assertThat(paris.getManagedFixSessions()).isNotEmpty()
+                .allSatisfy(session -> assertThat(session.getApplication().getDictionaryId()).isEqualTo(FixDictionaryId.of(FixRegularVersion.VERSION_44)));
     }
 
     @Test
