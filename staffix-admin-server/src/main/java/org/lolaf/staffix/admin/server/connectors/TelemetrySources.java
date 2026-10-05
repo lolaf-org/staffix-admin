@@ -55,7 +55,7 @@ public class TelemetrySources {
      */
     public Resolved<MetricsSource> metrics(String engineId, @Nullable String group, @Nullable String sessionId) {
         return resolve(engineId, group, sessionId, emitters -> telemetry.metrics(engineId, List.of(emitters)),
-                () -> telemetry.allMetrics(engineId), emitters -> monitor(engineId, emitters).map(EngineEmitterSettings.Monitor::timerBaseUnit).orElse(null));
+                () -> telemetry.allMetrics(engineId), emitters -> monitor(engineId, emitters));
     }
 
     /**
@@ -64,7 +64,7 @@ public class TelemetrySources {
      */
     public Resolved<LogsSource> logs(String engineId, @Nullable String group, @Nullable String sessionId) {
         return resolve(engineId, group, sessionId, emitters -> exportsLogs(engineId, emitters) ? telemetry.logs(engineId, List.of(emitters)) : List.of(),
-                () -> telemetry.allLogs(engineId), emitters -> null);
+                () -> telemetry.allLogs(engineId), emitters -> Optional.empty());
     }
 
     /**
@@ -96,7 +96,7 @@ public class TelemetrySources {
 
     private <S> Resolved<S> resolve(String engineId, @Nullable String group, @Nullable String sessionId,
                                     Function<Emitters, List<S>> sourcesOf, Supplier<List<S>> everySource,
-                                    Function<Emitters, @Nullable TimeUnit> timerBaseUnitOf) {
+                                    Function<Emitters, Optional<EngineEmitterSettings.Monitor>> monitorOf) {
         Map<Emitters, List<String>> sessionsByEmitters = sessionsByEmitters(engineId, group, sessionId);
         if (sessionsByEmitters.isEmpty()) {
             return new Resolved<>(everySource.get(), List.of(), Map.of());
@@ -104,14 +104,22 @@ public class TelemetrySources {
         Set<S> sources = new LinkedHashSet<>();
         Set<String> notCollected = new TreeSet<>();
         Map<S, Set<Optional<TimeUnit>>> unitsBySource = new HashMap<>();
+        Map<S, Duration> exportSteps = new HashMap<>();
         sessionsByEmitters.forEach((emitters, sessions) -> {
             List<S> found = sourcesOf.apply(emitters);
             if (found.isEmpty()) {
                 notCollected.addAll(sessions);
             }
             sources.addAll(found);
-            found.forEach(source -> unitsBySource.computeIfAbsent(source, s -> new HashSet<>())
-                    .add(Optional.ofNullable(timerBaseUnitOf.apply(emitters))));
+            Optional<EngineEmitterSettings.Monitor> monitor = monitorOf.apply(emitters);
+            Duration exportStep = monitor.map(EngineEmitterSettings.Monitor::exportStep).orElse(null);
+            found.forEach(source -> {
+                unitsBySource.computeIfAbsent(source, s -> new HashSet<>())
+                        .add(monitor.map(EngineEmitterSettings.Monitor::timerBaseUnit));
+                if (exportStep != null) {
+                    exportSteps.merge(source, exportStep, (one, other) -> one.compareTo(other) >= 0 ? one : other);
+                }
+            });
         });
         Map<S, TimeUnit> timerBaseUnits = new HashMap<>();
         unitsBySource.forEach((source, units) -> {
@@ -119,7 +127,7 @@ public class TelemetrySources {
                 timerBaseUnits.put(source, units.iterator().next().get());
             }
         });
-        return new Resolved<>(List.copyOf(sources), List.copyOf(notCollected), timerBaseUnits);
+        return new Resolved<>(List.copyOf(sources), List.copyOf(notCollected), timerBaseUnits, exportSteps);
     }
 
     private Map<Emitters, List<String>> sessionsByEmitters(String engineId, @Nullable String group, @Nullable String sessionId) {
@@ -153,8 +161,14 @@ public class TelemetrySources {
      *                       when their emitters are unknown
      * @param timerBaseUnits by source, the unit its engines' timers are in, when every monitoring plugin read through
      *                       it says the same
+     * @param exportSteps    by source, the longest export step of the monitoring plugins read through it, when known
      */
-    public record Resolved<S>(List<S> sources, List<String> notCollected, Map<S, TimeUnit> timerBaseUnits) {
+    public record Resolved<S>(List<S> sources, List<String> notCollected, Map<S, TimeUnit> timerBaseUnits,
+                              Map<S, Duration> exportSteps) {
+
+        public Resolved(List<S> sources, List<String> notCollected, Map<S, TimeUnit> timerBaseUnits) {
+            this(sources, notCollected, timerBaseUnits, Map.of());
+        }
     }
 
     private record Known(Instant at, List<SessionGroup> groups) {

@@ -16,7 +16,7 @@ public class TimeRange {
 
     private static final Duration MAX = Duration.ofDays(31);
     private static final int POINTS_PER_CHART = 240;
-    private static final Duration MIN_STEP = Duration.ofSeconds(5);
+    private static final Duration MIN_STEP = Duration.ofSeconds(1);
 
     Instant from;
     Instant to;
@@ -30,10 +30,12 @@ public class TimeRange {
     }
 
     /**
-     * Enough points for a chart's width, never finer than metrics are usually scraped.
+     * Enough points for a chart's width, in whole seconds as backends take a step; a second at the finest, which only
+     * an engine exporting that often fills.
      */
     public Duration chartStep() {
-        Duration step = Duration.between(from, to).dividedBy(POINTS_PER_CHART);
+        long millis = Duration.between(from, to).dividedBy(POINTS_PER_CHART).toMillis();
+        Duration step = Duration.ofSeconds((millis + 999) / 1000);
         return step.compareTo(MIN_STEP) < 0 ? MIN_STEP : step;
     }
 }

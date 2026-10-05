@@ -1,5 +1,6 @@
 package org.lolaf.staffix.admin.metrics;
 
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -26,5 +27,13 @@ public interface MetricsSource {
      */
     default void testConnection() {
         throw new MetricsSourceException("This metrics backend cannot be tested", null);
+    }
+
+    /**
+     * The narrowest window this backend rates over, set by how often it gets a sample (e.g. twice a scrape
+     * interval); a narrower {@link MetricQuery#getRateWindow()} is widened to it. Zero when the backend does not know.
+     */
+    default Duration getMinRateWindow() {
+        return Duration.ZERO;
     }
 }

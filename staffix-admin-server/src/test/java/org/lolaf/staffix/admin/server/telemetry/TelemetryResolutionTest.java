@@ -137,6 +137,31 @@ class TelemetryResolutionTest {
     }
 
     @Test
+    void ratesOverTwoExportsAtLeastAndReportsTheNarrowestWindowTheDataAllows() {
+        List<MetricQuery> queries = new ArrayList<>();
+        MetricsSource prometheus = new MetricsSource() {
+            @Override
+            public List<MetricSeries> query(MetricQuery query) {
+                queries.add(query);
+                return List.of();
+            }
+
+            @Override
+            public Duration getMinRateWindow() {
+                return Duration.ofSeconds(20);
+            }
+        };
+        when(sources.metrics("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(prometheus), List.of(), Map.of(),
+                Map.of(prometheus, Duration.ofSeconds(15))));
+
+        MetricsResult result = metricsController.queryMetrics("alpha", null, null, MetricKind.MESSAGE_RATE, 0.99, FROM, TO, Duration.ofSeconds(2));
+
+        assertThat(queries).singleElement().extracting(MetricQuery::getRateWindow).isEqualTo(Duration.ofSeconds(30));
+        assertThat(result.getMinRateWindow()).isEqualTo(Duration.ofSeconds(30));
+        assertThat(result.getStep()).isEqualTo(Duration.ofSeconds(15));
+    }
+
+    @Test
     void addsUpTheRatesOfTheSameMessageTypeAcrossSources() {
         MetricsSource initiators = query -> List.of(series("D", 1, 2), series("8", 5));
         MetricsSource clients = query -> List.of(series("D", 10, 20));

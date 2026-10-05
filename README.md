@@ -135,6 +135,7 @@ connectors:
     settings:
       url: http://prometheus:9090
       timerBaseUnit: microseconds   # for engines that do not report their micrometer baseTimeUnit
+      minRateWindow: 10s            # two scrape intervals (default 20s)
   - id: prod-loki
     name: Production Loki
     kind: loki
@@ -157,13 +158,20 @@ engines:
       clients-metrics: none        # by monitoring plugin instance id
 ```
 
-The console also reads how each engine emits (staffix's `GET components`): the timer unit of its monitoring plugin,
-the meters it has on (charts of the others are not offered), and whether a messages logger exports anything a
+The console also reads how each engine emits (staffix's `GET components`): the timer unit of its monitoring plugin
+and how often it exports, the meters it has on (charts of the others are not offered), and whether a messages logger exports anything a
 backend reads (a slf4j or file logger does not, so its sessions' logs show as not collected).
 
 **Prometheus** charts read the engines' micrometer meters received through the OpenTelemetry collector with
 `translation_strategy: UnderscoreEscapingWithoutSuffixes` (as in `staffix-admin-sandbox/docker`). The engines must
 publish percentile histograms for the latency charts; RTT and clock offset need staffix's RTT measurement enabled.
+
+A rate needs two samples in the window it is averaged over, so the data sets the finest window a chart can show:
+twice the engine's OTLP export `step` (staffix default 10 s), and twice the Prometheus scrape interval when
+Prometheus scrapes the collector's `prometheus` exporter. The console knows the first from the engine; set the
+connector's `minRateWindow` to the second (with Prometheus's own OTLP receiver there is no scrape: set it no higher
+than twice the export step). The Metrics tab's rate window cannot go under either, and a chart steps down to a point a
+second over a period of a few minutes. To see second by second, an engine must export every second.
 
 **Loki** holds what staffix's OTLP messages logger sends: every message in and out, and session events. Loki keeps
 the `fix.*` attributes as structured metadata, so by default the console filters them after a stream selector that

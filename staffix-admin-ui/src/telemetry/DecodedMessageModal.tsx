@@ -8,10 +8,6 @@ type DecodedField = Schemas['DecodedField']
 
 const SECTION_LABELS: Record<DecodedField['section'], string> = { HEADER: 'header', BODY: 'body', TRAILER: 'trailer' }
 const METRICS_AROUND_MS = 60_000
-/**
- * The Prometheus connector's default minimum, two 10 s OTLP pushes; a backend widens it if it needs more.
- */
-const METRICS_RATE_WINDOW = 'PT20S'
 
 /**
  * A raw FIX message, each tag named with the dictionary of the session config it went through, and for a logged one
@@ -77,7 +73,6 @@ function periodAround(epochMillis: number): FixedPeriod {
   return {
     from: new Date(epochMillis - METRICS_AROUND_MS).toISOString(),
     to: new Date(epochMillis + METRICS_AROUND_MS).toISOString(),
-    rateWindow: METRICS_RATE_WINDOW,
   }
 }
 

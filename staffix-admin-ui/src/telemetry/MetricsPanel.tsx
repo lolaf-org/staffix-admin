@@ -11,7 +11,7 @@ import { MetricTable } from './MetricTable'
 import { messageTypeName, plottedMessageTypes, rankedMessageTypes, SERIES_COUNT, seriesColors } from './series'
 import { useThemeMode } from '../theme/ThemeMode'
 import { TimeRangeSelector, type Period } from './TimeRangeSelector'
-import { parseDuration } from '../settings/duration'
+import { durationSeconds, parseDuration } from '../settings/duration'
 
 /**
  * RTT and clock offset are per session: over a group or an engine they would draw one line per session.
@@ -27,6 +27,8 @@ const KINDS: { value: MetricKind; label: string; title: string; perSession?: boo
 ]
 
 const QUANTILES = [0.5, 0.9, 0.99, 0.999]
+const AUTO = 'auto'
+const RATE_WINDOWS = ['PT1S', 'PT2S', 'PT5S', 'PT10S', 'PT30S', 'PT1M', 'PT5M']
 const LATENCIES: MetricKind[] = ['READ_LATENCY', 'WRITE_LATENCY', 'DECODING_LATENCY', 'ENCODING_LATENCY']
 const DIRECTIONS = [
   { value: 'in', title: 'incoming' },
@@ -55,10 +57,12 @@ export function MetricsPanel({ scope, chartHeight, period, marker }: Props) {
   const [kind, setKind] = useState<MetricKind>('MESSAGE_RATE')
   const [quantile, setQuantile] = useState(0.99)
   const [selectedPeriod, setSelectedPeriod] = useState<Period>(60)
+  const [rateWindow, setRateWindow] = useState(AUTO)
   const [view, setView] = useState<'chart' | 'table'>('chart')
   const [pickedTypes, setPickedTypes] = useState<string[]>([])
   const sessionScoped = scope.sessionId !== undefined
-  const metrics = useMetrics(scope, kind, quantile, period ?? selectedPeriod)
+  const metrics = useMetrics(scope, kind, quantile, period ?? selectedPeriod, rateWindow === AUTO ? undefined : rateWindow)
+  const minRateWindow = metrics.data?.minRateWindow ? durationSeconds(metrics.data.minRateWindow) ?? 0 : 0
   const measured = useMetricKinds(scope).data
   const isMeasured = (k: MetricKind) => measured === undefined || measured.includes(k)
   const colors = seriesColors(useThemeMode().dark)
@@ -119,6 +123,28 @@ export function MetricsPanel({ scope, chartHeight, period, marker }: Props) {
           />
         )}
         {!period && <TimeRangeSelector value={selectedPeriod} onChange={setSelectedPeriod} />}
+        {kind !== 'CLOCK_OFFSET' && (
+          <Select
+            value={rateWindow}
+            onChange={setRateWindow}
+            options={[
+              { value: AUTO, label: 'Rate window: auto', title: 'The time between two points, or the narrowest the data allows' },
+              ...RATE_WINDOWS.map((window) => {
+                const tooNarrow = durationSeconds(window)! < minRateWindow
+                return {
+                  value: window,
+                  label: `Rate window: ${durationLabel(window)}`,
+                  disabled: tooNarrow,
+                  title: tooNarrow
+                    ? `The data is not finer than ${durationLabel(metrics.data!.minRateWindow!)}: a rate needs two samples, and the engines export or the backend samples that often`
+                    : undefined,
+                }
+              }),
+            ]}
+            style={{ width: 170 }}
+            aria-label="Rate window"
+          />
+        )}
         <Segmented
           value={view}
           onChange={setView}
@@ -134,9 +160,12 @@ export function MetricsPanel({ scope, chartHeight, period, marker }: Props) {
           are the worst session's.
         </Typography.Text>
       )}
-      {metrics.data?.rateWindow && (
+      {metrics.data && (
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          Rates over {rateWindowLabel(metrics.data.rateWindow)}.
+          {metrics.data.rateWindow ? `Rates over ${durationLabel(metrics.data.rateWindow)}, a point` : 'A point'} every{' '}
+          {durationLabel(metrics.data.step)}.
+          {metrics.data.rateWindow && durationSeconds(metrics.data.rateWindow)! < durationSeconds(metrics.data.step)! &&
+            ' The window is narrower than the time between points, so the chart skips some: a shorter period shows them all.'}
         </Typography.Text>
       )}
       {metrics.isPending && <Skeleton active />}
@@ -165,7 +194,7 @@ export function MetricsPanel({ scope, chartHeight, period, marker }: Props) {
   )
 }
 
-function rateWindowLabel(iso: string): string {
+function durationLabel(iso: string): string {
   const duration = parseDuration(iso)
   return duration ? `${duration.amount} ${duration.unit}` : iso
 }

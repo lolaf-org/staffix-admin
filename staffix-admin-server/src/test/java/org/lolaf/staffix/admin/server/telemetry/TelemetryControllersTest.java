@@ -62,6 +62,15 @@ class TelemetryControllersTest {
     }
 
     @Test
+    void widensARateWindowToTwoOfTheEnginesExports() throws Exception {
+        mockMvc.perform(get("/api/metrics?engineId=paris-prod&group=acme&sessionId=trading&kind=ROUND_TRIP_TIME&rateWindow=PT2S" + LAST_HOUR))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rateWindow").value("PT10S"))
+                .andExpect(jsonPath("$.minRateWindow").value("PT10S"))
+                .andExpect(jsonPath("$.step").value("PT15S"));
+    }
+
+    @Test
     void reportsNoRateWindowForAGauge() throws Exception {
         mockMvc.perform(get("/api/metrics?engineId=nyc-uat&kind=CLOCK_OFFSET&rateWindow=PT20S" + LAST_HOUR))
                 .andExpect(status().isOk())

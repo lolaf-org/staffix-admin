@@ -5,6 +5,7 @@ connectors:
     kind: prometheus
     settings:
       timerBaseUnit: microseconds
+      minRateWindow: 10s
       url: http://localhost:9090
   - id: sandbox-loki
     name: Sandbox Loki

@@ -23,6 +23,11 @@ export function parseDuration(iso: string): { amount: number; unit: DurationUnit
   return { amount: round(total / unit.seconds), unit: unit.value }
 }
 
+export function durationSeconds(iso: string): number | undefined {
+  const duration = parseDuration(iso)
+  return duration && round(duration.amount * DURATION_UNITS.find((u) => u.value === duration.unit)!.seconds)
+}
+
 export function formatDuration(amount: number, unit: DurationUnit): string {
   const seconds = round(amount * DURATION_UNITS.find((u) => u.value === unit)!.seconds)
   return `PT${seconds}S`

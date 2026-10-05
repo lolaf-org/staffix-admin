@@ -105,6 +105,11 @@ public class PrometheusMetricsSource implements MetricsSource {
         };
     }
 
+    @Override
+    public Duration getMinRateWindow() {
+        return minRateWindow;
+    }
+
     private List<MetricSeries> latency(MetricQuery query, String timer, String direction, String selector, Duration window) {
         double quantile = Objects.requireNonNullElse(query.getQuantile(), 0.5);
         return queryRange(query, timerUnitsPerSecond(query),

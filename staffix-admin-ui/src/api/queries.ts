@@ -194,22 +194,23 @@ export interface MetricScope {
 }
 
 /**
- * A period in the past, so not refreshed; `rateWindow` is an ISO duration a backend may widen.
+ * A period in the past, so not refreshed.
  */
 export interface FixedPeriod {
   from: string
   to: string
-  rateWindow?: string
 }
 
 /**
- * `period` is the last minutes, refreshed, or a fixed period.
+ * `period` is the last minutes, refreshed, or a fixed period; `rateWindow` an ISO duration the console may widen,
+ * the step when unset.
  */
-export function useMetrics(scope: MetricScope, kind: MetricKind, quantile: number, period: number | FixedPeriod) {
+export function useMetrics(scope: MetricScope, kind: MetricKind, quantile: number, period: number | FixedPeriod, rateWindow?: string) {
   const live = typeof period === 'number'
   return useQuery({
-    queryKey: ['metrics', scope, kind, quantile, period],
-    queryFn: () => call(api.GET('/api/metrics', { params: { query: { ...scope, kind, quantile, ...(live ? window(period) : period) } } })),
+    queryKey: ['metrics', scope, kind, quantile, period, rateWindow],
+    queryFn: () =>
+      call(api.GET('/api/metrics', { params: { query: { ...scope, kind, quantile, rateWindow, ...(live ? window(period) : period) } } })),
     refetchInterval: live ? 15_000 : false,
     placeholderData: (previous) => previous,
   })

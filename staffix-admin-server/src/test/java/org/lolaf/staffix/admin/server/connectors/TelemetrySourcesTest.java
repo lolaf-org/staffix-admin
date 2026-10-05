@@ -81,13 +81,15 @@ class TelemetrySourcesTest {
     }
 
     @Test
-    void readsMetricsInTheTimerUnitOfTheMonitoringPluginAndOffersOnlyItsKinds() {
+    void readsMetricsInTheTimerUnitAndExportStepOfTheMonitoringPluginAndOffersOnlyItsKinds() {
         MetricsSource metrics = query -> List.of();
         when(telemetry.metrics("alpha", List.of(INITIATORS))).thenReturn(List.of(metrics));
         when(emitterSettings.monitor("alpha", "otlp-metrics")).thenReturn(Optional.of(new EngineEmitterSettings.Monitor(
-                List.of("OtlpMicrometerMonitoringManagerSettings"), null, TimeUnit.MICROSECONDS, EnumSet.of(MetricKind.READ_LATENCY))));
+                List.of("OtlpMicrometerMonitoringManagerSettings"), null, TimeUnit.MICROSECONDS, EnumSet.of(MetricKind.READ_LATENCY),
+                Duration.ofSeconds(5))));
 
         assertThat(sources.metrics("alpha", "gamma", null).timerBaseUnits()).containsEntry(metrics, TimeUnit.MICROSECONDS);
+        assertThat(sources.metrics("alpha", "gamma", null).exportSteps()).containsEntry(metrics, Duration.ofSeconds(5));
         assertThat(sources.metricKinds("alpha", null, null)).containsExactly(MetricKind.READ_LATENCY);
         assertThat(sources.metricKinds("alpha", "beta", "drop-copy")).isEmpty();
         assertThat(sources.metricKinds("delta", null, null)).containsExactlyInAnyOrder(MetricKind.values());

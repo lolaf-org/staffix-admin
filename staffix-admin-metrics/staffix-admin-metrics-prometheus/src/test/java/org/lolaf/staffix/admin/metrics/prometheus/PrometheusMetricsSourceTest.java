@@ -107,6 +107,11 @@ class PrometheusMetricsSourceTest {
     }
 
     @Test
+    void tellsItsMinimumRateWindow() {
+        assertThat(source(TimeUnit.MILLISECONDS).getMinRateWindow()).isEqualTo(Duration.ofSeconds(20));
+    }
+
+    @Test
     void readsLatencyQuantilesInSeconds() {
         List<MetricSeries> series = source(TimeUnit.MICROSECONDS).query(query(MetricKind.WRITE_LATENCY, Duration.ofMinutes(2)));
 

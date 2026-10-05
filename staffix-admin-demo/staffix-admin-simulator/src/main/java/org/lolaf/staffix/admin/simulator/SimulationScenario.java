@@ -17,6 +17,7 @@ import org.lolaf.staffix.stores.loggers.async.AsyncMessagesLoggerSettings;
 import org.lolaf.staffix.stores.loggers.otlp.OtlpMessagesLoggerSettings;
 import org.lolaf.staffix.stores.loggers.slf4j.Slf4jMessagesLoggerSettings;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -103,6 +104,7 @@ class SimulationScenario {
                 .instanceId(instanceId)
                 .otlpEndpointUrl(collector(instanceId))
                 .baseTimeUnit(TimeUnit.MICROSECONDS)
+                .step(clients ? Duration.ofSeconds(10) : Duration.ofSeconds(1))
                 .decodingLatencyEnabled(!clients)
                 .encodingLatencyEnabled(!clients)
                 .rttLatencyEnabled(true)

@@ -53,7 +53,8 @@ public class MetricsController {
 
     /**
      * Per message type kinds give one series per type and direction, the others one series per session. A rate is
-     * averaged over {@code rateWindow}, else the step; a backend may widen it, and the result says to what.
+     * averaged over {@code rateWindow}, else the step, widened to hold two of the engines' exports and to the
+     * backend's own minimum; the result says to what.
      */
     @GetMapping("/api/metrics")
     public MetricsResult queryMetrics(@RequestParam String engineId,
@@ -81,16 +82,43 @@ public class MetricsController {
                 .build();
         try {
             List<MetricSeries> series = resolved.sources().stream()
-                    .flatMap(source -> source.query(query.toBuilder().timerBaseUnit(resolved.timerBaseUnits().get(source)).build()).stream())
+                    .flatMap(source -> source.query(query.toBuilder()
+                            .timerBaseUnit(resolved.timerBaseUnits().get(source))
+                            .rateWindow(rateWindowFor(query, resolved.exportSteps().get(source)))
+                            .build()).stream())
                     .toList();
+            Duration minRateWindow = resolved.sources().stream()
+                    .map(source -> longest(source.getMinRateWindow(), twoExports(resolved.exportSteps().get(source))))
+                    .max(Comparator.naturalOrder())
+                    .orElse(Duration.ZERO);
             return MetricsResult.builder()
                     .series(resolved.sources().size() == 1 ? series : combineSameLabels(series, kind))
                     .notCollected(resolved.notCollected())
                     .rateWindow(widestRateWindow(series))
+                    .minRateWindow(minRateWindow.isZero() ? null : minRateWindow)
+                    .step(query.getStep())
                     .build();
         } catch (MetricsSourceException e) {
             throw TelemetryProblems.backendFailed("metrics", e);
         }
+    }
+
+    private static @Nullable Duration rateWindowFor(MetricQuery query, @Nullable Duration exportStep) {
+        if (exportStep == null) {
+            return query.getRateWindow();
+        }
+        return longest(Objects.requireNonNullElse(query.getRateWindow(), query.getStep()), twoExports(exportStep));
+    }
+
+    /**
+     * A rate needs two samples in its window, and an engine's meters change once an export.
+     */
+    private static Duration twoExports(@Nullable Duration exportStep) {
+        return exportStep == null ? Duration.ZERO : exportStep.multipliedBy(2);
+    }
+
+    private static Duration longest(Duration one, Duration other) {
+        return one.compareTo(other) >= 0 ? one : other;
     }
 
     private static void requirePositive(@Nullable Duration rateWindow) {

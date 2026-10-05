@@ -11,6 +11,7 @@ import tools.jackson.databind.JsonNode;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -37,6 +38,7 @@ public class EngineEmitterSettings {
     private static final Duration FRESH = Duration.ofMinutes(1);
     static final String MONITORING = "FixSessionsMonitoringManager";
     static final String OTLP_LOGGER = "OtlpMessagesLoggerSettings";
+    static final String OTLP_MONITOR = "OtlpMicrometerMonitoringManagerSettings";
     /**
      * Loggers known to export nothing a backend can read; any other, a demux included, may.
      */
@@ -129,8 +131,11 @@ public class EngineEmitterSettings {
      * @param types         its settings types, wrapper first
      * @param timerBaseUnit the unit its timers are exported in, null when it does not say
      * @param kinds         the metrics its enabled meters feed; every kind when it does not say
+     * @param exportStep    how often it pushes its meters over OTLP, which no backend can be finer than; null when
+     *                      it does not say
      */
-    public record Monitor(List<String> types, @Nullable String otlpEndpoint, @Nullable TimeUnit timerBaseUnit, Set<MetricKind> kinds) {
+    public record Monitor(List<String> types, @Nullable String otlpEndpoint, @Nullable TimeUnit timerBaseUnit, Set<MetricKind> kinds,
+                          @Nullable Duration exportStep) {
 
         static Monitor of(JsonNode settings) {
             List<JsonNode> chain = chain(settings);
@@ -145,7 +150,22 @@ public class EngineEmitterSettings {
                     }
                 }
             }
-            return new Monitor(typesOf(chain), otlpEndpointOf(chain), unit == null ? null : TimeUnit.valueOf(unit), kinds);
+            return new Monitor(typesOf(chain), otlpEndpointOf(chain), unit == null ? null : TimeUnit.valueOf(unit), kinds,
+                    exportStepOf(chain));
+        }
+
+        private static @Nullable Duration exportStepOf(List<JsonNode> chain) {
+            String step = chain.stream()
+                    .filter(node -> OTLP_MONITOR.equals(node.path("type").asString(null)))
+                    .map(node -> node.path("step").asString(null))
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(null);
+            try {
+                return step == null ? null : Duration.parse(step);
+            } catch (DateTimeParseException notADuration) {
+                return null;
+            }
         }
     }
 

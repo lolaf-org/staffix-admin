@@ -50,6 +50,7 @@ class SimulatedEmitters {
         ObjectNode micrometer = settings("OtlpMicrometerMonitoringManagerSettings", instanceId)
                 .put("otlpEndpointUrl", collector(instanceId))
                 .put("baseTimeUnit", "MICROSECONDS")
+                .put("step", "PT5S")
                 .put("readLatencyEnabled", true)
                 .put("writeLatencyEnabled", true)
                 .put("decodingLatencyEnabled", !clients)

@@ -7,6 +7,7 @@ import org.lolaf.staffix.admin.server.engines.GatewayException;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -29,7 +30,7 @@ class EngineEmitterSettingsTest {
              "sessionsPlugins":[
               {"type":"ThrottlingFixSessionsPluginSettings","instanceId":"metrics","pluginTypes":["ThrottlingFixSessionsPlugin"]},
               {"type":"AsyncFixSessionsPluginSettings","instanceId":"metrics","queueSize":1024,
-               "delegateSettings":{"type":"OtlpMicrometerMonitoringManagerSettings","instanceId":"metrics","baseTimeUnit":"MICROSECONDS",
+               "delegateSettings":{"type":"OtlpMicrometerMonitoringManagerSettings","instanceId":"metrics","baseTimeUnit":"MICROSECONDS","step":"PT5S",
                  "otlpEndpointUrl":"http://collector:4318","readLatencyEnabled":true,"writeLatencyEnabled":false,
                  "decodingLatencyEnabled":true,"encodingLatencyEnabled":false,"rttLatencyEnabled":false,"clockOffsetEnabled":false},
                "pluginTypes":["AsyncFixSessionsPlugin","FixSessionsMonitoringManager"]},
@@ -66,6 +67,7 @@ class EngineEmitterSettingsTest {
         assertThat(monitor.timerBaseUnit()).isEqualTo(TimeUnit.MICROSECONDS);
         assertThat(monitor.otlpEndpoint()).isEqualTo("http://collector:4318");
         assertThat(monitor.kinds()).containsExactlyInAnyOrder(MetricKind.READ_LATENCY, MetricKind.MESSAGE_RATE, MetricKind.DECODING_LATENCY);
+        assertThat(monitor.exportStep()).isEqualTo(Duration.ofSeconds(5));
     }
 
     @Test
@@ -73,6 +75,7 @@ class EngineEmitterSettingsTest {
         EngineEmitterSettings.Monitor monitor = settings.monitor("alpha", "custom").orElseThrow();
 
         assertThat(monitor.timerBaseUnit()).isNull();
+        assertThat(monitor.exportStep()).isNull();
         assertThat(monitor.kinds()).containsExactlyInAnyOrder(MetricKind.values());
     }
 

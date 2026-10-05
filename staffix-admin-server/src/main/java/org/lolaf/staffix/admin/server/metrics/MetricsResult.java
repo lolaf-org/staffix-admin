@@ -24,4 +24,14 @@ public class MetricsResult {
      */
     @Nullable
     Duration rateWindow;
+    /**
+     * The narrowest window the data allows, twice the engines' export interval or the backend's minimum; null when
+     * unknown.
+     */
+    @Nullable
+    Duration minRateWindow;
+    /**
+     * The time between two points.
+     */
+    Duration step;
 }
