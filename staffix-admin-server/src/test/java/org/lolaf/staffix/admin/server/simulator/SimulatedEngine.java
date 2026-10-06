@@ -13,7 +13,6 @@ import tools.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Random;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -34,10 +33,6 @@ class SimulatedEngine {
         this.engineId = engineId;
         this.staffixVersion = staffixVersion;
         this.connections = new ArrayList<>(connections);
-    }
-
-    synchronized void tick(Random random) {
-        connections.forEach(c -> c.running().tick(random));
     }
 
     synchronized List<SessionGroup> listGroups() {
@@ -110,7 +105,7 @@ class SimulatedEngine {
                     throw GatewayException.rejected(mode + " needs an initiator session: only the initiator sends the Logon carrying the reset");
                 }
                 session.resetSeqNums(1);
-                session.drop(2);
+                session.reconnect();
             }
             case RESET_SEQUENCE -> session.resetSeqNums(1);
             case RESET_SEQUENCE_IN_SESSION -> {

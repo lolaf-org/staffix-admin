@@ -15,7 +15,8 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * Replaces real engines with simulated ones, for UI work and demos without a running staffix.
+ * Replaces the engines and the telemetry backends with simulated ones, for the tests running the whole console under
+ * the {@code mock} profile. Demos run real engines instead: see {@code staffix-admin-simulator}.
  */
 @Configuration
 @Profile("mock")
@@ -56,8 +57,7 @@ public class SimulatorConfig {
     }
 
     @Bean
-    SimulationTicker simulationTicker(SimulatedEngineGateway gateway,
-                                      EngineRegistry registry) {
-        return new SimulationTicker(gateway, registry);
+    SimulatedAnnouncer simulatedAnnouncer(SimulatedEngineGateway gateway, EngineRegistry registry) {
+        return new SimulatedAnnouncer(gateway, registry);
     }
 }

@@ -1,6 +1,7 @@
 package org.lolaf.staffix.admin.server.user;
 
 import lombok.RequiredArgsConstructor;
+import org.lolaf.staffix.admin.server.security.AdminRole;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -27,7 +28,7 @@ public class UserController {
                 .collect(Collectors.toSet());
         return CurrentUser.builder()
                 .username(authentication.getName())
-                .roles(Arrays.stream(Role.values()).filter(r -> authorities.contains("ROLE_" + r.name())).toList())
+                .roles(Arrays.stream(Role.values()).filter(r -> authorities.contains(AdminRole.valueOf(r.name()).authority())).toList())
                 .build();
     }
 }

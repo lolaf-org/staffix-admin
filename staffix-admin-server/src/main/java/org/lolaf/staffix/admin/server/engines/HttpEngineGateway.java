@@ -103,21 +103,17 @@ class HttpEngineGateway implements EngineGateway {
 
     @Override
     public void updateSessionSettings(SessionRef session, JsonNode settings) {
-        operate(session, HttpMethod.PUT, sessionPath(session, "settings"), settings);
+        operate(session.getEngineId(), HttpMethod.PUT, sessionPath(session, "settings"), settings);
     }
 
     @Override
     public void removeSession(SessionRef session) {
-        operate(session, HttpMethod.DELETE, sessionPath(session, "settings"), null);
+        operate(session.getEngineId(), HttpMethod.DELETE, sessionPath(session, "settings"), null);
     }
 
     @Override
     public void addSession(String engineId, String sessionSettingsStore, JsonNode settings) {
-        try {
-            call(engineId, HttpMethod.POST, List.of("session-settings-stores", sessionSettingsStore, "sessions"), settings, Void.class);
-        } finally {
-            markStale(engineId);
-        }
+        operate(engineId, HttpMethod.POST, List.of("session-settings-stores", sessionSettingsStore, "sessions"), settings);
     }
 
     @Override
@@ -153,22 +149,22 @@ class HttpEngineGateway implements EngineGateway {
 
     @Override
     public void logon(SessionRef session) {
-        operate(session, HttpMethod.POST, sessionPath(session, "logon"), null);
+        operate(session.getEngineId(), HttpMethod.POST, sessionPath(session, "logon"), null);
     }
 
     @Override
     public void logout(SessionRef session) {
-        operate(session, HttpMethod.POST, sessionPath(session, "logout"), null);
+        operate(session.getEngineId(), HttpMethod.POST, sessionPath(session, "logout"), null);
     }
 
     @Override
     public void reset(SessionRef session, ResetMode mode) {
-        operate(session, HttpMethod.POST, sessionPath(session, "reset"), Map.of("mode", mode.name()));
+        operate(session.getEngineId(), HttpMethod.POST, sessionPath(session, "reset"), Map.of("mode", mode.name()));
     }
 
     @Override
     public void activate(SessionRef session, String configId) {
-        operate(session, HttpMethod.POST, sessionPath(session, "activate"), Map.of("config", configId));
+        operate(session.getEngineId(), HttpMethod.POST, sessionPath(session, "activate"), Map.of("config", configId));
     }
 
     @Override
@@ -180,12 +176,12 @@ class HttpEngineGateway implements EngineGateway {
         if (outgoing != null) {
             seqNums.put("outgoing", outgoing);
         }
-        operate(session, HttpMethod.PUT, sessionPath(session, "seqnums"), seqNums);
+        operate(session.getEngineId(), HttpMethod.PUT, sessionPath(session, "seqnums"), seqNums);
     }
 
     @Override
     public void sendMessages(SessionRef session, List<String> messages, char separator, boolean possDup) {
-        operate(session, HttpMethod.POST, sessionPath(session, "messages"),
+        operate(session.getEngineId(), HttpMethod.POST, sessionPath(session, "messages"),
                 Map.of("messages", messages, "separator", String.valueOf(separator), "possDup", possDup));
     }
 
@@ -252,11 +248,11 @@ class HttpEngineGateway implements EngineGateway {
     /**
      * Marks the status stale after, so the next poll shows the operation's effect.
      */
-    private void operate(SessionRef session, HttpMethod method, List<String> path, @Nullable Object body) {
+    private void operate(String engineId, HttpMethod method, List<String> path, @Nullable Object body) {
         try {
-            call(session.getEngineId(), method, path, body, Void.class);
+            call(engineId, method, path, body, Void.class);
         } finally {
-            markStale(session.getEngineId());
+            markStale(engineId);
         }
     }
 

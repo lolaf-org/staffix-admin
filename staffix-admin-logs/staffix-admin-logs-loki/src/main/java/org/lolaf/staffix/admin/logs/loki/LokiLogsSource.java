@@ -6,15 +6,17 @@ import org.lolaf.staffix.admin.logs.LogQuery;
 import org.lolaf.staffix.admin.logs.LogType;
 import org.lolaf.staffix.admin.logs.LogsSource;
 import org.lolaf.staffix.admin.logs.LogsSourceException;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.HttpClientSettings;
+import org.springframework.boot.http.client.HttpRedirects;
 import org.springframework.http.HttpStatusCode;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.JsonNode;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -44,10 +46,9 @@ public class LokiLogsSource implements LogsSource {
     private final Set<LokiLabel> indexedLabels;
 
     public LokiLogsSource(LokiSettings properties, RestClient.Builder builder) {
-        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
-                .connectTimeout(properties.getTimeout())
-                .build());
-        requestFactory.setReadTimeout(properties.getTimeout());
+        ClientHttpRequestFactory requestFactory = ClientHttpRequestFactoryBuilder.jdk().build(HttpClientSettings.defaults()
+                .withTimeouts(properties.getTimeout(), properties.getTimeout())
+                .withRedirects(HttpRedirects.DONT_FOLLOW));
         if (properties.getTenant() != null) {
             builder.defaultHeader("X-Scope-OrgID", properties.getTenant());
         }

@@ -9,6 +9,7 @@ import org.lolaf.staffix.admin.store.Connector;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -91,7 +92,7 @@ class ConnectorSecrets {
 
     // settings bind with relaxed names: apiToken, api-token and api_token are one setting
     private static String canonical(String name) {
-        return name.replace("-", "").replace("_", "").toLowerCase();
+        return name.replace("-", "").replace("_", "").toLowerCase(Locale.ROOT);
     }
 
     private interface SecretReplacement {

@@ -18,7 +18,6 @@ import tools.jackson.databind.node.JsonNodeFactory;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -45,9 +44,6 @@ class SimulatedEngineGateway implements EngineGateway {
         return engine;
     }
 
-    void tick(Random random) {
-        engines.values().forEach(e -> e.tick(random));
-    }
 
     @Override
     public List<SessionGroup> listGroups(String engineId) {

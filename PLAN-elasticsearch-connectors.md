@@ -118,3 +118,6 @@ Differences from the plan, found against the live sandbox:
   the nanosecond format, so a nanosecond mapping keeps its precision.
 - A timer without a histogram (`session.rtt`, an `aggregate_metric_double`) has a rate and a mean; a quantile is
   refused by Elasticsearch and reported as the backend failing.
+- The two connectors ship as one plugin, `staffix-admin-connector-elasticsearch` (as `staffix-admin-connector-demo`
+  serves both demo kinds), sharing an `ElasticsearchClient` (HTTP, credentials, connection test, errors) and the
+  scope and time range clauses, instead of the two modules sections 1 and 2 describe.

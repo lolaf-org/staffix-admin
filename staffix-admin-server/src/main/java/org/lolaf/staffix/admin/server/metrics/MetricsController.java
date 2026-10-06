@@ -14,6 +14,7 @@ import org.lolaf.staffix.admin.server.connectors.TelemetrySources;
 import org.lolaf.staffix.admin.server.engines.EngineGateway;
 import org.lolaf.staffix.admin.server.web.TelemetryProblems;
 import org.lolaf.staffix.admin.server.web.TimeRange;
+import org.lolaf.staffix.api.monitoring.FixMonitoringAttributes;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.validation.annotation.Validated;
@@ -39,8 +40,8 @@ import java.util.function.DoubleBinaryOperator;
 @RequiredArgsConstructor
 public class MetricsController {
 
-    private static final String MESSAGE_TYPE = "fix.msg.type";
-    private static final String DIRECTION = "fix.msg.dir";
+    private static final String MESSAGE_TYPE = FixMonitoringAttributes.FIX_MESSAGE_TYPE.getKey();
+    private static final String DIRECTION = FixMonitoringAttributes.FIX_MESSAGE_DIRECTION.getKey();
     private static final String READ = "messages.read.latency";
     private static final String WRITE = "messages.write.latency";
     /**
@@ -129,9 +130,9 @@ public class MetricsController {
 
     private MetricsResult query(String engineId, @Nullable String group, @Nullable String sessionId, Instant from, Instant to,
                                 @Nullable Duration rateWindow, MetricStatistic statistic, List<MetricQuery.MetricQueryBuilder> queries) {
-        TelemetryProblems.requireGroupForSession(group, sessionId);
         requirePositive(rateWindow);
-        TelemetrySources.Resolved<MetricsSource> resolved = resolve(engineId, group, sessionId);
+        TelemetrySources.Resolved<MetricsSource> resolved = TelemetryProblems.requireSources("metrics", engineId, group, sessionId,
+                () -> telemetrySources.metrics(engineId, group, sessionId));
         TimeRange range = TimeRange.of(from, to);
         Duration step = range.chartStep();
         try {
@@ -214,18 +215,5 @@ public class MetricsController {
                 .filter(Objects::nonNull)
                 .max(Comparator.naturalOrder())
                 .orElse(null);
-    }
-
-    private TelemetrySources.Resolved<MetricsSource> resolve(String engineId, @Nullable String group, @Nullable String sessionId) {
-        TelemetrySources.Resolved<MetricsSource> resolved;
-        try {
-            resolved = telemetrySources.metrics(engineId, group, sessionId);
-        } catch (IllegalArgumentException e) {
-            throw TelemetryProblems.connectorInvalid("metrics", e);
-        }
-        if (resolved.sources().isEmpty()) {
-            throw TelemetryProblems.notCollected("metrics", engineId, group, sessionId);
-        }
-        return resolved;
     }
 }

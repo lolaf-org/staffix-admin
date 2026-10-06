@@ -1,14 +1,16 @@
 package org.lolaf.staffix.admin.demo;
 
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.HttpClientSettings;
+import org.springframework.boot.http.client.HttpRedirects;
 import org.springframework.http.HttpStatusCode;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.JsonNode;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Objects;
@@ -23,10 +25,9 @@ final class DemoClient {
     private final URI baseUrl;
 
     DemoClient(DemoSettings settings, RestClient.Builder builder) {
-        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
-                .connectTimeout(settings.getTimeout())
-                .build());
-        requestFactory.setReadTimeout(settings.getTimeout());
+        ClientHttpRequestFactory requestFactory = ClientHttpRequestFactoryBuilder.jdk().build(HttpClientSettings.defaults()
+                .withTimeouts(settings.getTimeout(), settings.getTimeout())
+                .withRedirects(HttpRedirects.DONT_FOLLOW));
         this.client = builder.requestFactory(requestFactory).build();
         this.baseUrl = URI.create(settings.getUrl().toString().replaceAll("/+$", ""));
     }

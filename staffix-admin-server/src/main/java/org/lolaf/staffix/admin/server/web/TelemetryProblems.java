@@ -2,12 +2,36 @@ package org.lolaf.staffix.admin.server.web;
 
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
+import org.lolaf.staffix.admin.server.connectors.TelemetrySources;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.ErrorResponseException;
 
+import java.util.function.Supplier;
+
 @UtilityClass
 public class TelemetryProblems {
+
+    /**
+     * The sources of a scope's telemetry, which a query needs at least one of.
+     *
+     * @param what    {@code metrics} or {@code logs}, as the problems name them
+     * @param resolve resolves the scope, refusing a connector whose settings cannot make a source
+     */
+    public static <S> TelemetrySources.Resolved<S> requireSources(String what, String engineId, @Nullable String group,
+                                                                 @Nullable String sessionId, Supplier<TelemetrySources.Resolved<S>> resolve) {
+        requireGroupForSession(group, sessionId);
+        TelemetrySources.Resolved<S> resolved;
+        try {
+            resolved = resolve.get();
+        } catch (IllegalArgumentException e) {
+            throw connectorInvalid(what, e);
+        }
+        if (resolved.sources().isEmpty()) {
+            throw notCollected(what, engineId, group, sessionId);
+        }
+        return resolved;
+    }
 
     /**
      * A 404, so the UI tells telemetry nobody collects apart from a failure.

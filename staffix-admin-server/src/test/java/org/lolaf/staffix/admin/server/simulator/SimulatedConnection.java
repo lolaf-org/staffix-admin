@@ -53,7 +53,7 @@ class SimulatedConnection {
         }
         running.loggedIn = false;
         running = target;
-        target.drop(2);
+        target.reconnect();
     }
 
     /**

@@ -244,8 +244,9 @@ public class Connectors implements EngineTelemetry {
     }
 
     private Optional<Class<?>> settingsClass(Connector connector) {
-        if (metricsFactories.containsKey(connector.getKind())) {
-            return Optional.of(metricsFactories.get(connector.getKind()).getSettingsClass());
+        MetricsSourceFactory<?> metrics = metricsFactories.get(connector.getKind());
+        if (metrics != null) {
+            return Optional.of(metrics.getSettingsClass());
         }
         LogsSourceFactory<?> logs = logsFactories.get(connector.getKind());
         return logs == null ? Optional.empty() : Optional.of(logs.getSettingsClass());

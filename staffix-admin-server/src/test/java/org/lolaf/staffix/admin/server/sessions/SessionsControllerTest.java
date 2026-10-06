@@ -9,7 +9,6 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static org.awaitility.Awaitility.await;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.startsWith;
@@ -59,8 +58,7 @@ class SessionsControllerTest {
                 .andExpect(jsonPath("$.summary.loggedIn").value(false));
 
         mockMvc.perform(post(ACME_TRADING + "/logon").with(csrf())).andExpect(status().isNoContent());
-        await().pollInSameThread().untilAsserted(() -> mockMvc.perform(get(ACME_TRADING))
-                .andExpect(jsonPath("$.summary.loggedIn").value(true)));
+        mockMvc.perform(get(ACME_TRADING)).andExpect(jsonPath("$.summary.loggedIn").value(true));
     }
 
     @Test
@@ -98,9 +96,9 @@ class SessionsControllerTest {
     void saysWhichOfSeveralMessagesWasRefused() throws Exception {
         mockMvc.perform(post(ACME_TRADING + "/messages").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"messages\": [\"35=D|11=ORDER-1|55=AAPL\", \"35=D|11=ORDER-2|55=AAPL\"], \"separator\": \"|\"}"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail", startsWith("Message 1 of 2: ")));
+                        .content("{\"messages\": [\"35=D|11=ORDER-1|55=AAPL\", \"11=ORDER-2|55=AAPL\"], \"separator\": \"|\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail", startsWith("Message 2 of 2: ")));
     }
 
     @Test

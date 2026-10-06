@@ -39,6 +39,10 @@ export function sessionPath(ref: SessionRef) {
   return { params: { path: ref } }
 }
 
+export function enginePath(engineId: string) {
+  return { params: { path: { engineId } } }
+}
+
 export function sessionRoute(ref: SessionRef): string {
   return `/engines/${encodeURIComponent(ref.engineId)}/groups/${encodeURIComponent(ref.group)}/sessions/${encodeURIComponent(ref.sessionId)}`
 }
@@ -46,7 +50,7 @@ export function sessionRoute(ref: SessionRef): string {
 export function useGroups(engineId: string | undefined) {
   return useQuery({
     queryKey: ['groups', engineId],
-    queryFn: () => call(api.GET('/api/engines/{engineId}/groups', { params: { path: { engineId: engineId! } } })),
+    queryFn: () => call(api.GET('/api/engines/{engineId}/groups', enginePath(engineId!))),
     refetchInterval: POLL_INTERVAL_MS,
     enabled: engineId !== undefined,
   })
@@ -74,7 +78,7 @@ export function useSessionSettings(ref: SessionRef, runningConfigId: string) {
 export function useSessionSettingsSchema(engineId: string) {
   return useQuery({
     queryKey: ['sessionSettingsSchema', engineId],
-    queryFn: () => call(api.GET('/api/engines/{engineId}/schemas/session-settings', { params: { path: { engineId } } })),
+    queryFn: () => call(api.GET('/api/engines/{engineId}/schemas/session-settings', enginePath(engineId))),
     staleTime: Infinity,
   })
 }
@@ -85,7 +89,7 @@ export type ApplicationSetting = Schemas['ApplicationSetting']
 export function useSessionSettingsStores(engineId: string) {
   return useQuery({
     queryKey: ['sessionSettingsStores', engineId],
-    queryFn: () => call(api.GET('/api/engines/{engineId}/session-settings-stores', { params: { path: { engineId } } })),
+    queryFn: () => call(api.GET('/api/engines/{engineId}/session-settings-stores', enginePath(engineId))),
     staleTime: Infinity,
   })
 }
@@ -98,7 +102,7 @@ export type SessionComponents = Schemas['SessionComponents']
 export function useSessionComponents(engineId: string) {
   return useQuery({
     queryKey: ['sessionComponents', engineId],
-    queryFn: () => call(api.GET('/api/engines/{engineId}/session-components', { params: { path: { engineId } } })),
+    queryFn: () => call(api.GET('/api/engines/{engineId}/session-components', enginePath(engineId))),
     staleTime: Infinity,
     retry: false,
   })
@@ -119,59 +123,61 @@ export function fetchSessionSettings(ref: SessionRef) {
   return call(api.GET('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/settings', sessionPath(ref)))
 }
 
-/**
- * Writes a session's settings, refreshing them and the engine's sessions once the engine took them.
- */
-function useSettingsMutation<V>(engineId: string, mutationFn: (variables: V) => Promise<unknown>, success: string) {
-  const queryClient = useQueryClient()
-  const { message } = App.useApp()
-  return useMutation({
-    mutationFn,
-    onSuccess: () => {
-      message.success(success)
-      return Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['groups', engineId] }),
-        queryClient.invalidateQueries({ queryKey: ['settings', engineId] }),
-      ])
-    },
-  })
-}
-
 export function useUpdateSessionSettings(ref: SessionRef) {
-  return useSettingsMutation(ref.engineId, (settings: Record<string, unknown>) =>
+  return useEngineMutation(ref.engineId, (settings: Record<string, unknown>) =>
     call(api.PUT('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/settings', { ...sessionPath(ref), body: settings })),
-  'Settings saved; the session restarts on them')
+  'Settings saved; the session restarts on them', SETTINGS_WRITE)
 }
 
 export function useRemoveSession(ref: SessionRef) {
-  return useSettingsMutation(ref.engineId, () =>
+  return useEngineMutation(ref.engineId, () =>
     call(api.DELETE('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/settings', sessionPath(ref))),
-  'Session removed')
+  'Session removed', SETTINGS_WRITE)
 }
 
 export function useAddSession(engineId: string) {
-  return useSettingsMutation(engineId, ({ store, settings }: { store: string; settings: Record<string, unknown> }) =>
+  return useEngineMutation(engineId, ({ store, settings }: { store: string; settings: Record<string, unknown> }) =>
     call(api.POST('/api/engines/{engineId}/session-settings-stores/{sessionSettingsStore}/sessions', {
       params: { path: { engineId, sessionSettingsStore: store } },
       body: settings,
     })),
-  'Session added')
+  'Session added', SETTINGS_WRITE)
 }
+
+interface EngineMutationOptions {
+  /**
+   * Also refreshes the engine's session settings, for a call that wrote some.
+   */
+  refreshSettings?: boolean
+  /**
+   * Off for a form that shows the failure itself.
+   */
+  reportErrors?: boolean
+}
+
+/**
+ * A session settings write, whose form shows its own failure.
+ */
+const SETTINGS_WRITE: EngineMutationOptions = { refreshSettings: true, reportErrors: false }
 
 /**
  * A state-changing call on an engine: reports the outcome to the operator and refreshes that engine's sessions.
  */
 export function useEngineMutation<V>(engineId: string, mutationFn: (variables: V) => Promise<unknown>,
-                                     success: string | ((variables: V) => string)) {
+                                     success: string | ((variables: V) => string),
+                                     { refreshSettings = false, reportErrors = true }: EngineMutationOptions = {}) {
   const queryClient = useQueryClient()
   const { message } = App.useApp()
   return useMutation({
     mutationFn,
     onSuccess: (_, variables) => {
       message.success(typeof success === 'string' ? success : success(variables))
-      return queryClient.invalidateQueries({ queryKey: ['groups', engineId] })
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['groups', engineId] }),
+        ...(refreshSettings ? [queryClient.invalidateQueries({ queryKey: ['settings', engineId] })] : []),
+      ])
     },
-    onError: (error) => message.error(error.message),
+    onError: reportErrors ? (error) => message.error(error.message) : undefined,
   })
 }
 
@@ -194,7 +200,10 @@ export type Meter = Schemas['Meter']
 export type MetricStatistic = paths['/api/metrics']['get']['parameters']['query']['statistic']
 export type LogType = NonNullable<Schemas['LogEntry']['type']>
 
-function window(minutes: number) {
+/**
+ * The last minutes up to now.
+ */
+export function lastMinutes(minutes: number): FixedPeriod {
   const to = new Date()
   return { from: new Date(to.getTime() - minutes * 60_000).toISOString(), to: to.toISOString() }
 }
@@ -225,14 +234,14 @@ export type MetricRequest =
 
 /**
  * `period` is the last minutes, refreshed, or a fixed period; `rateWindow` an ISO duration the console may widen,
- * the step when unset. `follow` refreshes the last minutes every couple of seconds rather than every 15.
+ * the step when unset. `live` refreshes the last minutes every couple of seconds rather than every 15.
  */
-export function useMetrics(scope: MetricScope, request: MetricRequest | undefined, period: number | FixedPeriod, rateWindow?: string, follow = false) {
-  const live = typeof period === 'number'
+export function useMetrics(scope: MetricScope, request: MetricRequest | undefined, period: number | FixedPeriod, rateWindow?: string, live = false) {
+  const relative = typeof period === 'number'
   return useQuery({
     queryKey: ['metrics', scope, request, period, rateWindow],
     queryFn: () => {
-      const range = live ? window(period) : period
+      const range = relative ? lastMinutes(period) : period
       return request!.kind === 'messages'
         ? call(api.GET('/api/metrics/messages', { params: { query: { ...scope, rateWindow, ...range } } }))
         : call(
@@ -253,7 +262,7 @@ export function useMetrics(scope: MetricScope, request: MetricRequest | undefine
           )
     },
     enabled: request !== undefined,
-    refetchInterval: live ? (follow ? POLL_INTERVAL_MS : 15_000) : false,
+    refetchInterval: relative ? (live ? POLL_INTERVAL_MS : 15_000) : false,
     placeholderData: (previous) => previous,
   })
 }
@@ -304,13 +313,13 @@ export function useLogs(search: LogSearch, enabled: boolean, live = false) {
               types: search.types,
               msgTypes: search.msgTypes,
               limit: search.limit,
-              ...(typeof search.period === 'number' ? window(search.period) : { from: search.period.from, to: search.period.to }),
+              ...(typeof search.period === 'number' ? lastMinutes(search.period) : { from: search.period.from, to: search.period.to }),
             },
           },
         }),
       ),
     enabled,
-    refetchInterval: live && typeof search.period === 'number' ? POLL_INTERVAL_MS : false,
+    refetchInterval: live ? POLL_INTERVAL_MS : false,
     placeholderData: live ? (previous) => previous : undefined,
   })
 }

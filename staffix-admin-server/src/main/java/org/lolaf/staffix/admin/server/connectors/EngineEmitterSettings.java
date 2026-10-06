@@ -1,33 +1,25 @@
 package org.lolaf.staffix.admin.server.connectors;
 
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.lolaf.staffix.admin.server.engines.EngineGateway;
-import org.lolaf.staffix.admin.server.engines.GatewayException;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
 import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 /**
  * How an engine's emitters export, read from the settings staffix's HTTP connector serves ({@code GET components}).
  * The only place that knows staffix's settings field names; empty when the engine never answered.
  */
 @Component
-@RequiredArgsConstructor
 public class EngineEmitterSettings {
 
     /**
@@ -42,42 +34,25 @@ public class EngineEmitterSettings {
      */
     static final Set<String> NOT_EXPORTING = Set.of("Slf4jMessagesLoggerSettings", "FileMessagesLoggerSettings",
             "AsyncMessagesLoggerSettings");
-    private final EngineGateway gateway;
-    private final Clock clock;
-    private final Map<String, Known> lastAnswers = new ConcurrentHashMap<>();
+    private final LastAnswers<JsonNode> emitters;
+
+    public EngineEmitterSettings(EngineGateway gateway, Clock clock) {
+        this.emitters = new LastAnswers<>(FRESH, clock, gateway::getEmitters);
+    }
 
     public Optional<Logger> logger(String engineId, String instanceId) {
-        return emitters(engineId).flatMap(emitters -> elements(emitters.path("messagesLoggers"))
+        return emitters.of(engineId).flatMap(components -> components.path("messagesLoggers").valueStream()
                 .filter(logger -> instanceId.equals(logger.path("instanceId").asString(null)))
                 .findFirst()
                 .map(Logger::of));
     }
 
     public Optional<Monitor> monitor(String engineId, String instanceId) {
-        return emitters(engineId).flatMap(emitters -> elements(emitters.path("sessionsPlugins"))
+        return emitters.of(engineId).flatMap(components -> components.path("sessionsPlugins").valueStream()
                 .filter(plugin -> instanceId.equals(plugin.path("instanceId").asString(null))
-                        && elements(plugin.path("pluginTypes")).anyMatch(type -> MONITORING.equals(type.asString(null))))
+                        && plugin.path("pluginTypes").valueStream().anyMatch(type -> MONITORING.equals(type.asString(null))))
                 .findFirst()
                 .map(Monitor::of));
-    }
-
-    private Optional<JsonNode> emitters(String engineId) {
-        Instant now = clock.instant();
-        Known last = lastAnswers.get(engineId);
-        if (last != null && now.isBefore(last.at().plus(FRESH))) {
-            return Optional.of(last.emitters());
-        }
-        try {
-            JsonNode emitters = gateway.getEmitters(engineId);
-            lastAnswers.put(engineId, new Known(now, emitters));
-            return Optional.of(emitters);
-        } catch (GatewayException unreachable) {
-            return last == null ? Optional.empty() : Optional.of(last.emitters());
-        }
-    }
-
-    private static Stream<JsonNode> elements(JsonNode array) {
-        return StreamSupport.stream(array.spliterator(), false);
     }
 
     private static List<JsonNode> chain(JsonNode settings) {
@@ -144,8 +119,5 @@ public class EngineEmitterSettings {
                 return null;
             }
         }
-    }
-
-    private record Known(Instant at, JsonNode emitters) {
     }
 }

@@ -1,7 +1,7 @@
 import { Badge, DatePicker, Flex, Segmented } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
-import type { FixedPeriod } from '../api/queries'
-import { TIME_WINDOWS } from './timeWindows'
+import { lastMinutes, type FixedPeriod } from '../api/queries'
+import { LIVE_WINDOW, TIME_WINDOWS } from './timeWindows'
 
 /**
  * The last minutes up to now, or a fixed period.
@@ -11,7 +11,6 @@ export type Period = number | FixedPeriod
 const CUSTOM = 'custom' as const
 const LIVE = 'live' as const
 const MAX_DAYS = 31
-const SHORTEST_WINDOW = 15
 
 interface Props {
   value: Period
@@ -37,11 +36,7 @@ export function TimeRangeSelector({ value, onChange, live = false, onLiveChange 
         value={live ? LIVE : custom ? CUSTOM : value}
         onChange={(picked) => {
           onLiveChange?.(picked === LIVE)
-          if (picked === LIVE) {
-            onChange(SHORTEST_WINDOW)
-          } else {
-            onChange(picked === CUSTOM ? lastMinutes(value) : picked)
-          }
+          onChange(picked === LIVE ? LIVE_WINDOW : picked === CUSTOM ? lastMinutes(typeof value === 'number' ? value : 60) : picked)
         }}
       />
       {custom && (
@@ -57,11 +52,6 @@ export function TimeRangeSelector({ value, onChange, live = false, onLiveChange 
       )}
     </Flex>
   )
-}
-
-function lastMinutes(period: Period): FixedPeriod {
-  const to = dayjs()
-  return { from: to.subtract(typeof period === 'number' ? period : 60, 'minute').toISOString(), to: to.toISOString() }
 }
 
 function tooFarFrom(day: Dayjs, from: Dayjs | undefined): boolean {

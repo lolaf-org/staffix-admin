@@ -14,8 +14,8 @@ import java.util.List;
 
 /**
  * Three engines whose groups are counterparties: liquidity providers we connect to (initiators, with backup
- * configs), clients connecting to us (acceptors), one group mixing both. Between them they show every colour, an
- * operator logout, flaky sessions, session windows opening and closing, and a backup running.
+ * configs) and clients connecting to us (acceptors), with sessions logged out by an operator or outside their
+ * session time, and emitters of each kind the console tells apart.
  */
 @RequiredArgsConstructor
 class SimulationScenario {
@@ -29,30 +29,17 @@ class SimulationScenario {
     private SimulatedEngine paris() {
         EngineBuilder engine = new EngineBuilder("paris-prod", "0.9.1", "STAFFIX-PAR", "Europe/Paris");
         engine.initiator("alpha", "trading", "trading-drp");
-        engine.initiator("alpha", "market-data", "market-data-drp").getFirst().flaky(true);
-        engine.initiator("alpha", "drop-copy");
-        engine.initiator("beta", "trading", "trading-drp");
-        engine.initiator("beta", "market-data").getFirst().sessionTimeCycleTicks(45);
-        engine.initiator("gamma", "trading", "trading-drp");
         engine.emitters("clients-otlp", "clients-metrics");
-        engine.acceptor("gamma", "drop-copy", "dropcopy-acceptor");
         engine.acceptor("acme", "trading", "clients-acceptor");
         engine.acceptor("acme", "drop-copy", "clients-acceptor");
-        engine.acceptor("globex", "trading", "clients-acceptor").desiredState(SessionState.LOGGED_OUT);
-        engine.acceptor("globex", "drop-copy", "clients-acceptor").withinSessionTime(false);
-        engine.acceptor("initech", "trading", "clients-acceptor").flaky(true);
-        engine.acceptor("initech", "drop-copy", "clients-acceptor");
         return engine.build();
     }
 
     private SimulatedEngine london() {
         EngineBuilder engine = new EngineBuilder("london-prod", "0.9.1", "STAFFIX-LDN", "Europe/London");
-        engine.initiator("delta", "trading", "trading-drp");
         engine.initiator("delta", "market-data");
-        engine.initiator("epsilon", "trading", "trading-drp").getFirst().flaky(true);
-        engine.acceptor("fund-alpha", "trading", "clients-acceptor");
         engine.acceptor("fund-alpha", "drop-copy", "clients-acceptor");
-        engine.acceptor("fund-beta", "trading", "clients-acceptor").sessionTimeCycleTicks(30);
+        engine.acceptor("fund-beta", "trading", "clients-acceptor").withinSessionTime(false);
         return engine.build();
     }
 
@@ -60,7 +47,7 @@ class SimulationScenario {
         EngineBuilder engine = new EngineBuilder("nyc-uat", "0.9.0", "STAFFIX-NYC", "America/New_York");
         engine.emitters("slf4j", null);
         engine.acceptor("uat-client-1", "trading", "uat-acceptor");
-        engine.acceptor("uat-client-2", "trading", "uat-acceptor").flaky(true);
+        engine.acceptor("uat-client-2", "trading", "uat-acceptor");
         engine.acceptor("uat-client-3", "trading", "uat-acceptor").desiredState(SessionState.LOGGED_OUT);
         return engine.build();
     }
@@ -98,14 +85,13 @@ class SimulationScenario {
         /**
          * One initiator per session, named after it; the first config is the main one, the others its backups.
          */
-        List<SimulatedSession.SimulatedSessionBuilder> initiator(String group, String... configIds) {
+        void initiator(String group, String... configIds) {
             List<SimulatedSession.SimulatedSessionBuilder> configs = new ArrayList<>();
             for (String configId : configIds) {
                 String host = "fix" + (configId.endsWith("-drp") ? "-dr" : "") + "." + group + ".example.com";
                 configs.add(config(group, configId, SessionType.INITIATOR, host + ":" + nextPort++));
             }
             connections.add(new Connection(group + "-" + configIds[0], emitters, configs));
-            return configs;
         }
 
         SimulatedEngine build() {

@@ -6,9 +6,12 @@ import org.lolaf.staffix.admin.metrics.MetricQuery;
 import org.lolaf.staffix.admin.metrics.MetricSeries;
 import org.lolaf.staffix.admin.metrics.MetricsSource;
 import org.lolaf.staffix.admin.metrics.MetricsSourceException;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.HttpClientSettings;
+import org.springframework.boot.http.client.HttpRedirects;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.ResourceAccessException;
@@ -17,7 +20,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -49,10 +51,9 @@ public class PrometheusMetricsSource implements MetricsSource {
     private final JsonMapper jsonMapper;
 
     public PrometheusMetricsSource(PrometheusSettings properties, RestClient.Builder builder, JsonMapper jsonMapper) {
-        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
-                .connectTimeout(properties.getTimeout())
-                .build());
-        requestFactory.setReadTimeout(properties.getTimeout());
+        ClientHttpRequestFactory requestFactory = ClientHttpRequestFactoryBuilder.jdk().build(HttpClientSettings.defaults()
+                .withTimeouts(properties.getTimeout(), properties.getTimeout())
+                .withRedirects(HttpRedirects.DONT_FOLLOW));
         this.client = builder.requestFactory(requestFactory).build();
         String url = properties.getUrl().toString().replaceAll("/+$", "");
         this.queryRangeUrl = URI.create(url + "/api/v1/query_range");

@@ -1,17 +1,14 @@
 package org.lolaf.staffix.admin.server.connectors;
 
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.lolaf.staffix.admin.logs.LogsSource;
 import org.lolaf.staffix.admin.metrics.MetricsSource;
 import org.lolaf.staffix.admin.server.engines.EngineGateway;
-import org.lolaf.staffix.admin.server.engines.GatewayException;
 import org.lolaf.staffix.admin.server.sessions.SessionGroup;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -21,7 +18,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -33,7 +29,6 @@ import java.util.function.Supplier;
  * logger exports nothing a backend reads has its logs not collected, whatever its connector.
  */
 @Component
-@RequiredArgsConstructor
 public class TelemetrySources {
 
     /**
@@ -41,11 +36,15 @@ public class TelemetrySources {
      */
     private static final Duration FRESH = Duration.ofSeconds(10);
 
-    private final EngineGateway gateway;
     private final EngineTelemetry telemetry;
     private final EngineEmitterSettings emitterSettings;
-    private final Clock clock;
-    private final Map<String, Known> lastAnswers = new ConcurrentHashMap<>();
+    private final LastAnswers<List<SessionGroup>> groups;
+
+    public TelemetrySources(EngineGateway gateway, EngineTelemetry telemetry, EngineEmitterSettings emitterSettings, Clock clock) {
+        this.telemetry = telemetry;
+        this.emitterSettings = emitterSettings;
+        this.groups = new LastAnswers<>(FRESH, clock, gateway::listGroups);
+    }
 
     /**
      * @param sessionId a config id: an initiator's backup reads as its session
@@ -111,28 +110,13 @@ public class TelemetrySources {
 
     private Map<Emitters, List<String>> sessionsByEmitters(String engineId, @Nullable String group, @Nullable String sessionId) {
         Map<Emitters, List<String>> sessionsByEmitters = new HashMap<>();
-        groups(engineId).stream()
+        groups.of(engineId).orElse(List.of()).stream()
                 .filter(sessions -> group == null || sessions.getGroup().equals(group))
                 .forEach(sessions -> sessions.getSessions().stream()
                         .filter(session -> sessionId == null || session.getId().equals(sessionId) || session.getConfigIds().contains(sessionId))
                         .forEach(session -> sessionsByEmitters.computeIfAbsent(Emitters.of(session), emitters -> new ArrayList<>())
                                 .add(sessions.getGroup() + "." + session.getId())));
         return sessionsByEmitters;
-    }
-
-    private List<SessionGroup> groups(String engineId) {
-        Instant now = clock.instant();
-        Known last = lastAnswers.get(engineId);
-        if (last != null && now.isBefore(last.at().plus(FRESH))) {
-            return last.groups();
-        }
-        try {
-            List<SessionGroup> groups = gateway.listGroups(engineId);
-            lastAnswers.put(engineId, new Known(now, groups));
-            return groups;
-        } catch (GatewayException unreachable) {
-            return last == null ? List.of() : last.groups();
-        }
     }
 
     /**
@@ -148,8 +132,5 @@ public class TelemetrySources {
         public Resolved(List<S> sources, List<String> notCollected, Map<S, TimeUnit> timerBaseUnits) {
             this(sources, notCollected, timerBaseUnits, Map.of());
         }
-    }
-
-    private record Known(Instant at, List<SessionGroup> groups) {
     }
 }

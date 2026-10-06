@@ -41,8 +41,8 @@ public class LogsController {
                                     @RequestParam(defaultValue = "") List<LogType> types,
                                     @RequestParam(defaultValue = "") List<String> msgTypes,
                                     @RequestParam(defaultValue = "500") @Min(1) @Max(5000) int limit) {
-        TelemetryProblems.requireGroupForSession(group, sessionId);
-        TelemetrySources.Resolved<LogsSource> resolved = resolve(engineId, group, sessionId);
+        TelemetrySources.Resolved<LogsSource> resolved = TelemetryProblems.requireSources("logs", engineId, group, sessionId,
+                () -> telemetrySources.logs(engineId, group, sessionId));
         TimeRange range = TimeRange.of(from, to);
         LogQuery query = LogQuery.builder()
                 .engineId(engineId)
@@ -67,18 +67,5 @@ public class LogsController {
         } catch (LogsSourceException e) {
             throw TelemetryProblems.backendFailed("logs", e);
         }
-    }
-
-    private TelemetrySources.Resolved<LogsSource> resolve(String engineId, @Nullable String group, @Nullable String sessionId) {
-        TelemetrySources.Resolved<LogsSource> resolved;
-        try {
-            resolved = telemetrySources.logs(engineId, group, sessionId);
-        } catch (IllegalArgumentException e) {
-            throw TelemetryProblems.connectorInvalid("logs", e);
-        }
-        if (resolved.sources().isEmpty()) {
-            throw TelemetryProblems.notCollected("logs", engineId, group, sessionId);
-        }
-        return resolved;
     }
 }
