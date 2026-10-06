@@ -4,6 +4,7 @@ import { LockOutlined, UserOutlined } from '@ant-design/icons'
 import { useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate } from 'react-router'
 import { login } from '../api/queries'
+import staffixLogo from '../assets/staffix-logo.png'
 
 interface Credentials {
   username: string
@@ -35,9 +36,12 @@ export function LoginPage() {
   return (
     <Flex justify="center" align="center" style={{ minHeight: '100vh', padding: 16 }}>
       <Card style={{ width: 360, maxWidth: '100%' }}>
-        <Typography.Title level={3} style={{ marginTop: 0 }}>
-          Staffix admin console
-        </Typography.Title>
+        <Flex vertical align="center" gap={12} style={{ marginBottom: 24 }}>
+          <img src={staffixLogo} alt="" width={96} height={96} />
+          <Typography.Title level={3} style={{ margin: 0 }}>
+            Staffix admin console
+          </Typography.Title>
+        </Flex>
         <Form<Credentials> layout="vertical" onFinish={submit} requiredMark={false}>
           <Form.Item name="username" label="Username" rules={[{ required: true }]}>
             <Input prefix={<UserOutlined />} autoComplete="username" autoFocus />

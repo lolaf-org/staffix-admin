@@ -5,6 +5,7 @@ import { Navigate, Outlet, useLocation, useNavigate } from 'react-router'
 import { isUnauthorized } from '../api/client'
 import { logout, useCurrentUser } from '../api/queries'
 import { useThemeMode, type ThemeMode } from '../theme/ThemeMode'
+import staffixLogo from '../assets/staffix-logo.png'
 
 const { Header, Content } = Layout
 
@@ -43,9 +44,12 @@ export function AppLayout() {
     <Layout style={{ minHeight: '100vh' }}>
       <div style={{ margin: '16px 16px 0', borderRadius: token.borderRadiusLG, overflow: 'hidden', border: `1px solid ${token.colorBorderSecondary}` }}>
         <Header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingInline: 20 }}>
-          <Typography.Title level={4} style={{ color: 'white', margin: 0, whiteSpace: 'nowrap' }}>
-            Staffix admin console
-          </Typography.Title>
+          <Flex align="center" gap={12}>
+            <img src={staffixLogo} alt="" width={52} height={52} />
+            <Typography.Title level={4} style={{ color: 'white', margin: 0, whiteSpace: 'nowrap' }}>
+              Staffix admin console
+            </Typography.Title>
+          </Flex>
           <Flex align="center" gap={8}>
             <Segmented<ThemeMode>
               size="small"
