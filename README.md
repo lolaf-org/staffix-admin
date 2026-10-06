@@ -183,8 +183,10 @@ A rate needs two samples in the window it is averaged over, so the data sets the
 twice the engine's OTLP export `step` (staffix default 10 s), and twice the Prometheus scrape interval when
 Prometheus scrapes the collector's `prometheus` exporter. The console knows the first from the engine; set the
 connector's `minRateWindow` to the second (with Prometheus's own OTLP receiver there is no scrape: set it no higher
-than twice the export step). The Metrics tab's rate window cannot go under either, and a chart steps down to a point a
-second over a period of a few minutes. To see second by second, an engine must export every second.
+than twice the export step). Scrape faster than the engines export, e.g. every 2 s for a 5 s step: the collector keeps
+only each meter's latest export, so a scrape at the same pace misses exports and leaves too few samples for the
+narrowest windows, which then chart nothing. The Metrics tab's rate window cannot go under either, and a chart steps
+down to a point a second over a period of a few minutes. To see second by second, an engine must export every second.
 
 **Loki** holds what staffix's OTLP messages logger sends: every message in and out, and session events. Loki keeps
 the `fix.*` attributes as structured metadata, so by default the console filters them after a stream selector that
