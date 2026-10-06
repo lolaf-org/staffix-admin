@@ -25,13 +25,14 @@ interface Props {
 
 export function LogsPanel({ engineId, group, sessionId }: Props) {
   const [period, setPeriod] = useState<Period>(15)
+  const [live, setLive] = useState(false)
   const [text, setText] = useState('')
   const [types, setTypes] = useState<LogType[]>([])
   const [msgTypes, setMsgTypes] = useState<string[]>([])
   const messageTypes = useMessageTypes({ engineId, group, sessionId })
-  const [limit, setLimit] = useState(500)
+  const [limit, setLimit] = useState(100)
   const [decoding, setDecoding] = useState<DecodeTarget>()
-  const logs = useLogs({ engineId, group, sessionId, period, text, types, msgTypes, limit }, engineId !== '')
+  const logs = useLogs({ engineId, group, sessionId, period, text, types, msgTypes, limit }, engineId !== '', live)
 
   return (
     <Flex vertical gap={12}>
@@ -61,11 +62,11 @@ export function LogsPanel({ engineId, group, sessionId }: Props) {
           onChange={(values) => setTypes(values as LogType[])}
           options={TYPES.map((t) => ({ value: t.value, label: t.label }))}
         />
-        <TimeRangeSelector value={period} onChange={setPeriod} />
+        <TimeRangeSelector value={period} onChange={setPeriod} live={live} onLiveChange={setLive} />
         <Select
           value={limit}
           onChange={setLimit}
-          options={[100, 500, 1000, 5000].map((n) => ({ value: n, label: `${n} lines` }))}
+          options={[50, 100, 200, 500].map((n) => ({ value: n, label: `${n} lines` }))}
           style={{ width: 120 }}
           aria-label="Maximum lines"
         />
@@ -77,7 +78,8 @@ export function LogsPanel({ engineId, group, sessionId }: Props) {
       </Typography.Text>
       <Table<Schemas['LogEntry']>
         size="small"
-        loading={logs.isFetching}
+        // a live refresh keeps the entries shown rather than flashing the table
+        loading={logs.isPending || (logs.isFetching && !live)}
         dataSource={logs.data?.entries}
         rowKey={(entry) => `${entry.timestamp}-${entry.group}-${entry.sessionId}-${entry.line}`}
         pagination={{ pageSize: 50, showSizeChanger: false, size: 'small' }}

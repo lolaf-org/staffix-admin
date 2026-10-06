@@ -1,4 +1,4 @@
-import { DatePicker, Flex, Segmented } from 'antd'
+import { Badge, DatePicker, Flex, Segmented } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import type { FixedPeriod } from '../api/queries'
 import { TIME_WINDOWS } from './timeWindows'
@@ -8,23 +8,41 @@ import { TIME_WINDOWS } from './timeWindows'
  */
 export type Period = number | FixedPeriod
 
-const CUSTOM = 'custom'
+const CUSTOM = 'custom' as const
+const LIVE = 'live' as const
 const MAX_DAYS = 31
+const SHORTEST_WINDOW = 15
 
 interface Props {
   value: Period
   onChange: (period: Period) => void
+  /**
+   * Whether the view follows the shortest window as it moves; given with `onLiveChange`, which offers it first.
+   */
+  live?: boolean
+  onLiveChange?: (live: boolean) => void
 }
 
-export function TimeRangeSelector({ value, onChange }: Props) {
+export function TimeRangeSelector({ value, onChange, live = false, onLiveChange }: Props) {
   const custom = typeof value !== 'number'
 
   return (
     <Flex wrap gap={8} align="center">
-      <Segmented<number | typeof CUSTOM>
-        options={[...TIME_WINDOWS, { value: CUSTOM, label: 'Custom' }]}
-        value={custom ? CUSTOM : value}
-        onChange={(picked) => onChange(picked === CUSTOM ? lastMinutes(value) : picked)}
+      <Segmented<number | typeof CUSTOM | typeof LIVE>
+        options={[
+          ...(onLiveChange ? [{ value: LIVE, label: <Badge status={live ? 'processing' : 'default'} text="Live" /> }] : []),
+          ...TIME_WINDOWS,
+          { value: CUSTOM, label: 'Custom' },
+        ]}
+        value={live ? LIVE : custom ? CUSTOM : value}
+        onChange={(picked) => {
+          onLiveChange?.(picked === LIVE)
+          if (picked === LIVE) {
+            onChange(SHORTEST_WINDOW)
+          } else {
+            onChange(picked === CUSTOM ? lastMinutes(value) : picked)
+          }
+        }}
       />
       {custom && (
         <DatePicker.RangePicker

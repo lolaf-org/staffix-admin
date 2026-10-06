@@ -225,9 +225,9 @@ export type MetricRequest =
 
 /**
  * `period` is the last minutes, refreshed, or a fixed period; `rateWindow` an ISO duration the console may widen,
- * the step when unset.
+ * the step when unset. `follow` refreshes the last minutes every couple of seconds rather than every 15.
  */
-export function useMetrics(scope: MetricScope, request: MetricRequest | undefined, period: number | FixedPeriod, rateWindow?: string) {
+export function useMetrics(scope: MetricScope, request: MetricRequest | undefined, period: number | FixedPeriod, rateWindow?: string, follow = false) {
   const live = typeof period === 'number'
   return useQuery({
     queryKey: ['metrics', scope, request, period, rateWindow],
@@ -253,7 +253,7 @@ export function useMetrics(scope: MetricScope, request: MetricRequest | undefine
           )
     },
     enabled: request !== undefined,
-    refetchInterval: live ? 15_000 : false,
+    refetchInterval: live ? (follow ? POLL_INTERVAL_MS : 15_000) : false,
     placeholderData: (previous) => previous,
   })
 }
@@ -286,7 +286,10 @@ export interface LogSearch {
   limit: number
 }
 
-export function useLogs(search: LogSearch, enabled: boolean) {
+/**
+ * `live` re-reads the last minutes every couple of seconds, keeping the shown entries while it does.
+ */
+export function useLogs(search: LogSearch, enabled: boolean, live = false) {
   return useQuery({
     queryKey: ['logs', search],
     queryFn: () =>
@@ -307,6 +310,8 @@ export function useLogs(search: LogSearch, enabled: boolean) {
         }),
       ),
     enabled,
+    refetchInterval: live && typeof search.period === 'number' ? POLL_INTERVAL_MS : false,
+    placeholderData: live ? (previous) => previous : undefined,
   })
 }
 

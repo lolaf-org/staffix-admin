@@ -76,6 +76,7 @@ export function MetricsPanel({ scope, chartHeight, period, marker }: Props) {
   const [selected, setSelected] = useState(MESSAGES)
   const [statistic, setStatistic] = useState(String(0.99))
   const [selectedPeriod, setSelectedPeriod] = useState<Period>(60)
+  const [live, setLive] = useState(false)
   const [rateWindow, setRateWindow] = useState(AUTO)
   const [view, setView] = useState<'chart' | 'table'>('chart')
   const [pickedTypes, setPickedTypes] = useState<string[]>([])
@@ -91,7 +92,7 @@ export function MetricsPanel({ scope, chartHeight, period, marker }: Props) {
     }
   }, [meters, selected])
   const request = requestOf(selected, meter, statistic)
-  const metrics = useMetrics(scope, request, period ?? selectedPeriod, rateWindow === AUTO ? undefined : rateWindow)
+  const metrics = useMetrics(scope, request, period ?? selectedPeriod, rateWindow === AUTO ? undefined : rateWindow, live && !period)
   const minRateWindow = metrics.data?.minRateWindow ? durationSeconds(metrics.data.minRateWindow) ?? 0 : 0
   const colors = seriesColors(useThemeMode().dark)
   const dictionaryTypes = useMessageTypes(scope).data
@@ -154,7 +155,7 @@ export function MetricsPanel({ scope, chartHeight, period, marker }: Props) {
             title={`Up to ${SERIES_COUNT} message types; cleared, the ${SERIES_COUNT} first by order flow`}
           />
         )}
-        {!period && <TimeRangeSelector value={selectedPeriod} onChange={setSelectedPeriod} />}
+        {!period && <TimeRangeSelector value={selectedPeriod} onChange={setSelectedPeriod} live={live} onLiveChange={setLive} />}
         {request?.kind !== 'meter' || request.statistic !== 'VALUE' ? (
           <Select
             value={rateWindow}
