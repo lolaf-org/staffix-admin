@@ -10,8 +10,8 @@ serves a React UI and proxies the engines' HTTP admin connectors. The browser ne
 | `staffix-admin-server` | Spring Boot backend: REST API for the UI, engine proxy. Its controllers are the API contract |
 | `staffix-admin-ui` | React + Ant Design UI |
 | `staffix-admin-app` | The executable jar: the server with the UI inside |
-| `staffix-admin-metrics` | `staffix-admin-metrics-spi`, the SPI for metrics backends; `staffix-admin-metrics-prometheus`, metrics from Prometheus |
-| `staffix-admin-logs` | `staffix-admin-logs-spi`, the SPI for logs backends; `staffix-admin-logs-loki`, FIX message logs from Loki |
+| `staffix-admin-metrics` | `staffix-admin-metrics-spi`, the SPI for metrics backends; `staffix-admin-metrics-prometheus`, metrics from Prometheus; `staffix-admin-metrics-elasticsearch`, metrics from Elasticsearch |
+| `staffix-admin-logs` | `staffix-admin-logs-spi`, the SPI for logs backends; `staffix-admin-logs-loki`, FIX message logs from Loki; `staffix-admin-logs-elasticsearch`, FIX message logs from Elasticsearch |
 | `staffix-admin-store` | `staffix-admin-store-spi`, where the connectors are kept; `staffix-admin-store-yaml`, a YAML file |
 | `staffix-admin-audit` | `staffix-admin-audit-spi`, where audit entries go; `staffix-admin-audit-log`, log lines |
 | `staffix-admin-connector-spi` | What a backend plugin declares about its settings: descriptions, secrets, secret references |
@@ -104,8 +104,8 @@ unless its "Restart live session on update" is off.
 ## Metrics and logs
 
 The console reads engines' metrics and FIX logs from backends described by connectors. A connector has an id, a
-name, a kind (`prometheus` for metrics, `loki` for logs) and that kind's settings; there can be several of a kind,
-e.g. one Loki per environment. A session's logs go through one of its engine's messages loggers and its metrics
+name, a kind (`prometheus` or `elasticsearch-metrics` for metrics, `loki` or `elasticsearch-logs` for logs) and that
+kind's settings; there can be several of a kind, e.g. one Loki per environment. A session's logs go through one of its engine's messages loggers and its metrics
 through one of its monitoring plugins, as the engine reports; each of these emitters reads from the connector
 assigned to it, else from its engine's `defaults`, else from the global `defaults`. Telemetry with none, or `none`,
 shows as not collected, and so do the metrics of a session without a monitoring plugin. A view spanning several
@@ -144,6 +144,13 @@ connectors:
       indexedLabels: [ fix_eid, fix_sg, fix_sn ]   # labels Loki indexes, matched in the stream selector
       streamSelector: '{service_name="fix-gateway"}'  # default {service_name=~".+"}
       tenant: ${env:LOKI_TENANT}   # X-Scope-OrgID, for a multi-tenant Loki
+  - id: prod-elasticsearch-logs
+    name: Production Elasticsearch logs
+    kind: elasticsearch-logs
+    settings:
+      url: https://elasticsearch:9200
+      index: logs-*.otel-*          # the default
+      apiKey: ${env:ES_API_KEY}     # or username and password
 defaults:
   metrics: prod-prometheus
   logs: prod-loki
@@ -185,6 +192,24 @@ scans every stream of the time range. Promote `fix.eid`, `fix.sg` and `fix.sn` t
 `otlp_config` (as `staffix-admin-sandbox/docker/conf/loki.yaml` does) and list them in `indexedLabels`, so a query
 reads only the streams of its engine, group or session.
 
+**Elasticsearch** connectors read what the OpenTelemetry collector's `elasticsearch` exporter writes with its OTel
+mapping (the default), into the `metrics-*.otel-*` and `logs-*.otel-*` data streams (each connector's `index`). A
+`fix.*` attribute is matched by its own name, whether staffix sent it as a resource or a record attribute. The
+collector needs two processors on the metrics pipeline (as in
+`staffix-admin-sandbox/docker/conf/otel-collector-elastic.yaml`):
+
+- `cumulative_to_delta` on histograms: Elasticsearch stores only delta histograms, and drops the cumulative ones
+  micrometer exports.
+- A rename of micrometer's `<timer>.max` gauges, e.g. to `<timer>_max` with `metrics_transform`: when Elasticsearch
+  maps `metrics.<timer>.max` before `metrics.<timer>`, the timer is no longer mapped as a histogram and cannot be read.
+
+Points are computed per step: a rate from the recordings of the buckets in its window, a mean from their sum and
+count, a quantile once per window from the histogram (so a window wider than the step gives fewer points), a gauge's
+value as its average over the step. A mean or a quantile is approximated from the histogram's buckets, and a timer
+without a histogram (an `aggregate_metric_double`) has a rate and a mean but no quantile. Set `minRateWindow` to twice
+the engines' export step. A logs text filter matches whole words of the message, case insensitive (`body.text` is a
+text field), rather than any substring.
+
 ## Plugins
 
 Every jar in `plugins/` (next to `staffix-admin.jar`; `-Dloader.path=...` names another directory) joins the
@@ -200,7 +225,7 @@ names its auto-configuration, which registers beans of the console's SPIs:
 
 The console provides Spring Boot (web, RestClient), Jackson, the SPIs above and `staffix-api`: a plugin depends on
 them as `provided`, as `staffix-admin-logs/staffix-admin-logs-loki/pom.xml` does. Anything else it needs, it shades into its jar or ships as more jars in `plugins/`. The
-distribution's own `plugins/` holds the YAML store, the audit log and the Prometheus and Loki connectors (the demo
+distribution's own `plugins/` holds the YAML store, the audit log and the Prometheus, Loki and Elasticsearch connectors (the demo
 distribution adds the demo connector); the
 console refuses to start without a store and an audit sink, and the connectors you do not use can go.
 

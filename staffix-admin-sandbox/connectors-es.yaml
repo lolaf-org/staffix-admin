@@ -1,0 +1,17 @@
+version: 0
+connectors:
+  - id: sandbox-elasticsearch-metrics
+    name: Sandbox Elasticsearch metrics
+    kind: elasticsearch-metrics
+    settings:
+      timerBaseUnit: microseconds
+      minRateWindow: 10s
+      url: http://localhost:9200
+  - id: sandbox-elasticsearch-logs
+    name: Sandbox Elasticsearch logs
+    kind: elasticsearch-logs
+    settings:
+      url: http://localhost:9200
+defaults:
+  metrics: sandbox-elasticsearch-metrics
+  logs: sandbox-elasticsearch-logs

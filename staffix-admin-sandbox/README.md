@@ -6,15 +6,15 @@ Prometheus and their FIX logs in Loki. Like the console, it builds against the s
 ## Run
 
 ```shell
-# 1. Prometheus, Loki and the OpenTelemetry collector (add --profile grafana for Grafana on :3000)
-(cd staffix-admin-sandbox/docker && docker compose up -d)
+# 1. Prometheus, Loki and the OpenTelemetry collector
+(cd staffix-admin-sandbox/docker && docker compose --profile prometheus-loki up -d)
 
 # 2. The console, with the sandbox users (reader, writer, engine; password = name), reading the sandbox's
 #    Prometheus and Loki through its connectors
 ./mvnw install
-(cd staffix-admin-sandbox/docker && docker compose --profile console up -d console)
+(cd staffix-admin-sandbox/docker && docker compose --profile console-prometheus-loki up -d)
 #    or from the working copy, with the connectors in data/ (git ignores it, so editing them changes no tracked file)
-[ -f data/connectors.yaml ] || { mkdir -p data && cp staffix-admin-sandbox/connectors.yaml data/; }
+[ -f data/connectors.yaml ] || { mkdir -p data && cp staffix-admin-sandbox/connectors-prometheus-loki.yaml data/connectors.yaml; }
 DIST=staffix-admin-dist/target/staffix-admin/staffix-admin
 java -Dloader.path=$DIST/plugins -jar $DIST/staffix-admin.jar --staffix.admin.security.jaas-config=file:dev/console/jaas.conf
 
@@ -23,12 +23,36 @@ java -Dloader.path=$DIST/plugins -jar $DIST/staffix-admin.jar --staffix.admin.se
 ./mvnw exec:java -Psandbox -pl staffix-admin-sandbox
 ```
 
-Open http://localhost:8080 and log in as `writer`. Stop with `docker compose --profile console down` in
-`staffix-admin-sandbox/docker`; add `-v` to also forget the connectors the containerized console stored.
+Open http://localhost:8080 and log in as `writer`. Stop with
+`docker compose --profile prometheus-loki --profile console-prometheus-loki down` in `staffix-admin-sandbox/docker`;
+add `-v` to also forget the connectors the containerized console stored.
 
 The containerized console runs the distribution `./mvnw install` built, with the users of `docker/conf/console` and the
-connectors of `connectors.yaml` (copied into its volume on first start). It uses host networking, so it reaches the
-engines, Prometheus and Loki as the host does: Linux, or Docker Desktop with host networking enabled.
+connectors of `connectors-prometheus-loki.yaml` (copied into its volume on first start). It uses host networking, so it
+reaches the engines, Prometheus and Loki as the host does: Linux, or Docker Desktop with host networking enabled.
+
+### Elasticsearch and Kibana
+
+The `kibana` profile starts Elasticsearch, Kibana on :5601 and a second OpenTelemetry collector on port 4320, which
+writes logs to the `logs-generic.otel-default` data stream and metrics to `metrics-generic.otel-default` (histograms
+converted to delta, the only temporality Elasticsearch stores, and timers' `.max` gauges renamed `_max`, so the timers
+map as histograms). Point the engines at it instead of the default collector:
+
+```shell
+(cd staffix-admin-sandbox/docker && docker compose --profile kibana up -d)
+./mvnw exec:java -Psandbox -pl staffix-admin-sandbox -DotlpUrl=http://localhost:4320
+```
+
+In Kibana, Discover the `logs-*` or `metrics-*` data views. The `console-es` profile runs the console with the
+connectors of `connectors-es.yaml`, which read Elasticsearch by default (instead of `console-prometheus-loki`: both
+listen on 8080):
+
+```shell
+(cd staffix-admin-sandbox/docker && docker compose --profile console-es up -d)
+```
+
+Stop with `docker compose --profile kibana --profile console-es down`; add `-v` to also drop the indexed data and the
+connectors this console stored.
 
 ## What runs
 

@@ -4,6 +4,7 @@ services:
 
   otel-collector:
     image: otel/opentelemetry-collector:0.158.0
+    profiles: [ prometheus-loki ]
     command: --config=/etc/otel/config.yaml
     ports:
       - "4318:4318"
@@ -12,6 +13,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v3.13.1
+    profiles: [ prometheus-loki ]
     ports:
       - "9090:9090"
     volumes:
@@ -19,15 +21,17 @@ services:
 
   loki:
     image: grafana/loki:3.7.8
+    profiles: [ prometheus-loki ]
     command: -config.file=/etc/loki/loki.yaml
     volumes:
       - ./conf/loki.yaml:/etc/loki/loki.yaml
     ports:
       - "3100:3100"
 
-  console:
+  # both consoles listen on 8080 (host network): run one at a time
+  console-prometheus-loki: &console
     image: eclipse-temurin:21-jre
-    profiles: [ console ]
+    profiles: [ console-prometheus-loki ]
     # the engines advertise their host name and the connectors name localhost: the console sees what the host sees
     network_mode: host
     command:
@@ -41,19 +45,62 @@ services:
       - ../../staffix-admin-dist/target/staffix-admin/staffix-admin:/app:ro
       - ./conf/console/jaas.conf:/etc/staffix-admin/jaas.conf:ro
       - ./conf/console/users.properties:/etc/staffix-admin/users.properties:ro
-      - ../connectors.yaml:/etc/staffix-admin/connectors.yaml:ro
+      - ../connectors-prometheus-loki.yaml:/etc/staffix-admin/connectors.yaml:ro
       - console-data:/data
 
-  grafana:
-    image: grafana/grafana-enterprise:13.0.3
-    profiles: [ grafana ]
-    environment:
-      GF_AUTH_ANONYMOUS_ENABLED: "true"
-      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
-    ports:
-      - "3000:3000"
+  # the same console, with the Elasticsearch connectors as defaults
+  console-es:
+    <<: *console
+    profiles: [ console-es ]
     volumes:
-      - ./conf/grafana/provisioning:/etc/grafana/provisioning
+      - ../../staffix-admin-dist/target/staffix-admin/staffix-admin:/app:ro
+      - ./conf/console/jaas.conf:/etc/staffix-admin/jaas.conf:ro
+      - ./conf/console/users.properties:/etc/staffix-admin/users.properties:ro
+      - ../connectors-es.yaml:/etc/staffix-admin/connectors.yaml:ro
+      - console-es-data:/data
+
+  # Elasticsearch and Kibana behind their own collector on 4320: run the engines with -DotlpUrl=http://localhost:4320
+  otel-collector-elastic:
+    image: otel/opentelemetry-collector-contrib:0.158.0
+    profiles: [ kibana ]
+    command: --config=/etc/otel/config.yaml
+    ports:
+      - "4320:4320"
+    volumes:
+      - ./conf/otel-collector-elastic.yaml:/etc/otel/config.yaml
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  elasticsearch:
+    image: elasticsearch:9.5.3
+    profiles: [ kibana ]
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms1g -Xmx1g
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health?wait_for_status=yellow" ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  kibana:
+    image: kibana:9.5.3
+    profiles: [ kibana ]
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
 
 volumes:
   console-data:
+  console-es-data:
+  elasticsearch-data:

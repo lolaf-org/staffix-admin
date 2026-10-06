@@ -88,6 +88,16 @@
             </dependency>
             <dependency>
                 <groupId>org.lolaf</groupId>
+                <artifactId>staffix-admin-metrics-elasticsearch</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.lolaf</groupId>
+                <artifactId>staffix-admin-logs-elasticsearch</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.lolaf</groupId>
                 <artifactId>staffix-admin-connector-demo</artifactId>
                 <version>${project.version}</version>
             </dependency>

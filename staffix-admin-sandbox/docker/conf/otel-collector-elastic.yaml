@@ -1,0 +1,38 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4320
+
+processors:
+  # micrometer exports a timer's max as the gauge <timer>.max: once Elasticsearch maps it, the timer itself is no longer
+  # mapped as a histogram (a field cannot be both a value and the prefix of another), so it becomes <timer>_max
+  metrics_transform:
+    transforms:
+      - include: ^(.+)\.max$
+        match_type: regexp
+        action: update
+        new_name: $${1}_max
+  batch:
+    timeout: 2s
+    send_batch_size: 512
+  # Elasticsearch only stores delta histograms; the engines export cumulative ones
+  cumulative_to_delta:
+    include:
+      metric_types: [ histogram ]
+
+exporters:
+  # OTel-native mapping (the default): logs-generic.otel-default and metrics-generic.otel-default data streams
+  elasticsearch:
+    endpoint: http://elasticsearch:9200
+
+service:
+  pipelines:
+    metrics:
+      receivers: [ otlp ]
+      processors: [ metrics_transform, cumulative_to_delta, batch ]
+      exporters: [ elasticsearch ]
+    logs:
+      receivers: [ otlp ]
+      processors: [ batch ]
+      exporters: [ elasticsearch ]
