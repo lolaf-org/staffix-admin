@@ -44,6 +44,21 @@ class SimulatedEngineGateway implements EngineGateway {
         return engine;
     }
 
+    /**
+     * What the simulated metrics and logs cover: the running configs of the scope. A config that exists but does not
+     * run yields nothing, as a real backend holds nothing for it.
+     */
+    List<SimulatedSession> runningConfigs(String engineId, @Nullable String group, @Nullable String configId) {
+        SimulatedEngine engine = engine(engineId);
+        if (configId != null && !engine.hasConfig(group, configId)) {
+            throw GatewayException.unknownSession(SessionRef.of(engineId, group, configId));
+        }
+        return engine.runningConfigs().stream()
+                .filter(s -> group == null || s.group.equals(group))
+                .filter(s -> configId == null || s.id.equals(configId))
+                .toList();
+    }
+
 
     @Override
     public List<SessionGroup> listGroups(String engineId) {

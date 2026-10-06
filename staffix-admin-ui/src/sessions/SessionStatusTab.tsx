@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { App, Descriptions, Divider, Flex, InputNumber, Modal, Select, Table, Tag, Typography } from 'antd'
 import { useLocation, useNavigate } from 'react-router'
-import { api, call, type Schemas } from '../api/client'
-import { sessionPath, useEngineMutation, useRemoveSession, type SessionRef } from '../api/queries'
+import { type Schemas } from '../api/client'
+import { useActivateConfig, useLogon, useLogout, useRemoveSession, useResetSession, useSetSeqNums, type SessionRef } from '../api/queries'
 import { HEALTH_LABELS, statusOf } from './health'
 import { StatusBadge } from './StatusBadge'
 import { formatCompIds } from './identity'
@@ -16,8 +16,8 @@ interface Props {
 
 export function SessionStatusTab({ sessionRef, detail }: Props) {
   const { summary } = detail
-  const logon = useEngineMutation(sessionRef.engineId, () => call(api.POST('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/logon', sessionPath(sessionRef))), 'Logon requested')
-  const logout = useEngineMutation(sessionRef.engineId, () => call(api.POST('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/logout', sessionPath(sessionRef))), 'Logout requested')
+  const logon = useLogon(sessionRef)
+  const logout = useLogout(sessionRef)
 
   return (
     <Flex vertical gap={16}>
@@ -71,11 +71,7 @@ export function SessionStatusTab({ sessionRef, detail }: Props) {
 function ResetSection({ sessionRef, summary }: { sessionRef: SessionRef; summary: Schemas['SessionSummary'] }) {
   const modes = RESET_MODES.filter((m) => !m.initiatorOnly || summary.type === 'INITIATOR')
   const [mode, setMode] = useState(modes[0]!.mode)
-  const reset = useEngineMutation(
-    sessionRef.engineId,
-    () => call(api.POST('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/reset', { ...sessionPath(sessionRef), body: { mode } })),
-    'Reset requested',
-  )
+  const reset = useResetSession(sessionRef)
   const selected = RESET_MODES.find((m) => m.mode === mode)!
 
   return (
@@ -85,7 +81,7 @@ function ResetSection({ sessionRef, summary }: { sessionRef: SessionRef; summary
       </Divider>
       <Flex wrap gap={8}>
         <Select value={mode} onChange={setMode} options={modes.map((m) => ({ value: m.mode, label: m.label }))} style={{ minWidth: 240 }} />
-        <WriteButton danger loading={reset.isPending} onConfirm={() => reset.mutate(undefined)} confirm={`${selected.label} on ${summary.group}.${summary.id}?`}>
+        <WriteButton danger loading={reset.isPending} onConfirm={() => reset.mutate({ mode })} confirm={`${selected.label} on ${summary.group}.${summary.id}?`}>
           Reset
         </WriteButton>
       </Flex>
@@ -126,11 +122,7 @@ function SeqNumsButton({ sessionRef, detail }: Props) {
   const [open, setOpen] = useState(false)
   const [incoming, setIncoming] = useState<number | null>(null)
   const [outgoing, setOutgoing] = useState<number | null>(null)
-  const update = useEngineMutation(
-    sessionRef.engineId,
-    () => call(api.PUT('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/seqnums', { ...sessionPath(sessionRef), body: { incoming, outgoing } })),
-    'Sequence numbers updated',
-  )
+  const update = useSetSeqNums(sessionRef)
 
   const show = () => {
     setIncoming(detail.incomingSeqNum)
@@ -147,7 +139,7 @@ function SeqNumsButton({ sessionRef, detail }: Props) {
         okText="Apply"
         confirmLoading={update.isPending}
         onCancel={() => setOpen(false)}
-        onOk={() => update.mutate(undefined, { onSuccess: () => setOpen(false) })}
+        onOk={() => update.mutate({ incoming, outgoing }, { onSuccess: () => setOpen(false) })}
       >
         <Flex vertical gap={12}>
           <label>
@@ -165,12 +157,7 @@ function SeqNumsButton({ sessionRef, detail }: Props) {
 }
 
 function Configs({ sessionRef, detail }: Props) {
-  const activate = useEngineMutation(
-    sessionRef.engineId,
-    (configId: string) =>
-      call(api.POST('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/activate', { ...sessionPath(sessionRef), body: { configId } })),
-    'Switch requested',
-  )
+  const activate = useActivateConfig(sessionRef)
 
   return (
     <div>

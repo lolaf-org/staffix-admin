@@ -10,6 +10,7 @@ import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.NameCallback;
 import javax.security.auth.callback.PasswordCallback;
+import javax.security.auth.callback.UnsupportedCallbackException;
 import javax.security.auth.login.FailedLoginException;
 import javax.security.auth.login.LoginException;
 import javax.security.auth.spi.LoginModule;
@@ -52,7 +53,7 @@ public class PropertiesFileLoginModule implements LoginModule {
         PasswordCallback password = new PasswordCallback("password", false);
         try {
             callbackHandler.handle(new Callback[]{name, password});
-        } catch (Exception e) {
+        } catch (IOException | UnsupportedCallbackException e) {
             throw loginException("Cannot read the credentials", e);
         }
         String user = name.getName();

@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
 import { Alert, Button, Checkbox, Flex, Form, Input, Radio, Typography } from 'antd'
 import type { TextAreaRef } from 'antd/es/input/TextArea'
-import { api, call, type Schemas } from '../api/client'
-import { sessionPath, useEngineMutation, type DecodeTarget, type SessionRef } from '../api/queries'
+import { type Schemas } from '../api/client'
+import { useSendMessages, type DecodeTarget, type SessionRef } from '../api/queries'
 import { DecodedMessageModal } from '../telemetry/DecodedMessageModal'
 import { WriteButton } from './WriteButton'
 
@@ -14,18 +14,12 @@ interface MessageForm {
   possDup: boolean
 }
 
-type SendRequest = Omit<MessageForm, 'messages'> & { messages: string[] }
-
 export function SendMessageTab({ sessionRef, summary }: { sessionRef: SessionRef; summary: Schemas['SessionSummary'] }) {
   const [form] = Form.useForm<MessageForm>()
   const [decoding, setDecoding] = useState<DecodeTarget>()
   const textArea = useRef<TextAreaRef>(null)
   const messages = messageLines(Form.useWatch('messages', form) ?? '')
-  const send = useEngineMutation(
-    sessionRef.engineId,
-    (body: SendRequest) => call(api.POST('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/messages', { ...sessionPath(sessionRef), body })),
-    (body) => (body.messages.length === 1 ? 'Message sent' : `${body.messages.length} messages sent`),
-  )
+  const send = useSendMessages(sessionRef)
   const where = `${summary.group}.${summary.id}, config ${summary.runningConfigId}`
 
   return (

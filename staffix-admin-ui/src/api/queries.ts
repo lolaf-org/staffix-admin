@@ -144,6 +144,37 @@ export function useAddSession(engineId: string) {
   'Session added', SETTINGS_WRITE)
 }
 
+const SESSION = '/api/engines/{engineId}/groups/{group}/sessions/{sessionId}'
+
+export function useLogon(ref: SessionRef) {
+  return useEngineMutation(ref.engineId, () => call(api.POST(`${SESSION}/logon`, sessionPath(ref))), 'Logon requested')
+}
+
+export function useLogout(ref: SessionRef) {
+  return useEngineMutation(ref.engineId, () => call(api.POST(`${SESSION}/logout`, sessionPath(ref))), 'Logout requested')
+}
+
+export function useResetSession(ref: SessionRef) {
+  return useEngineMutation(ref.engineId, (body: Schemas['ResetRequest']) =>
+    call(api.POST(`${SESSION}/reset`, { ...sessionPath(ref), body })), 'Reset requested')
+}
+
+export function useSetSeqNums(ref: SessionRef) {
+  return useEngineMutation(ref.engineId, (body: Schemas['SeqNumsRequest']) =>
+    call(api.PUT(`${SESSION}/seqnums`, { ...sessionPath(ref), body })), 'Sequence numbers updated')
+}
+
+export function useActivateConfig(ref: SessionRef) {
+  return useEngineMutation(ref.engineId, (configId: string) =>
+    call(api.POST(`${SESSION}/activate`, { ...sessionPath(ref), body: { configId } })), 'Switch requested')
+}
+
+export function useSendMessages(ref: SessionRef) {
+  return useEngineMutation(ref.engineId, (body: Schemas['SendMessageRequest']) =>
+    call(api.POST(`${SESSION}/messages`, { ...sessionPath(ref), body })),
+  (body) => (body.messages.length === 1 ? 'Message sent' : `${body.messages.length} messages sent`))
+}
+
 interface EngineMutationOptions {
   /**
    * Also refreshes the engine's session settings, for a call that wrote some.

@@ -6,10 +6,13 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -114,7 +117,7 @@ public class FixDictionaryParser {
             factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
             factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
             return factory.newDocumentBuilder().parse(new ByteArrayInputStream(xml));
-        } catch (Exception e) {
+        } catch (ParserConfigurationException | SAXException | IOException e) {
             throw new IllegalArgumentException("Not a FIX dictionary: " + e.getMessage(), e);
         }
     }

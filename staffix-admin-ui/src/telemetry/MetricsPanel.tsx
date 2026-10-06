@@ -101,6 +101,9 @@ export function MetricsPanel({ scope, chartHeight, period, marker }: Props) {
   const plottedTypes = plottedMessageTypes(typesWithData, pickedTypes)
   const format = formatOf(request, meter)
   const title = titleOf(selected, meter, statistic)
+  const facets = metrics.isSuccess && metrics.data.series.length > 0
+    ? toFacets(metrics.data.series, title, colors, plottedTypes, typeName)
+    : undefined
 
   function choose(name: string) {
     setSelected(name)
@@ -207,22 +210,35 @@ export function MetricsPanel({ scope, chartHeight, period, marker }: Props) {
         : <Alert type="error" title={metrics.error.message} />)}
       {metrics.isSuccess && <NotCollectedNotice what="metrics" sessions={metrics.data.notCollected} />}
       {metrics.isSuccess && metrics.data.series.length === 0 && <Empty description="No data for this period" />}
-      {metrics.isSuccess && metrics.data.series.length > 0 && (() => {
-        const facets = toFacets(metrics.data.series, title, colors, plottedTypes, typeName)
-        if (view === 'table') return <MetricTable facets={facets} format={format} />
-        const perDirection = facets.length > 1
-        const yTicks = perDirection ? niceTicks(Math.max(...facets.flatMap((f) => f.series.flatMap((s) => s.points.map((p) => p.value))))) : undefined
-        return (
-          <Flex vertical gap={8}>
-            <SeriesLegend series={facets[0]!.series} />
-            <Flex wrap gap={16}>
-              {facets.map((facet) => (
-                <MetricChart key={facet.title} title={facet.title} series={facet.series} format={format} yTicks={yTicks} height={chartHeight} marker={marker} />
-              ))}
-            </Flex>
-          </Flex>
-        )
-      })()}
+      {facets && (view === 'table'
+        ? <MetricTable facets={facets} format={format} />
+        : <Charts facets={facets} format={format} height={chartHeight} marker={marker} />)}
+    </Flex>
+  )
+}
+
+interface ChartsProps {
+  facets: Facet[]
+  format: (value: number) => string
+  height?: number
+  marker?: number
+}
+
+/**
+ * A chart per facet under one legend; facets per direction share their scale, so they compare at a glance.
+ */
+function Charts({ facets, format, height, marker }: ChartsProps) {
+  const yTicks = facets.length > 1
+    ? niceTicks(Math.max(...facets.flatMap((f) => f.series.flatMap((s) => s.points.map((p) => p.value)))))
+    : undefined
+  return (
+    <Flex vertical gap={8}>
+      <SeriesLegend series={facets[0]!.series} />
+      <Flex wrap gap={16}>
+        {facets.map((facet) => (
+          <MetricChart key={facet.title} title={facet.title} series={facet.series} format={format} yTicks={yTicks} height={height} marker={marker} />
+        ))}
+      </Flex>
     </Flex>
   )
 }
