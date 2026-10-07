@@ -3,6 +3,7 @@ package org.lolaf.staffix.admin.sandbox;
 import lombok.extern.slf4j.Slf4j;
 import org.lolaf.staffix.admin.sandbox.SandboxEngine.Session;
 import org.lolaf.staffix.admin.sandbox.SandboxEngine.Target;
+import org.lolaf.staffix.admin.sandbox.Traffic.DropCopy;
 import org.lolaf.staffix.admin.sandbox.Traffic.Listener;
 import org.lolaf.staffix.admin.sandbox.Traffic.Publisher;
 import org.lolaf.staffix.admin.sandbox.Traffic.Quoter;
@@ -15,8 +16,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 /**
- * Three engines trading with each other: a bank initiating to two venues, which quote it, publish news to it and
- * send it a drop copy. Between them every session state the console shows appears: logged in, a backup that cannot
+ * Three engines trading with each other: a bank initiating to two venues, which quote it, fill the orders it places on
+ * some quotes, publish news to it and copy venue-x's fills on a drop copy. Between them every session state the console shows appears: logged in, a backup that cannot
  * connect, a session outside its window, and one whose counterparty never connects.
  */
 @Slf4j
@@ -47,13 +48,14 @@ public final class SandboxApplication {
                 .initiator("venue-y-market-data",
                         new Target(Session.of("venue-y", "market-data", "ALPHA_MD", "VENY", new Listener(MessageTypes.News)), VENUE_Y_PORT))
                 .acceptor("drop-copy-gateway", ALPHA_BANK_PORT,
-                        Session.of("venue-x", "drop-copy", "ALPHA", "VENX_DC", new Listener(MessageTypes.News)));
+                        Session.of("venue-x", "drop-copy", "ALPHA", "VENX_DC", new Listener(MessageTypes.News, MessageTypes.ExecutionReport)));
 
+        DropCopy venueXDropCopy = new DropCopy(traffic, newsInterval);
         SandboxEngine venueX = new SandboxEngine("venue-x", settings)
                 .acceptor("venue-x-gateway", VENUE_X_PORT,
-                        Session.of("alpha-bank", "trading", "VENX", "ALPHA", new Quoter()))
+                        Session.of("alpha-bank", "trading", "VENX", "ALPHA", new Quoter(venueXDropCopy)))
                 .initiator("alpha-bank-drop-copy",
-                        new Target(Session.of("alpha-bank", "drop-copy", "VENX_DC", "ALPHA", new Publisher(traffic, newsInterval)), ALPHA_BANK_PORT));
+                        new Target(Session.of("alpha-bank", "drop-copy", "VENX_DC", "ALPHA", venueXDropCopy), ALPHA_BANK_PORT));
 
         SandboxEngine venueY = new SandboxEngine("venue-y", settings)
                 .acceptor("venue-y-gateway", VENUE_Y_PORT,

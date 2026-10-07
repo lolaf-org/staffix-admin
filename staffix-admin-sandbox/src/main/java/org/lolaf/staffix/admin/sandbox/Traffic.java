@@ -1,11 +1,22 @@
 package org.lolaf.staffix.admin.sandbox;
 
 import lombok.Setter;
+import org.lolaf.staffix.admin.sandbox.fix44.encoders.ExecutionReportEncoder;
+import org.lolaf.staffix.admin.sandbox.fix44.encoders.NewOrderSingleEncoder;
 import org.lolaf.staffix.admin.sandbox.fix44.encoders.NewsEncoder;
 import org.lolaf.staffix.admin.sandbox.fix44.encoders.QuoteEncoder;
 import org.lolaf.staffix.admin.sandbox.fix44.encoders.QuoteRequestEncoder;
+import org.lolaf.staffix.admin.sandbox.fix44.fields.ClOrdID;
+import org.lolaf.staffix.admin.sandbox.fix44.fields.ExecType;
 import org.lolaf.staffix.admin.sandbox.fix44.fields.NoRelatedSym;
+import org.lolaf.staffix.admin.sandbox.fix44.fields.OfferPx;
+import org.lolaf.staffix.admin.sandbox.fix44.fields.OrdStatus;
+import org.lolaf.staffix.admin.sandbox.fix44.fields.OrdType;
+import org.lolaf.staffix.admin.sandbox.fix44.fields.OrderQty;
+import org.lolaf.staffix.admin.sandbox.fix44.fields.Price;
+import org.lolaf.staffix.admin.sandbox.fix44.fields.QuoteID;
 import org.lolaf.staffix.admin.sandbox.fix44.fields.QuoteReqID;
+import org.lolaf.staffix.admin.sandbox.fix44.fields.Side;
 import org.lolaf.staffix.admin.sandbox.fix44.fields.Symbol;
 import org.lolaf.staffix.admin.sandbox.fix44.msg.MessageTypes;
 import org.lolaf.staffix.api.FixDictionaryId;
@@ -19,6 +30,7 @@ import org.lolaf.staffix.api.msg.MessageType;
 import org.lolaf.staffix.api.msg.MessageTypeRegistry;
 import org.lolaf.staffix.api.session.FixSession;
 import org.lolaf.staffix.api.session.FixSessionSettings;
+import org.lolaf.staffix.api.time.UTCTime;
 import org.lolaf.staffix.api.version.FixApiVersion;
 import org.lolaf.staffix.api.version.FixRegularVersion;
 
@@ -37,6 +49,7 @@ import java.util.concurrent.atomic.AtomicLong;
 final class Traffic {
 
     private static final List<String> SYMBOLS = List.of("EUR/USD", "GBP/USD", "USD/JPY", "USD/CHF", "AUD/USD");
+    private static final int QUOTES_PER_ORDER = 5;
 
     private Traffic() {
     }
@@ -88,13 +101,16 @@ final class Traffic {
     }
 
     /**
-     * Asks for a quote on a random symbol every interval.
+     * Asks for a quote on a random symbol every interval, and buys at the offer of one quote in {@value QUOTES_PER_ORDER}
+     * with a NewOrderSingle naming the quote.
      */
     static final class Requester extends Periodic {
 
         private final AtomicLong requests = new AtomicLong();
+        private final AtomicLong quotes = new AtomicLong();
         private final QuoteRoundTrips roundTrips = new QuoteRoundTrips();
         private QuoteRequestEncoder quoteRequest;
+        private NewOrderSingleEncoder order;
 
         Requester(ScheduledExecutorService scheduler, Duration interval) {
             super(scheduler, interval, FixRegularVersion.VERSION_44);
@@ -103,8 +119,10 @@ final class Traffic {
         @Override
         public List<FixMessageDecoder> setup(FixSessionSettings settings, FixSession session, Set<MessageType> encodedMessagesTypes) {
             encodedMessagesTypes.add(MessageTypes.QuoteRequest);
+            encodedMessagesTypes.add(MessageTypes.NewOrderSingle);
             quoteRequest = session.newEncoder(QuoteRequestEncoder.class).asReusable();
-            return List.of(new QuoteDecoder(roundTrips));
+            order = session.newEncoder(NewOrderSingleEncoder.class).asReusable();
+            return List.of(new QuoteDecoder(this), new Ignoring(MessageTypes.ExecutionReport));
         }
 
         @Override
@@ -116,7 +134,7 @@ final class Traffic {
 
         @Override
         void send(FixSession session) {
-            String quoteReqId = session.getFixSessionId().getName() + "-" + requests.incrementAndGet();
+            String quoteReqId = session.getFixSessionId().getGroup() + "-" + requests.incrementAndGet();
             quoteRequest.begin()
                     .setQuoteReqID(quoteReqId)
                     .addNoRelatedSym(1)
@@ -125,14 +143,33 @@ final class Traffic {
             session.send(quoteRequest, null);
         }
 
+        private void quoted(FixSession session, QuoteDecoder quote) {
+            roundTrips.quoted(quote.quoteReqId);
+            if (quotes.incrementAndGet() % QUOTES_PER_ORDER != 0) {
+                return;
+            }
+            session.send(order.begin()
+                    .setClOrdID(quote.quoteReqId + "-o")
+                    .setQuoteID(quote.quoteId)
+                    .setSymbol(quote.symbol)
+                    .setSide(Side.SideValues.BUY)
+                    .setTransactTime(session.getClock().now(), TimeUnit.MILLISECONDS)
+                    .setOrderQty(100 * ThreadLocalRandom.current().nextInt(1, 21))
+                    .setOrdType(OrdType.OrdTypeValues.LIMIT)
+                    .setPrice(quote.offerPx), null);
+        }
+
         @Setter
         private static final class QuoteDecoder implements FixMessageDecoder {
 
-            private final QuoteRoundTrips roundTrips;
+            private final Requester requester;
             private String quoteReqId;
+            private String quoteId;
+            private String symbol;
+            private double offerPx;
 
-            QuoteDecoder(QuoteRoundTrips roundTrips) {
-                this.roundTrips = roundTrips;
+            QuoteDecoder(Requester requester) {
+                this.requester = requester;
             }
 
             @Override
@@ -142,12 +179,15 @@ final class Traffic {
 
             @Override
             public void mapFieldsForDecoding(FixFieldsDecoderMapper mapper, FieldsRegistry fieldsRegistry) {
-                mapper.mapStringField(QuoteReqID.get(), this::setQuoteReqId, null);
+                mapper.mapStringField(QuoteReqID.get(), this::setQuoteReqId, null)
+                        .mapStringField(QuoteID.get(), this::setQuoteId, null)
+                        .mapStringField(Symbol.get(), this::setSymbol, null)
+                        .mapDoubleField(OfferPx.get(), this::setOfferPx, 0);
             }
 
             @Override
             public void onDecoded(FixSession session, boolean possDupFlag, boolean possResend) {
-                roundTrips.quoted(quoteReqId);
+                requester.quoted(session, this);
             }
         }
     }
@@ -155,7 +195,7 @@ final class Traffic {
     /**
      * Publishes a headline every interval.
      */
-    static final class Publisher extends Periodic {
+    static class Publisher extends Periodic {
 
         private NewsEncoder news;
 
@@ -181,9 +221,80 @@ final class Traffic {
     }
 
     /**
-     * Answers every QuoteRequest with a Quote around a random mid.
+     * A drop copy session: publishes headlines, and copies the fills of the venue's trading sessions.
+     */
+    static final class DropCopy extends Publisher {
+
+        private ExecutionReportEncoder copy;
+        private volatile FixSession session;
+
+        DropCopy(ScheduledExecutorService scheduler, Duration interval) {
+            super(scheduler, interval);
+        }
+
+        @Override
+        public List<FixMessageDecoder> setup(FixSessionSettings settings, FixSession session, Set<MessageType> encodedMessagesTypes) {
+            encodedMessagesTypes.add(MessageTypes.ExecutionReport);
+            copy = session.newEncoder(ExecutionReportEncoder.class).asReusable();
+            return super.setup(settings, session, encodedMessagesTypes);
+        }
+
+        @Override
+        public synchronized void onSessionCreated(FixSession session, FieldsRegistry fieldsRegistry,
+                                                  MessageTypeRegistry messageTypeRegistry, List<FixMessageDecoder> decoders) {
+            this.session = session;
+            super.onSessionCreated(session, fieldsRegistry, messageTypeRegistry, decoders);
+        }
+
+        /**
+         * Sends on the drop copy session's own thread, as its encoder is not shared; a fill made while it is logged
+         * out is not copied.
+         */
+        void copy(Fill fill) {
+            FixSession dropCopy = session;
+            if (dropCopy != null && dropCopy.isLoggedIn()) {
+                dropCopy.processTask(() -> dropCopy.send(fill.encode(copy.begin(), dropCopy.getClock().now()), null));
+            }
+        }
+    }
+
+    record Fill(String clOrdId, String orderId, String symbol, Side.SideValues side, double quantity, double price) {
+
+        ExecutionReportEncoder encode(ExecutionReportEncoder report, UTCTime now) {
+            return report
+                    .setOrderID(orderId)
+                    .setClOrdID(clOrdId)
+                    .setExecID(orderId + "-f1")
+                    .setExecType(ExecType.ExecTypeValues.TRADE)
+                    .setOrdStatus(OrdStatus.OrdStatusValues.FILLED)
+                    .setSymbol(symbol)
+                    .setSide(side)
+                    .setOrderQty(quantity)
+                    .setPrice(price)
+                    .setLastQty(quantity)
+                    .setLastPx(price)
+                    .setLeavesQty(0)
+                    .setCumQty(quantity)
+                    .setAvgPx(price)
+                    .setTransactTime(now, TimeUnit.MILLISECONDS);
+        }
+    }
+
+    /**
+     * Answers every QuoteRequest with a Quote around a random mid, and fills every NewOrderSingle at its price, copying
+     * the fill to the drop copy when there is one.
      */
     static final class Quoter implements FixApplication {
+
+        private final DropCopy dropCopy;
+
+        Quoter() {
+            this(null);
+        }
+
+        Quoter(DropCopy dropCopy) {
+            this.dropCopy = dropCopy;
+        }
 
         @Override
         public FixApiVersion getFixApiVersion() {
@@ -198,7 +309,50 @@ final class Traffic {
         @Override
         public List<FixMessageDecoder> setup(FixSessionSettings settings, FixSession session, Set<MessageType> encodedMessagesTypes) {
             encodedMessagesTypes.add(MessageTypes.Quote);
-            return List.of(new QuoteRequestDecoder(session));
+            encodedMessagesTypes.add(MessageTypes.ExecutionReport);
+            return List.of(new QuoteRequestDecoder(session), new OrderDecoder(session, dropCopy));
+        }
+
+        @Setter
+        private static final class OrderDecoder implements FixMessageDecoder {
+
+            private final ExecutionReportEncoder report;
+            private final DropCopy dropCopy;
+            private final AtomicLong orders = new AtomicLong();
+            private String clOrdId;
+            private String symbol;
+            private Side.SideValues side;
+            private double orderQty;
+            private double price;
+
+            OrderDecoder(FixSession session, DropCopy dropCopy) {
+                report = session.newEncoder(ExecutionReportEncoder.class).asReusable();
+                this.dropCopy = dropCopy;
+            }
+
+            @Override
+            public MessageType getMessageType() {
+                return MessageTypes.NewOrderSingle;
+            }
+
+            @Override
+            public void mapFieldsForDecoding(FixFieldsDecoderMapper mapper, FieldsRegistry fieldsRegistry) {
+                mapper.mapStringField(ClOrdID.get(), this::setClOrdId, null)
+                        .mapStringField(Symbol.get(), this::setSymbol, null)
+                        .mapCharValuesEnumField(Side.get(), this::setSide, null)
+                        .mapDoubleField(OrderQty.get(), this::setOrderQty, 0)
+                        .mapDoubleField(Price.get(), this::setPrice, 0);
+            }
+
+            @Override
+            public void onDecoded(FixSession session, boolean possDupFlag, boolean possResend) {
+                String orderId = session.getFixSessionId().getSenderCompID().getValue() + "-" + orders.incrementAndGet();
+                Fill fill = new Fill(clOrdId, orderId, symbol, side, orderQty, price);
+                session.send(fill.encode(report.begin(), session.getClock().now()), null);
+                if (dropCopy != null) {
+                    dropCopy.copy(fill);
+                }
+            }
         }
 
         @Setter
@@ -252,10 +406,10 @@ final class Traffic {
      */
     static final class Listener implements FixApplication {
 
-        private final MessageType messageType;
+        private final List<MessageType> messageTypes;
 
-        Listener(MessageType messageType) {
-            this.messageType = messageType;
+        Listener(MessageType... messageTypes) {
+            this.messageTypes = List.of(messageTypes);
         }
 
         @Override
@@ -270,7 +424,7 @@ final class Traffic {
 
         @Override
         public List<FixMessageDecoder> setup(FixSessionSettings settings, FixSession session, Set<MessageType> encodedMessagesTypes) {
-            return List.of(new Ignoring(messageType));
+            return messageTypes.stream().<FixMessageDecoder>map(Ignoring::new).toList();
         }
     }
 

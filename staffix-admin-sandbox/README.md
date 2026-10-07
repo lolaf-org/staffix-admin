@@ -66,8 +66,10 @@ connectors this console stored.
 | `venue-x` | `alpha-bank.drop-copy` | `alpha-bank.trading` |
 | `venue-y` | | `alpha-bank.trading`, `alpha-bank.fixt-trading`, `alpha-bank.market-data`, `alpha-bank.end-of-day` (outside its window), `gamma-fund.trading` (never connects) |
 
-The bank asks for quotes every 200 ms and the venues answer; `venue-y` publishes News on `market-data` and `venue-x`
-on the drop copy. `fixt-trading` is FIXT.1.1 with FIX 5.0 SP2 application messages; every other session is FIX 4.4.
+The bank asks for quotes every 200 ms and the venues answer; on one quote in five it buys at the offer with a
+NewOrderSingle naming the quote, which the venue fills, and `venue-x` copies its fills on the drop copy. Tracing a
+QuoteReqID (e.g. `venue-x-195`) in the Trace tab finds the request, the quote, the order, its fill and the drop copy,
+on both engines. `venue-y` publishes News on `market-data` and `venue-x` on the drop copy. `fixt-trading` is FIXT.1.1 with FIX 5.0 SP2 application messages; every other session is FIX 4.4.
 The applications publish their own meters through staffix's monitoring: the bank times `quote.round.trip` (a
 QuoteRequest until its Quote, tag `venue`) and reads `quotes.pending` from its requests in flight (a gauge read at each
 export); the venues time `quote.pricing` and set `quote.last.mid` on every quote (a gauge they set). All three engines share HTTP admin API port 8686. System properties `consoleUrl`,
