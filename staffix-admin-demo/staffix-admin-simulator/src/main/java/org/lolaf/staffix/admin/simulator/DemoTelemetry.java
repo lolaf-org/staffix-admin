@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.SplittableRandom;
@@ -201,12 +202,15 @@ class DemoTelemetry {
         }
         if (random > 0.6) {
             String symbol = SYMBOLS.get((int) (random * 1000) % SYMBOLS.size());
+            int quantity = 100 * (1 + (int) (random * 20));
+            String price = String.format(Locale.ROOT, "%.2f", 50 + random * 100);
             String order = "11=ORD-" + (second % 1_000_000) + "|55=" + symbol + "|54=" + (random > 0.8 ? 2 : 1)
-                    + "|38=" + (100 * (1 + (int) (random * 20))) + "|40=2|44=" + String.format("%.2f", 50 + random * 100);
+                    + "|38=" + quantity + "|40=2|44=" + price;
             String orderSide = weSendOrders ? "OUT" : "IN";
             String reportSide = weSendOrders ? "IN" : "OUT";
             entries.add(entry(session, t.plusMillis(2), reportSide, fix(parties, reportSide, second, t.plusMillis(2),
-                    "35=8|37=EX-" + (second % 1_000_000) + "|17=FILL-" + second + "|150=2|39=2|" + order + "|14=100|151=0")));
+                    "35=8|37=EX-" + (second % 1_000_000) + "|17=FILL-" + second + "|150=F|39=2|" + order
+                            + "|32=" + quantity + "|31=" + price + "|151=0|14=" + quantity + "|6=" + price)));
             entries.add(entry(session, t, orderSide, fix(parties, orderSide, second, t, "35=D|" + order)));
         }
         if (second % 30 == 0) {
