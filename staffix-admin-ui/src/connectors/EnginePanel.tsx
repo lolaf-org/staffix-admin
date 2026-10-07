@@ -1,6 +1,6 @@
 import { Flex, Select, Table, Tag, Tooltip, Typography } from 'antd'
 import type { Schemas } from '../api/client'
-import type { ConnectorKind, ConnectorsConfig } from '../api/queries'
+import type { ConnectorKind, ConsoleConfig } from '../api/queries'
 import { assignmentOptions, connectorName, engineDefault, engineMapping, type Role, roleKey, withEngineMapping } from './draft'
 
 type EngineEmitters = Schemas['EngineEmitters']
@@ -8,10 +8,10 @@ type EngineEmitters = Schemas['EngineEmitters']
 interface Props {
   engineId: string
   emitters?: EngineEmitters
-  config: ConnectorsConfig
+  config: ConsoleConfig
   kinds: ConnectorKind[]
   disabled: boolean
-  onChange: (config: ConnectorsConfig) => void
+  onChange: (config: ConsoleConfig) => void
 }
 
 /**

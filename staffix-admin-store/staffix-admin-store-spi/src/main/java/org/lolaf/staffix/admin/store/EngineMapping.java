@@ -14,7 +14,7 @@ import java.util.Map;
 @Builder(toBuilder = true)
 public class EngineMapping {
     /**
-     * For an emitter without its own entry; a role left null falls back on {@link ConnectorsConfig#getDefaults()}.
+     * For an emitter without its own entry; a role left null falls back on {@link ConsoleConfig#getDefaults()}.
      */
     @Builder.Default
     EngineConnectors defaults = EngineConnectors.builder().build();

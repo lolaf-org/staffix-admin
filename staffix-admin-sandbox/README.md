@@ -14,7 +14,7 @@ Prometheus and their FIX logs in Loki. Like the console, it builds against the s
 ./mvnw install
 (cd staffix-admin-sandbox/docker && docker compose --profile console-prometheus-loki up -d)
 #    or from the working copy, with the connectors in data/ (git ignores it, so editing them changes no tracked file)
-[ -f data/connectors.yaml ] || { mkdir -p data && cp staffix-admin-sandbox/connectors-prometheus-loki.yaml data/connectors.yaml; }
+[ -f data/console.yaml ] || { mkdir -p data && cp staffix-admin-sandbox/console-prometheus-loki.yaml data/console.yaml; }
 DIST=staffix-admin-dist/target/staffix-admin/staffix-admin
 java -Dloader.path=$DIST/plugins -jar $DIST/staffix-admin.jar --staffix.admin.security.jaas-config=file:dev/console/jaas.conf
 
@@ -28,7 +28,7 @@ Open http://localhost:8080 and log in as `writer`. Stop with
 add `-v` to also forget the connectors the containerized console stored.
 
 The containerized console runs the distribution `./mvnw install` built, with the users of `docker/conf/console` and the
-connectors of `connectors-prometheus-loki.yaml` (copied into its volume on first start). It uses host networking, so it
+connectors of `console-prometheus-loki.yaml` (copied into its volume on first start). It uses host networking, so it
 reaches the engines, Prometheus and Loki as the host does: Linux, or Docker Desktop with host networking enabled.
 
 ### Elasticsearch and Kibana
@@ -44,14 +44,14 @@ map as histograms). Point the engines at it instead of the default collector:
 ```
 
 In Kibana, Discover the `logs-*` or `metrics-*` data views. The `console-es` profile runs the console with the
-connectors of `connectors-es.yaml`, which read Elasticsearch by default (instead of `console-prometheus-loki`: both
+connectors of `console-es.yaml`, which read Elasticsearch by default (instead of `console-prometheus-loki`: both
 listen on 8080). They need the distribution's `staffix-admin-logs-elasticsearch` and
 `staffix-admin-metrics-elasticsearch` plugins, with `staffix-admin-logs-elasticsearch-common`, all in its `plugins/`:
 
 ```shell
 (cd staffix-admin-sandbox/docker && docker compose --profile console-es up -d)
-# or from the working copy (data/connectors.yaml replaced: keep a copy if you edited it)
-mkdir -p data && cp staffix-admin-sandbox/connectors-es.yaml data/connectors.yaml
+# or from the working copy (data/console.yaml replaced: keep a copy if you edited it)
+mkdir -p data && cp staffix-admin-sandbox/console-es.yaml data/console.yaml
 java -Dloader.path=$DIST/plugins -jar $DIST/staffix-admin.jar --staffix.admin.security.jaas-config=file:dev/console/jaas.conf
 ```
 

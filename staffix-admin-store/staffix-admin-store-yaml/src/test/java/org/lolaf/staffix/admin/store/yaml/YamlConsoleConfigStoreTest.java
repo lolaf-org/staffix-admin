@@ -3,11 +3,13 @@ package org.lolaf.staffix.admin.store.yaml;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.lolaf.staffix.admin.store.Connector;
-import org.lolaf.staffix.admin.store.ConnectorStoreException;
-import org.lolaf.staffix.admin.store.ConnectorsConfig;
+import org.lolaf.staffix.admin.store.ConsoleConfig;
+import org.lolaf.staffix.admin.store.ConsoleConfigStoreException;
 import org.lolaf.staffix.admin.store.EngineConnectors;
 import org.lolaf.staffix.admin.store.EngineMapping;
-import org.lolaf.staffix.admin.store.StaleConnectorsException;
+import org.lolaf.staffix.admin.store.StaleConsoleConfigException;
+import org.lolaf.staffix.admin.store.TraceConfig;
+import org.lolaf.staffix.admin.store.TraceField;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -18,9 +20,9 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class YamlConnectorStoreTest {
+class YamlConsoleConfigStoreTest {
 
-    private static final ConnectorsConfig CONFIG = ConnectorsConfig.builder()
+    private static final ConsoleConfig CONFIG = ConsoleConfig.builder()
             .connector(Connector.builder()
                     .id("alpha-prometheus")
                     .name("Alpha Prometheus")
@@ -49,18 +51,18 @@ class YamlConnectorStoreTest {
 
     @Test
     void isEmptyBeforeTheFirstSave() {
-        assertThat(new YamlConnectorStore(dataDir.resolve("absent")).load()).isEqualTo(ConnectorsConfig.EMPTY);
+        assertThat(new YamlConsoleConfigStore(dataDir.resolve("absent")).load()).isEqualTo(ConsoleConfig.EMPTY);
     }
 
     @Test
     void savesReadableYamlAndReadsItBack() throws IOException {
-        YamlConnectorStore store = new YamlConnectorStore(dataDir.resolve("admin"));
+        YamlConsoleConfigStore store = new YamlConsoleConfigStore(dataDir.resolve("admin"));
 
-        ConnectorsConfig saved = store.save(CONFIG);
+        ConsoleConfig saved = store.save(CONFIG);
 
         assertThat(saved).isEqualTo(CONFIG.toBuilder().version(1).build());
         assertThat(store.load()).isEqualTo(saved);
-        assertThat(Files.readString(dataDir.resolve("admin").resolve(YamlConnectorStore.FILE_NAME))).isEqualTo("""
+        assertThat(Files.readString(dataDir.resolve("admin").resolve(YamlConsoleConfigStore.FILE_NAME))).isEqualTo("""
                 version: 1
                 connectors:
                   - id: alpha-prometheus
@@ -96,20 +98,20 @@ class YamlConnectorStoreTest {
 
     @Test
     void writesAFileOnlyItsOwnerReads() throws IOException {
-        new YamlConnectorStore(dataDir).save(CONFIG);
+        new YamlConsoleConfigStore(dataDir).save(CONFIG);
 
-        assertThat(Files.getPosixFilePermissions(dataDir.resolve(YamlConnectorStore.FILE_NAME)))
+        assertThat(Files.getPosixFilePermissions(dataDir.resolve(YamlConsoleConfigStore.FILE_NAME)))
                 .containsExactlyInAnyOrder(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE);
     }
 
     @Test
     void refusesASaveBasedOnAnOlderVersion() {
-        YamlConnectorStore store = new YamlConnectorStore(dataDir);
-        ConnectorsConfig loadedByBoth = store.load();
+        YamlConsoleConfigStore store = new YamlConsoleConfigStore(dataDir);
+        ConsoleConfig loadedByBoth = store.load();
         store.save(loadedByBoth.toBuilder().connector(CONFIG.getConnectors().getFirst()).build());
 
         assertThatThrownBy(() -> store.save(loadedByBoth.toBuilder().connector(CONFIG.getConnectors().getLast()).build()))
-                .isInstanceOfSatisfying(StaleConnectorsException.class, e -> {
+                .isInstanceOfSatisfying(StaleConsoleConfigException.class, e -> {
                     assertThat(e.getExpectedVersion()).isZero();
                     assertThat(e.getStoredVersion()).isEqualTo(1);
                 });
@@ -118,7 +120,7 @@ class YamlConnectorStoreTest {
 
     @Test
     void readsAHandWrittenFile() throws IOException {
-        Files.writeString(dataDir.resolve(YamlConnectorStore.FILE_NAME), """
+        Files.writeString(dataDir.resolve(YamlConsoleConfigStore.FILE_NAME), """
                 connectors:
                   - id: alpha-loki
                     name: Alpha Loki
@@ -129,25 +131,50 @@ class YamlConnectorStoreTest {
                   logs: alpha-loki
                 """);
 
-        ConnectorsConfig config = new YamlConnectorStore(dataDir).load();
+        ConsoleConfig config = new YamlConsoleConfigStore(dataDir).load();
 
         assertThat(config.getVersion()).isZero();
         assertThat(config.getConnectors()).extracting(Connector::getId).containsExactly("alpha-loki");
         assertThat(config.getDefaults()).isEqualTo(EngineConnectors.builder().logs("alpha-loki").build());
         assertThat(config.getEngines()).isEmpty();
+        assertThat(config.getTrace()).isNull();
+    }
+
+    @Test
+    void keepsTheTraceSettingsAnEmptyListIncluded() throws IOException {
+        YamlConsoleConfigStore store = new YamlConsoleConfigStore(dataDir);
+        TraceConfig trace = TraceConfig.builder()
+                .linkingTags(List.of())
+                .keyFields(List.of(TraceField.builder().tag(11).name("ClOrdID").build(), TraceField.builder().tag(526).name("SecondaryClOrdID").build()))
+                .build();
+
+        ConsoleConfig saved = store.save(ConsoleConfig.builder().trace(trace).build());
+
+        assertThat(store.load()).isEqualTo(saved);
+        assertThat(Files.readString(dataDir.resolve(YamlConsoleConfigStore.FILE_NAME))).isEqualTo("""
+                version: 1
+                defaults: {}
+                trace:
+                  linkingTags: []
+                  keyFields:
+                    - tag: 11
+                      name: ClOrdID
+                    - tag: 526
+                      name: SecondaryClOrdID
+                """);
     }
 
     @Test
     void reportsAMisspelledKey() throws IOException {
-        Files.writeString(dataDir.resolve(YamlConnectorStore.FILE_NAME), """
+        Files.writeString(dataDir.resolve(YamlConsoleConfigStore.FILE_NAME), """
                 connectors:
                   - id: alpha-loki
                     knd: loki
                 """);
 
-        assertThatThrownBy(() -> new YamlConnectorStore(dataDir).load())
-                .isInstanceOf(ConnectorStoreException.class)
-                .hasMessageContaining(YamlConnectorStore.FILE_NAME)
+        assertThatThrownBy(() -> new YamlConsoleConfigStore(dataDir).load())
+                .isInstanceOf(ConsoleConfigStoreException.class)
+                .hasMessageContaining(YamlConsoleConfigStore.FILE_NAME)
                 .hasMessageContaining("knd");
     }
 }

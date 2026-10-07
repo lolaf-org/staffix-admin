@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { ApiError } from '../api/client'
 import {
   type Connector,
-  type ConnectorsConfig,
+  type ConsoleConfig,
   useCanWrite,
   useConnectorEngines,
   useConnectorKinds,
@@ -17,7 +17,7 @@ import { EnginePanel } from './EnginePanel'
 import { assignmentOptions, type Role, ROLE_LABELS, roleKey, roleOf } from './draft'
 
 /**
- * Edits a draft of the whole connectors file, saved in one go so its version guards against a concurrent change.
+ * Edits a draft of the connectors part of the console configuration, saved in one go so its version guards against a concurrent change.
  */
 export function ConnectorsPage() {
   const stored = useConnectors()
@@ -25,7 +25,7 @@ export function ConnectorsPage() {
   const engines = useConnectorEngines()
   const save = useSaveConnectors()
   const canWrite = useCanWrite()
-  const [draft, setDraft] = useState<ConnectorsConfig>()
+  const [draft, setDraft] = useState<ConsoleConfig>()
   const [editing, setEditing] = useState<{ connector?: Connector } | undefined>()
 
   if (stored.isPending || kinds.isPending) return <Skeleton active />
@@ -33,7 +33,7 @@ export function ConnectorsPage() {
   if (kinds.isError) return <Alert type="error" title={kinds.error.message} />
 
   const config = draft ?? stored.data
-  const change = (next: ConnectorsConfig) => {
+  const change = (next: ConsoleConfig) => {
     save.reset()
     setDraft(next)
   }

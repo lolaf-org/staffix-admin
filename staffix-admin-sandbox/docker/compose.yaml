@@ -38,14 +38,14 @@ services:
       - sh
       - -c
       - >-
-        [ -f /data/connectors.yaml ] || cp /etc/staffix-admin/connectors.yaml /data/;
+        [ -f /data/console.yaml ] || cp /etc/staffix-admin/console.yaml /data/;
         exec java -Dloader.path=/app/plugins -jar /app/staffix-admin.jar --staffix.admin.data-dir=/data
         --staffix.admin.security.jaas-config=file:/etc/staffix-admin/jaas.conf
     volumes:
       - ../../staffix-admin-dist/target/staffix-admin/staffix-admin:/app:ro
       - ./conf/console/jaas.conf:/etc/staffix-admin/jaas.conf:ro
       - ./conf/console/users.properties:/etc/staffix-admin/users.properties:ro
-      - ../connectors-prometheus-loki.yaml:/etc/staffix-admin/connectors.yaml:ro
+      - ../console-prometheus-loki.yaml:/etc/staffix-admin/console.yaml:ro
       - console-data:/data
 
   # the same console, with the Elasticsearch connectors as defaults
@@ -56,7 +56,7 @@ services:
       - ../../staffix-admin-dist/target/staffix-admin/staffix-admin:/app:ro
       - ./conf/console/jaas.conf:/etc/staffix-admin/jaas.conf:ro
       - ./conf/console/users.properties:/etc/staffix-admin/users.properties:ro
-      - ../connectors-es.yaml:/etc/staffix-admin/connectors.yaml:ro
+      - ../console-es.yaml:/etc/staffix-admin/console.yaml:ro
       - console-es-data:/data
 
   # Elasticsearch and Kibana behind their own collector on 4320: run the engines with -DotlpUrl=http://localhost:4320

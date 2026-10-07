@@ -2,7 +2,7 @@ package org.lolaf.staffix.admin.server.connectors;
 
 import lombok.experimental.UtilityClass;
 import org.lolaf.staffix.admin.store.Connector;
-import org.lolaf.staffix.admin.store.ConnectorsConfig;
+import org.lolaf.staffix.admin.store.ConsoleConfig;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 @UtilityClass
 class ConnectorChanges {
 
-    String describe(ConnectorsConfig before, ConnectorsConfig after) {
+    String describe(ConsoleConfig before, ConsoleConfig after) {
         List<String> changes = new ArrayList<>();
         changes(changes, "connector", byId(before), byId(after));
         if (!before.getDefaults().equals(after.getDefaults())) {
@@ -28,7 +28,7 @@ class ConnectorChanges {
         return "connectors: " + (changes.isEmpty() ? "no change" : String.join("; ", changes));
     }
 
-    private static Map<String, Connector> byId(ConnectorsConfig config) {
+    private static Map<String, Connector> byId(ConsoleConfig config) {
         return config.getConnectors().stream().collect(Collectors.toMap(Connector::getId, Function.identity()));
     }
 

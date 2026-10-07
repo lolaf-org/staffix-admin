@@ -3,14 +3,15 @@ package org.lolaf.staffix.admin.store;
 import lombok.Builder;
 import lombok.Singular;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
 
 @Value
 @Builder(toBuilder = true)
-public class ConnectorsConfig {
-    public static final ConnectorsConfig EMPTY = ConnectorsConfig.builder().build();
+public class ConsoleConfig {
+    public static final ConsoleConfig EMPTY = ConsoleConfig.builder().build();
 
     /**
      * Raised by one on every save; a save based on another version than the stored one is refused, so two admins
@@ -29,4 +30,9 @@ public class ConnectorsConfig {
      */
     @Singular
     Map<String, EngineMapping> engines;
+    /**
+     * Null for the console's defaults.
+     */
+    @Nullable
+    TraceConfig trace;
 }

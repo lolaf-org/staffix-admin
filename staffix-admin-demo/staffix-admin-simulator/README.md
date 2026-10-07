@@ -6,7 +6,7 @@ real engines: they announce themselves, answer `status`, `settings`, `components
 staffix refuses. Sessions log on, drop, reconnect, follow session windows and can be switched to their backups.
 
 Their metrics and FIX logs are generated and served on a separate port for the console's `demo-metrics` and
-`demo-logs` connectors, which the demo distribution (`staffix-admin-dist-demo`) declares in `data/connectors.yaml`.
+`demo-logs` connectors, which the demo distribution (`staffix-admin-dist-demo`) declares in `data/console.yaml`.
 Values derive from the instant and the session, so a chart shows the same data on each refresh. `nyc-uat` logs
 through slf4j and has no monitoring plugin, so the console shows its telemetry as not collected; `paris-prod`'s
 client acceptors measure no decoding, encoding or clock offset.

@@ -8,8 +8,8 @@ import org.lolaf.staffix.admin.metrics.MetricsSource;
 import org.lolaf.staffix.admin.metrics.MetricsSourceException;
 import org.lolaf.staffix.admin.metrics.MetricsSourceFactory;
 import org.lolaf.staffix.admin.store.Connector;
-import org.lolaf.staffix.admin.store.ConnectorStore;
-import org.lolaf.staffix.admin.store.ConnectorsConfig;
+import org.lolaf.staffix.admin.store.ConsoleConfig;
+import org.lolaf.staffix.admin.store.ConsoleConfigStore;
 import org.lolaf.staffix.admin.store.EngineConnectors;
 import org.lolaf.staffix.admin.store.EngineMapping;
 
@@ -34,7 +34,7 @@ import java.util.stream.Stream;
  */
 public class Connectors implements EngineTelemetry {
 
-    private final ConnectorStore store;
+    private final ConsoleConfigStore store;
     private final SettingsBinder binder;
     private final ConnectorSecrets secrets;
     private final Map<String, MetricsSourceFactory<?>> metricsFactories;
@@ -42,7 +42,7 @@ public class Connectors implements EngineTelemetry {
     private final Map<String, Built<MetricsSource>> metricsSources = new ConcurrentHashMap<>();
     private final Map<String, Built<LogsSource>> logsSources = new ConcurrentHashMap<>();
 
-    Connectors(ConnectorStore store, SettingsBinder binder, ConnectorSecrets secrets, List<MetricsSourceFactory<?>> metricsFactories,
+    Connectors(ConsoleConfigStore store, SettingsBinder binder, ConnectorSecrets secrets, List<MetricsSourceFactory<?>> metricsFactories,
                List<LogsSourceFactory<?>> logsFactories) {
         this.store = store;
         this.binder = binder;
@@ -56,30 +56,31 @@ public class Connectors implements EngineTelemetry {
         }
     }
 
-    public ConnectorsConfig load() {
+    public ConsoleConfig load() {
         return store.load();
     }
 
     /**
      * Secrets typed as plain values are stored encrypted, and those sent back as {@value ConnectorSecrets#SET} keep
-     * their stored value.
+     * their stored value. The trace settings are only edited in the stored file: the stored ones are kept.
      *
      * @throws InvalidConnectorsException listing every problem, before anything is stored
      */
-    public ConnectorsConfig save(ConnectorsConfig config) {
+    public ConsoleConfig save(ConsoleConfig config) {
         List<String> problems = new ArrayList<>();
-        ConnectorsConfig stored = store.load();
-        ConnectorsConfig protectedConfig = config.toBuilder()
+        ConsoleConfig stored = store.load();
+        ConsoleConfig protectedConfig = config.toBuilder()
                 .clearConnectors()
                 .connectors(config.getConnectors().stream()
                         .map(connector -> protectSecrets(restoreSecrets(connector, stored, problems), problems))
                         .toList())
+                .trace(stored.getTrace())
                 .build();
         problems.addAll(problems(protectedConfig));
         if (!problems.isEmpty()) {
             throw new InvalidConnectorsException(problems);
         }
-        ConnectorsConfig saved = store.save(protectedConfig);
+        ConsoleConfig saved = store.save(protectedConfig);
         Set<String> ids = saved.getConnectors().stream().map(Connector::getId).collect(Collectors.toSet());
         metricsSources.keySet().retainAll(ids);
         logsSources.keySet().retainAll(ids);
@@ -133,7 +134,7 @@ public class Connectors implements EngineTelemetry {
 
     @Override
     public List<MetricsSource> metrics(String engineId, Collection<Emitters> emitters) {
-        ConnectorsConfig config = store.load();
+        ConsoleConfig config = store.load();
         EngineMapping mapping = config.getEngines().get(engineId);
         return emitters.stream()
                 .filter(session -> session.monitoring() != null)
@@ -146,7 +147,7 @@ public class Connectors implements EngineTelemetry {
 
     @Override
     public List<LogsSource> logs(String engineId, Collection<Emitters> emitters) {
-        ConnectorsConfig config = store.load();
+        ConsoleConfig config = store.load();
         EngineMapping mapping = config.getEngines().get(engineId);
         return emitters.stream()
                 .map(session -> assigned(config, mapping, loggerConnector(mapping, session.messagesLogger()), EngineConnectors::getLogs))
@@ -158,7 +159,7 @@ public class Connectors implements EngineTelemetry {
 
     @Override
     public List<MetricsSource> allMetrics(String engineId) {
-        ConnectorsConfig config = store.load();
+        ConsoleConfig config = store.load();
         return everyConnector(config, engineId, EngineMapping::getMonitors, EngineConnectors::getMetrics)
                 .flatMap(connectorId -> metricsSource(config, connectorId).stream())
                 .toList();
@@ -166,7 +167,7 @@ public class Connectors implements EngineTelemetry {
 
     @Override
     public List<LogsSource> allLogs(String engineId) {
-        ConnectorsConfig config = store.load();
+        ConsoleConfig config = store.load();
         return everyConnector(config, engineId, EngineMapping::getLoggers, EngineConnectors::getLogs)
                 .flatMap(connectorId -> logsSource(config, connectorId).stream())
                 .toList();
@@ -190,14 +191,14 @@ public class Connectors implements EngineTelemetry {
         return logsSource(store.load(), connectorId);
     }
 
-    private Optional<MetricsSource> metricsSource(ConnectorsConfig config, String connectorId) {
+    private Optional<MetricsSource> metricsSource(ConsoleConfig config, String connectorId) {
         return connector(config, connectorId)
                 .filter(connector -> metricsFactories.containsKey(connector.getKind()))
                 .map(connector -> metricsSources.compute(connectorId, (id, built) -> built != null && built.connector().equals(connector)
                         ? built : new Built<>(connector, createMetricsSource(connector))).source());
     }
 
-    private Optional<LogsSource> logsSource(ConnectorsConfig config, String connectorId) {
+    private Optional<LogsSource> logsSource(ConsoleConfig config, String connectorId) {
         return connector(config, connectorId)
                 .filter(connector -> logsFactories.containsKey(connector.getKind()))
                 .map(connector -> logsSources.compute(connectorId, (id, built) -> built != null && built.connector().equals(connector)
@@ -212,7 +213,7 @@ public class Connectors implements EngineTelemetry {
         return mapping == null ? null : mapping.getLoggers().get(messagesLogger);
     }
 
-    private static Optional<String> assigned(ConnectorsConfig config, @Nullable EngineMapping mapping, @Nullable String emitterConnector,
+    private static Optional<String> assigned(ConsoleConfig config, @Nullable EngineMapping mapping, @Nullable String emitterConnector,
                                              Function<EngineConnectors, @Nullable String> role) {
         String connectorId = emitterConnector;
         if (connectorId == null && mapping != null) {
@@ -224,7 +225,7 @@ public class Connectors implements EngineTelemetry {
         return connectorId == null || connectorId.equals(EngineConnectors.NONE) ? Optional.empty() : Optional.of(connectorId);
     }
 
-    private static Stream<String> everyConnector(ConnectorsConfig config, String engineId, Function<EngineMapping, Map<String, String>> emitters,
+    private static Stream<String> everyConnector(ConsoleConfig config, String engineId, Function<EngineMapping, Map<String, String>> emitters,
                                                  Function<EngineConnectors, @Nullable String> role) {
         EngineMapping mapping = config.getEngines().get(engineId);
         Stream<String> byEmitter = mapping == null ? Stream.empty() : emitters.apply(mapping).values().stream()
@@ -232,7 +233,7 @@ public class Connectors implements EngineTelemetry {
         return Stream.concat(byEmitter, assigned(config, mapping, null, role).stream()).distinct();
     }
 
-    private Connector restoreSecrets(Connector connector, ConnectorsConfig stored, List<String> problems) {
+    private Connector restoreSecrets(Connector connector, ConsoleConfig stored, List<String> problems) {
         return settingsClass(connector)
                 .map(settingsClass -> secrets.restore(connector,
                         connector.getId() == null ? null : connector(stored, connector.getId()).orElse(null), settingsClass, problems))
@@ -252,7 +253,7 @@ public class Connectors implements EngineTelemetry {
         return logs == null ? Optional.empty() : Optional.of(logs.getSettingsClass());
     }
 
-    private static Optional<Connector> connector(ConnectorsConfig config, String connectorId) {
+    private static Optional<Connector> connector(ConsoleConfig config, String connectorId) {
         return config.getConnectors().stream().filter(connector -> connectorId.equals(connector.getId())).findFirst();
     }
 
@@ -272,7 +273,7 @@ public class Connectors implements EngineTelemetry {
         return factory.create(binder.bind(connector.getSettings(), factory.getSettingsClass()));
     }
 
-    private List<String> problems(ConnectorsConfig config) {
+    private List<String> problems(ConsoleConfig config) {
         List<String> problems = new ArrayList<>();
         Set<String> metricsIds = new HashSet<>();
         Set<String> logsIds = new HashSet<>();

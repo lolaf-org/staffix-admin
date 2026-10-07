@@ -2,10 +2,9 @@ import { Alert, Flex, Modal, Segmented, Skeleton, Table, Tag, Typography, theme 
 import { useState } from 'react'
 import { Link } from 'react-router'
 import type { Schemas } from '../api/client'
-import { useDecodedMessage, type DecodeTarget, type FixedPeriod } from '../api/queries'
+import { useDecodedMessage, useTraceSettings, type DecodeTarget, type FixedPeriod } from '../api/queries'
 import { MetricsPanel } from './MetricsPanel'
 import { traceRoute } from './routes'
-import { LINKING_TAGS } from '../trace/trace'
 
 type DecodedField = Schemas['DecodedField']
 
@@ -80,6 +79,7 @@ function periodAround(epochMillis: number): FixedPeriod {
 }
 
 function FieldsTable({ fields, onTrace }: { fields: DecodedField[]; onTrace: () => void }) {
+  const linkingTags = useTraceSettings().data?.linkingTags ?? []
   const { token } = theme.useToken()
   const mono = { fontFamily: token.fontFamilyCode, fontSize: 12 }
   const rows = fields.map((field, index) => ({ ...field, key: index, firstOfSection: index === 0 || fields[index - 1]!.section !== field.section }))
@@ -119,7 +119,7 @@ function FieldsTable({ fields, onTrace }: { fields: DecodedField[]; onTrace: () 
           title: 'Value',
           dataIndex: 'value',
           render: (value: string, row) =>
-            LINKING_TAGS.includes(String(row.tag)) ? (
+            linkingTags.includes(row.tag) ? (
               <Link to={traceRoute(value)} onClick={onTrace} title="Trace this id across sessions" style={{ ...mono, wordBreak: 'break-all' }}>
                 {value}
               </Link>

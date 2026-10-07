@@ -10,8 +10,8 @@ import org.lolaf.staffix.admin.server.engines.EngineRegistry;
 import org.lolaf.staffix.admin.server.engines.GatewayException;
 import org.lolaf.staffix.admin.server.sessions.SessionGroup;
 import org.lolaf.staffix.admin.store.Connector;
-import org.lolaf.staffix.admin.store.ConnectorsConfig;
-import org.lolaf.staffix.admin.store.StaleConnectorsException;
+import org.lolaf.staffix.admin.store.ConsoleConfig;
+import org.lolaf.staffix.admin.store.StaleConsoleConfigException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -51,7 +51,7 @@ public class ConnectorsController {
     private final EngineEmitterSettings emitterSettings;
 
     @GetMapping
-    public ConnectorsConfig getConnectors() {
+    public ConsoleConfig getConnectors() {
         return redacted(connectors.load());
     }
 
@@ -61,8 +61,8 @@ public class ConnectorsController {
      */
     @PreAuthorize(WRITER)
     @PutMapping
-    public ConnectorsConfig saveConnectors(@RequestBody ConnectorsConfig config) {
-        ConnectorsConfig before = connectors.load();
+    public ConsoleConfig saveConnectors(@RequestBody ConsoleConfig config) {
+        ConsoleConfig before = connectors.load();
         return redacted(auditLog.record("connectors: save", () -> connectors.save(config),
                 saved -> ConnectorChanges.describe(before, saved)));
     }
@@ -97,8 +97,8 @@ public class ConnectorsController {
         return problem;
     }
 
-    @ExceptionHandler(StaleConnectorsException.class)
-    ProblemDetail stale(StaleConnectorsException e) {
+    @ExceptionHandler(StaleConsoleConfigException.class)
+    ProblemDetail stale(StaleConsoleConfigException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
     }
 
@@ -107,7 +107,7 @@ public class ConnectorsController {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, e.getMessage());
     }
 
-    private ConnectorsConfig redacted(ConnectorsConfig config) {
+    private ConsoleConfig redacted(ConsoleConfig config) {
         return config.toBuilder()
                 .clearConnectors()
                 .connectors(config.getConnectors().stream().map(connectors::redacted).toList())

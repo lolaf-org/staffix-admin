@@ -1,29 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { api, call, isNotCollected, type Schemas } from '../api/client'
-import { lastMinutes, type FixedPeriod } from '../api/queries'
+import { lastMinutes, type FixedPeriod, type TraceSettings } from '../api/queries'
 import type { Period } from '../telemetry/TimeRangeSelector'
-
-/**
- * The tags whose values tie the messages of one order or quote together: following them finds its replaces, its
- * executions and its drop copies.
- */
-export const LINKING_TAGS = ['11', '41', '37', '131', '117']
-
-export const KEY_FIELDS = [
-  { tag: '11', name: 'ClOrdID' },
-  { tag: '41', name: 'OrigClOrdID' },
-  { tag: '37', name: 'OrderID' },
-  { tag: '131', name: 'QuoteReqID' },
-  { tag: '117', name: 'QuoteID' },
-  { tag: '150', name: 'ExecType' },
-  { tag: '39', name: 'OrdStatus' },
-  { tag: '54', name: 'Side' },
-  { tag: '55', name: 'Symbol' },
-  { tag: '38', name: 'OrderQty' },
-  { tag: '44', name: 'Price' },
-  { tag: '32', name: 'LastQty' },
-  { tag: '31', name: 'LastPx' },
-]
 
 export const MAX_ROUNDS = 3
 export const MAX_IDS = 20
@@ -53,11 +31,11 @@ export interface Trace {
   failures: string[]
 }
 
-export function useTrace(id: string, engineIds: string[], period: Period) {
+export function useTrace(id: string, engineIds: string[], period: Period, settings: TraceSettings | undefined) {
   return useQuery({
-    queryKey: ['trace', id, engineIds, period],
-    queryFn: () => trace(id, engineIds, typeof period === 'number' ? lastMinutes(period) : period),
-    enabled: id !== '' && engineIds.length > 0,
+    queryKey: ['trace', id, engineIds, period, settings],
+    queryFn: () => trace(id, engineIds, typeof period === 'number' ? lastMinutes(period) : period, settings!.linkingTags.map(String)),
+    enabled: id !== '' && engineIds.length > 0 && settings !== undefined,
     refetchOnWindowFocus: false,
   })
 }
@@ -65,7 +43,7 @@ export function useTrace(id: string, engineIds: string[], period: Period) {
 /**
  * Searches the ids known so far on every engine, then the ids the messages found link to, round after round.
  */
-async function trace(id: string, engineIds: string[], range: FixedPeriod): Promise<Trace> {
+async function trace(id: string, engineIds: string[], range: FixedPeriod, linkingTags: string[]): Promise<Trace> {
   const ids = new Set([id])
   const entries = new Map<string, TraceEntry>()
   const notCollected: string[] = []
@@ -93,7 +71,7 @@ async function trace(id: string, engineIds: string[], range: FixedPeriod): Promi
     for (const entry of found) {
       entries.set(`${entry.engineId}|${entry.group}|${entry.sessionId}|${entry.timestamp}|${entry.line}`, entry)
       const fields = fieldsOf(entry.line)
-      for (const tag of LINKING_TAGS) {
+      for (const tag of linkingTags) {
         const value = fields.get(tag)
         if (value === undefined || ids.has(value)) continue
         if (ids.size === MAX_IDS) {

@@ -2,9 +2,9 @@
 FROM eclipse-temurin:21-jre
 RUN useradd --system --home-dir /opt/staffix-admin staffix && mkdir /data && chown staffix /data
 COPY target/staffix-admin-demo/staffix-admin /opt/staffix-admin
-COPY src/docker/connectors.yaml /opt/staffix-admin/seed/connectors.yaml
+COPY src/docker/console.yaml /opt/staffix-admin/seed/console.yaml
 USER staffix
 WORKDIR /opt/staffix-admin
 EXPOSE 8080
 VOLUME /data
-ENTRYPOINT ["sh", "-c", "[ -f /data/connectors.yaml ] || cp seed/connectors.yaml /data/; exec java $JAVA_OPTS -jar staffix-admin.jar --staffix.admin.data-dir=/data"]
+ENTRYPOINT ["sh", "-c", "[ -f /data/console.yaml ] || cp seed/console.yaml /data/; exec java $JAVA_OPTS -jar staffix-admin.jar --staffix.admin.data-dir=/data"]

@@ -11,11 +11,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ConnectorsConfigurationTest {
 
     @Test
-    void refusesToStartWithoutAConnectorStore() {
+    void refusesToStartWithoutAConsoleConfigStore() {
         new ApplicationContextRunner()
                 .withUserConfiguration(ConnectorsConfiguration.class)
                 .withBean(SecretCipher.class, () -> new SecretCipher(null, List.of()))
                 .run(context -> assertThat(context).hasFailed().getFailure()
-                        .rootCause().hasMessageContaining("No connector store"));
+                        .rootCause().hasMessageContaining("No console configuration store"));
     }
 }

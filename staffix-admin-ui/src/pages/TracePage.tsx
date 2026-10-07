@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { Alert, Card, Empty, Flex, Input, Select, Table, Tag, Tooltip, Typography } from 'antd'
 import { useQueries } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router'
-import { messageTypesQuery, useEngines, type DecodeTarget, type LogType } from '../api/queries'
+import { messageTypesQuery, useEngines, useTraceSettings, type DecodeTarget, type LogType, type TraceSettings } from '../api/queries'
 import { DecodedMessageModal } from '../telemetry/DecodedMessageModal'
 import { formatDateTime, formatLogTime } from '../telemetry/format'
 import { LOG_TYPES } from '../telemetry/LogsPanel'
 import { TimeRangeSelector, type Period } from '../telemetry/TimeRangeSelector'
-import { fieldsOf, KEY_FIELDS, LIMIT, MAX_IDS, MAX_ROUNDS, separatorOf, useTrace, type TraceEntry } from '../trace/trace'
+import { fieldsOf, LIMIT, MAX_IDS, MAX_ROUNDS, separatorOf, useTrace, type TraceEntry } from '../trace/trace'
 
 const EVERY_ENGINE = ''
 const DEFAULT_MINUTES = 1440
@@ -22,7 +22,8 @@ export function TracePage() {
   const engine = params.get('engine') ?? EVERY_ENGINE
   const period = periodOf(params)
   const engineIds = engine === EVERY_ENGINE ? (engines.data?.map((e) => e.engineId) ?? []) : [engine]
-  const trace = useTrace(id, engineIds, period)
+  const settings = useTraceSettings()
+  const trace = useTrace(id, engineIds, period, settings.data)
   const [decoding, setDecoding] = useState<DecodeTarget>()
   const messageTypes = useMessageTypeNames(trace.data?.entries ?? [])
 
@@ -60,6 +61,7 @@ export function TracePage() {
           />
           <TimeRangeSelector value={period} onChange={setPeriod} />
         </Flex>
+        {settings.isError && <Alert type="error" title={settings.error.message} />}
         {id === '' ? (
           <Empty description="Enter an id to follow its order or quote across sessions and engines" />
         ) : (
@@ -67,6 +69,7 @@ export function TracePage() {
             trace={trace}
             id={id}
             messageTypes={messageTypes}
+            keyFields={settings.data?.keyFields ?? []}
             onFollow={(value) => update({ id: value })}
             onDecode={(entry) =>
               setDecoding({
@@ -88,11 +91,12 @@ interface ResultProps {
   trace: ReturnType<typeof useTrace>
   id: string
   messageTypes: Map<string, Map<string, string>>
+  keyFields: TraceSettings['keyFields']
   onFollow: (id: string) => void
   onDecode: (entry: TraceEntry) => void
 }
 
-function TraceResult({ trace, id, messageTypes, onFollow, onDecode }: ResultProps) {
+function TraceResult({ trace, id, messageTypes, keyFields, onFollow, onDecode }: ResultProps) {
   if (trace.isError) return <Alert type="error" title={trace.error.message} />
   const ids = trace.data?.ids ?? [id]
   return (
@@ -167,7 +171,7 @@ function TraceResult({ trace, id, messageTypes, onFollow, onDecode }: ResultProp
           {
             title: 'Fields',
             key: 'fields',
-            render: (_: unknown, entry: TraceEntry) => <KeyFields line={entry.line} id={id} ids={ids} />,
+            render: (_: unknown, entry: TraceEntry) => <KeyFields line={entry.line} id={id} ids={ids} keyFields={keyFields} />,
           },
         ]}
       />
@@ -175,16 +179,16 @@ function TraceResult({ trace, id, messageTypes, onFollow, onDecode }: ResultProp
   )
 }
 
-function KeyFields({ line, id, ids }: { line: string; id: string; ids: string[] }) {
+function KeyFields({ line, id, ids, keyFields }: { line: string; id: string; ids: string[]; keyFields: TraceSettings['keyFields'] }) {
   const fields = fieldsOf(line)
-  const present = KEY_FIELDS.filter((field) => fields.has(field.tag))
+  const present = keyFields.filter((field) => fields.has(String(field.tag)))
   if (present.length === 0) {
     return <Typography.Text style={{ fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all' }}>{line}</Typography.Text>
   }
   return (
     <Flex wrap gap={4}>
       {present.map(({ tag, name }) => {
-        const value = fields.get(tag)!
+        const value = fields.get(String(tag))!
         return (
           <Tag key={tag} color={value === id ? 'gold' : ids.includes(value) ? 'blue' : undefined} style={{ marginInlineEnd: 0 }}>
             {name}={value}

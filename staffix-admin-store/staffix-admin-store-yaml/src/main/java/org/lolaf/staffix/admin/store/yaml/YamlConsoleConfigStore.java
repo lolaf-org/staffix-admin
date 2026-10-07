@@ -2,12 +2,14 @@ package org.lolaf.staffix.admin.store.yaml;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import org.lolaf.staffix.admin.store.Connector;
-import org.lolaf.staffix.admin.store.ConnectorStore;
-import org.lolaf.staffix.admin.store.ConnectorStoreException;
-import org.lolaf.staffix.admin.store.ConnectorsConfig;
+import org.lolaf.staffix.admin.store.ConsoleConfig;
+import org.lolaf.staffix.admin.store.ConsoleConfigStore;
+import org.lolaf.staffix.admin.store.ConsoleConfigStoreException;
 import org.lolaf.staffix.admin.store.EngineConnectors;
 import org.lolaf.staffix.admin.store.EngineMapping;
-import org.lolaf.staffix.admin.store.StaleConnectorsException;
+import org.lolaf.staffix.admin.store.StaleConsoleConfigException;
+import org.lolaf.staffix.admin.store.TraceConfig;
+import org.lolaf.staffix.admin.store.TraceField;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.MapperFeature;
@@ -23,18 +25,18 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
 /**
- * Keeps the connectors in {@code connectors.yaml} under the data directory, so they can be read, diffed and edited by
- * hand. A hand edit that leaves the version unchanged is overwritten by the next save from the UI, and comments do
- * not survive one.
+ * Keeps the console configuration in {@code console.yaml} under the data directory, so it can be read, diffed and
+ * edited by hand. A hand edit that leaves the version unchanged is overwritten by the next save from the UI, and
+ * comments do not survive one.
  */
-class YamlConnectorStore implements ConnectorStore {
+class YamlConsoleConfigStore implements ConsoleConfigStore {
 
-    static final String FILE_NAME = "connectors.yaml";
+    static final String FILE_NAME = "console.yaml";
 
     private final Path file;
     private final YAMLMapper mapper;
 
-    YamlConnectorStore(Path dataDir) {
+    YamlConsoleConfigStore(Path dataDir) {
         this.file = dataDir.resolve(FILE_NAME);
         this.mapper = YAMLMapper.builder()
                 .disable(YAMLWriteFeature.WRITE_DOC_START_MARKER)
@@ -44,36 +46,40 @@ class YamlConnectorStore implements ConnectorStore {
                 .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
                 .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .changeDefaultPropertyInclusion(inclusion -> inclusion.withValueInclusion(JsonInclude.Include.NON_EMPTY))
-                .addMixIn(ConnectorsConfig.class, ConnectorsConfigMixIn.class)
+                .addMixIn(ConsoleConfig.class, ConsoleConfigMixIn.class)
                 .addMixIn(Connector.class, ConnectorMixIn.class)
                 .addMixIn(EngineConnectors.class, EngineConnectorsMixIn.class)
                 .addMixIn(EngineMapping.class, EngineMappingMixIn.class)
-                .addMixIn(ConnectorsConfig.ConnectorsConfigBuilder.class, BuilderMixIn.class)
+                .addMixIn(ConsoleConfig.ConsoleConfigBuilder.class, BuilderMixIn.class)
                 .addMixIn(Connector.ConnectorBuilder.class, BuilderMixIn.class)
                 .addMixIn(EngineConnectors.EngineConnectorsBuilder.class, BuilderMixIn.class)
                 .addMixIn(EngineMapping.EngineMappingBuilder.class, BuilderMixIn.class)
+                .addMixIn(TraceConfig.class, TraceConfigMixIn.class)
+                .addMixIn(TraceField.class, TraceFieldMixIn.class)
+                .addMixIn(TraceConfig.TraceConfigBuilder.class, BuilderMixIn.class)
+                .addMixIn(TraceField.TraceFieldBuilder.class, BuilderMixIn.class)
                 .build();
     }
 
     @Override
-    public ConnectorsConfig load() {
+    public ConsoleConfig load() {
         if (!Files.exists(file)) {
-            return ConnectorsConfig.EMPTY;
+            return ConsoleConfig.EMPTY;
         }
         try {
-            return mapper.readValue(file, ConnectorsConfig.class);
+            return mapper.readValue(file, ConsoleConfig.class);
         } catch (JacksonException e) {
-            throw new ConnectorStoreException("Cannot read the connectors from " + file + ": " + e.getOriginalMessage(), e);
+            throw new ConsoleConfigStoreException("Cannot read the console configuration from " + file + ": " + e.getOriginalMessage(), e);
         }
     }
 
     @Override
-    public synchronized ConnectorsConfig save(ConnectorsConfig config) {
+    public synchronized ConsoleConfig save(ConsoleConfig config) {
         long storedVersion = load().getVersion();
         if (config.getVersion() != storedVersion) {
-            throw new StaleConnectorsException(config.getVersion(), storedVersion);
+            throw new StaleConsoleConfigException(config.getVersion(), storedVersion);
         }
-        ConnectorsConfig saved = config.toBuilder().version(storedVersion + 1).build();
+        ConsoleConfig saved = config.toBuilder().version(storedVersion + 1).build();
         try {
             Files.createDirectories(file.getParent());
             Path temp = Files.createTempFile(file.getParent(), FILE_NAME, ".tmp");
@@ -84,13 +90,13 @@ class YamlConnectorStore implements ConnectorStore {
                 Files.deleteIfExists(temp);
             }
         } catch (IOException | JacksonException e) {
-            throw new ConnectorStoreException("Cannot write the connectors to " + file, e);
+            throw new ConsoleConfigStoreException("Cannot write the console configuration to " + file, e);
         }
         return saved;
     }
 
-    @JsonDeserialize(builder = ConnectorsConfig.ConnectorsConfigBuilder.class)
-    private interface ConnectorsConfigMixIn {
+    @JsonDeserialize(builder = ConsoleConfig.ConsoleConfigBuilder.class)
+    private interface ConsoleConfigMixIn {
     }
 
     @JsonDeserialize(builder = Connector.ConnectorBuilder.class)
@@ -99,6 +105,18 @@ class YamlConnectorStore implements ConnectorStore {
 
     @JsonDeserialize(builder = EngineConnectors.EngineConnectorsBuilder.class)
     private interface EngineConnectorsMixIn {
+    }
+
+    /**
+     * Keeps an empty list, which means none where an absent one means the defaults.
+     */
+    @JsonDeserialize(builder = TraceConfig.TraceConfigBuilder.class)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private interface TraceConfigMixIn {
+    }
+
+    @JsonDeserialize(builder = TraceField.TraceFieldBuilder.class)
+    private interface TraceFieldMixIn {
     }
 
     @JsonPOJOBuilder(withPrefix = "")

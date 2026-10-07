@@ -383,6 +383,19 @@ export function useMessageTypes(scope: MetricScope) {
   return useQuery(messageTypesQuery(scope))
 }
 
+export type TraceSettings = Schemas['TraceSettings']
+
+/**
+ * How the order trace follows ids and what it shows: the console's configuration, else its defaults.
+ */
+export function useTraceSettings() {
+  return useQuery({
+    queryKey: ['traceSettings'],
+    queryFn: () => call(api.GET('/api/trace/settings')),
+    staleTime: 5 * 60_000,
+  })
+}
+
 export function messageTypesQuery(scope: MetricScope) {
   return {
     queryKey: ['messageTypes', scope],
@@ -391,7 +404,7 @@ export function messageTypesQuery(scope: MetricScope) {
   }
 }
 
-export type ConnectorsConfig = Schemas['ConnectorsConfig']
+export type ConsoleConfig = Schemas['ConsoleConfig']
 export type Connector = Schemas['Connector']
 export type ConnectorKind = Schemas['ConnectorKind']
 
@@ -421,7 +434,7 @@ export function useConnectorEngines() {
 export function useSaveConnectors() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (config: ConnectorsConfig) => call(api.PUT('/api/connectors', { body: config })),
+    mutationFn: (config: ConsoleConfig) => call(api.PUT('/api/connectors', { body: config })),
     onSuccess: (saved) => queryClient.setQueryData(['connectors'], saved),
   })
 }

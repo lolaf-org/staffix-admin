@@ -70,7 +70,7 @@ docker run -p 8080:8080 \
   starting from `staffix-admin-dist/src/config/`: `application.yml`, `jaas.conf` and your users or JAAS module. Hash
   a password with the image itself:
   `docker run --rm --entrypoint sh staffix-admin -c "java -Dloader.main=org.lolaf.staffix.admin.server.security.jaas.PasswordHasher -jar staffix-admin.jar 'secret'"`.
-- `/data` is the data directory: `connectors.yaml` lives there, so keep it on a volume.
+- `/data` is the data directory: `console.yaml` lives there, so keep it on a volume.
 - `JAVA_OPTS` passes JVM options; any setting can also come from the environment
   (`staffix.admin.engine-request-timeout` as `STAFFIX_ADMIN_ENGINEREQUESTTIMEOUT`).
 - Plugins of your own: build on the image, `FROM staffix-admin` then `COPY my-plugin.jar plugins/`, rather than
@@ -112,8 +112,8 @@ shows as not collected, and so do the metrics of a session without a monitoring 
 backends reads each and merges them; a latency quantile of a message type then shows the highest of the backends'.
 The console creates no connector itself.
 
-Connectors live in `connectors.yaml` under `staffix.admin.data-dir` (default `data`, relative to the working
-directory), readable by the console's user only. Writers manage them in the Connectors tab: connectors with a form
+Connectors live in the console configuration, `console.yaml` under `staffix.admin.data-dir` (default `data`,
+relative to the working directory), readable by the console's user only. Writers manage them in the Connectors tab: connectors with a form
 per kind and a connection test, the defaults, and each engine's emitters with the sessions using them. The file can
 also be edited by hand; changes apply without a restart.
 
@@ -220,6 +220,19 @@ ids (ClOrdID, OrigClOrdID, OrderID, QuoteReqID, QuoteID), so a trace from a ClOr
 only the OrderID and the replaces. It stops after 3 rounds of linked ids, 20 ids, or 1000 messages per engine and
 round, and says so. A value in the decoded message links to its trace, and the URL holds the trace, to share it.
 
+The linking tags and the fields shown for each message are those above unless `console.yaml` sets them; a list left
+out keeps the defaults, an empty one means none. They are edited in the file only, and apply without a restart:
+
+```yaml
+trace:
+  linkingTags: [11, 41, 37, 526]       # 526 SecondaryClOrdID
+  keyFields:
+    - tag: 11
+      name: ClOrdID
+    - tag: 526
+      name: SecondaryClOrdID
+```
+
 The match is exact: `ORD-1` does not find `ORD-12`. Loki filters the lines itself; Elasticsearch finds the value as a
 phrase and the console keeps the exact matches. A message logged with SOH between fields matches like one logged with
 `|`. Loki has no index on the message content: a trace over a long period of busy engines reads all of their lines,
@@ -236,7 +249,7 @@ names its auto-configuration, which registers beans of the console's SPIs:
 | `MetricsSourceFactory` (`staffix-admin-metrics-spi`), `LogsSourceFactory` (`staffix-admin-logs-spi`) | adds a connector kind, with its settings class (`@Description`, `@Secret` from `staffix-admin-connector-spi`) |
 | `SecretResolver` (`staffix-admin-connector-spi`) | adds a reference scheme, e.g. `${vault:...}`; a scheme already taken fails at startup |
 | `AuditSink` (`staffix-admin-audit-spi`) | receives every audit entry, as `staffix-admin-audit-log` does (lines of the `staffix.admin.audit` logger); at least one is required |
-| `ConnectorStore` (`staffix-admin-store-spi`) | keeps the connectors, as `staffix-admin-store-yaml` does (`connectors.yaml` of the data directory); exactly one is required |
+| `ConsoleConfigStore` (`staffix-admin-store-spi`) | keeps the console configuration (connectors, trace settings), as `staffix-admin-store-yaml` does (`console.yaml` of the data directory); exactly one is required |
 
 The console provides Spring Boot (web, RestClient), Jackson, the SPIs above and `staffix-api`: a plugin depends on
 them as `provided`, as `staffix-admin-logs/staffix-admin-logs-loki/pom.xml` does. Anything else it needs, it shades into its jar or ships as more jars in `plugins/`. The
@@ -330,7 +343,7 @@ supported yet.
 
 1. Run `DevelopmentApplication` (in the server's test sources, so on the test class path holding the plugins and the
    development users) from the IDE in the repository root, port 8080, after
-   `[ -f data/connectors.yaml ] || { mkdir -p data && cp staffix-admin-demo/staffix-admin-dist-demo/src/data/connectors.yaml data/; }`; and the
+   `[ -f data/console.yaml ] || { mkdir -p data && cp staffix-admin-demo/staffix-admin-dist-demo/src/data/console.yaml data/; }`; and the
    simulator (`./mvnw exec:java -pl :staffix-admin-simulator`) for engines.
 2. Start the UI dev server, which first regenerates the TypeScript types from the running backend:
 

@@ -10,11 +10,12 @@ import org.lolaf.staffix.admin.connector.Secret;
 import org.lolaf.staffix.admin.server.secrets.EnvSecretResolver;
 import org.lolaf.staffix.admin.server.secrets.SecretCipher;
 import org.lolaf.staffix.admin.store.Connector;
-import org.lolaf.staffix.admin.store.ConnectorStore;
-import org.lolaf.staffix.admin.store.ConnectorsConfig;
+import org.lolaf.staffix.admin.store.ConsoleConfig;
+import org.lolaf.staffix.admin.store.ConsoleConfigStore;
 import org.lolaf.staffix.admin.store.EngineConnectors;
 import org.lolaf.staffix.admin.store.EngineMapping;
-import org.lolaf.staffix.admin.store.StaleConnectorsException;
+import org.lolaf.staffix.admin.store.StaleConsoleConfigException;
+import org.lolaf.staffix.admin.store.TraceConfig;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -43,7 +44,7 @@ class ConnectorsTest {
 
     @Test
     void buildsOneSourcePerConnectorFromItsOwnSettings() {
-        connectors.save(ConnectorsConfig.builder().connector(ALPHA_METRICS).connector(ALPHA_LOGS).connector(BETA_LOGS).build());
+        connectors.save(ConsoleConfig.builder().connector(ALPHA_METRICS).connector(ALPHA_LOGS).connector(BETA_LOGS).build());
 
         assertThat(connectors.metricsSource("alpha-metrics")).get().extracting(source -> ((StubMetricsSource) source).getUrl())
                 .isEqualTo("http://alpha:9090");
@@ -55,7 +56,7 @@ class ConnectorsTest {
 
     @Test
     void readsAnEmitterFromItsOwnConnectorElseItsEngineDefaultElseTheDefault() {
-        connectors.save(ConnectorsConfig.builder().connector(ALPHA_METRICS).connector(ALPHA_LOGS).connector(BETA_LOGS)
+        connectors.save(ConsoleConfig.builder().connector(ALPHA_METRICS).connector(ALPHA_LOGS).connector(BETA_LOGS)
                 .defaults(EngineConnectors.builder().metrics("alpha-metrics").logs("alpha-logs").build())
                 .engine("beta", EngineMapping.builder()
                         .defaults(EngineConnectors.builder().logs("beta-logs").build())
@@ -76,7 +77,7 @@ class ConnectorsTest {
 
     @Test
     void readsEachSourceOfTheEmittersOnce() {
-        connectors.save(ConnectorsConfig.builder().connector(ALPHA_LOGS).connector(BETA_LOGS)
+        connectors.save(ConsoleConfig.builder().connector(ALPHA_LOGS).connector(BETA_LOGS)
                 .defaults(EngineConnectors.builder().logs("alpha-logs").build())
                 .engine("beta", EngineMapping.builder().logger("clients", "beta-logs").logger("audit", EngineConnectors.NONE).build())
                 .build());
@@ -88,7 +89,7 @@ class ConnectorsTest {
 
     @Test
     void collectsNoMetricsOfAnUnmonitoredSession() {
-        connectors.save(ConnectorsConfig.builder().connector(ALPHA_METRICS)
+        connectors.save(ConsoleConfig.builder().connector(ALPHA_METRICS)
                 .defaults(EngineConnectors.builder().metrics("alpha-metrics").build())
                 .build());
 
@@ -97,7 +98,7 @@ class ConnectorsTest {
 
     @Test
     void collectsNothingWithoutADefault() {
-        connectors.save(ConnectorsConfig.builder().connector(ALPHA_LOGS)
+        connectors.save(ConsoleConfig.builder().connector(ALPHA_LOGS)
                 .engine("beta", EngineMapping.builder().logger("clients", "alpha-logs").build())
                 .build());
 
@@ -108,7 +109,7 @@ class ConnectorsTest {
 
     @Test
     void readsEveryConnectorOfAnEngineWhoseEmittersAreUnknown() {
-        connectors.save(ConnectorsConfig.builder().connector(ALPHA_METRICS).connector(ALPHA_LOGS).connector(BETA_LOGS)
+        connectors.save(ConsoleConfig.builder().connector(ALPHA_METRICS).connector(ALPHA_LOGS).connector(BETA_LOGS)
                 .defaults(EngineConnectors.builder().logs("alpha-logs").build())
                 .engine("beta", EngineMapping.builder()
                         .logger("clients", "beta-logs")
@@ -126,7 +127,7 @@ class ConnectorsTest {
 
     @Test
     void answersNothingForAnUnknownConnectorOrTheOtherRole() {
-        connectors.save(ConnectorsConfig.builder().connector(ALPHA_METRICS).connector(ALPHA_LOGS).build());
+        connectors.save(ConsoleConfig.builder().connector(ALPHA_METRICS).connector(ALPHA_LOGS).build());
 
         assertThat(connectors.metricsSource("gamma")).isEmpty();
         assertThat(connectors.metricsSource("alpha-logs")).isEmpty();
@@ -134,8 +135,19 @@ class ConnectorsTest {
     }
 
     @Test
+    void keepsTheStoredTraceSettings() {
+        TraceConfig trace = TraceConfig.builder().linkingTags(List.of(11, 526)).build();
+        ConsoleConfig stored = store.save(ConsoleConfig.builder().trace(trace).build());
+
+        connectors.save(stored.toBuilder().trace(null).connector(ALPHA_LOGS).build());
+
+        assertThat(store.load().getTrace()).isEqualTo(trace);
+        assertThat(store.load().getConnectors()).extracting(Connector::getId).containsExactly("alpha-logs");
+    }
+
+    @Test
     void keepsASourceUntilItsConnectorChanges() {
-        ConnectorsConfig saved = connectors.save(ConnectorsConfig.builder().connector(ALPHA_LOGS).connector(BETA_LOGS).build());
+        ConsoleConfig saved = connectors.save(ConsoleConfig.builder().connector(ALPHA_LOGS).connector(BETA_LOGS).build());
         LogsSource alpha = connectors.logsSource("alpha-logs").orElseThrow();
         LogsSource beta = connectors.logsSource("beta-logs").orElseThrow();
 
@@ -151,7 +163,7 @@ class ConnectorsTest {
 
     @Test
     void listsEveryProblemAndStoresNothing() {
-        ConnectorsConfig invalid = ConnectorsConfig.builder()
+        ConsoleConfig invalid = ConsoleConfig.builder()
                 .connector(ALPHA_METRICS)
                 .connector(ALPHA_METRICS.toBuilder().name("Again").build())
                 .connector(Connector.builder().id("beta").name("Beta").kind("elastic").build())
@@ -178,15 +190,15 @@ class ConnectorsTest {
                         "engine alpha: metrics connector missing is not a metrics connector",
                         "engine alpha logger clients-otlp: logs connector alpha-metrics is not a logs connector",
                         "engine alpha monitor otlp-metrics: metrics connector missing is not a metrics connector"));
-        assertThat(store.load()).isEqualTo(ConnectorsConfig.EMPTY);
+        assertThat(store.load()).isEqualTo(ConsoleConfig.EMPTY);
     }
 
     @Test
     void forgetsTheSourceOfARemovedConnector() {
-        ConnectorsConfig saved = connectors.save(ConnectorsConfig.builder().connector(ALPHA_LOGS).build());
+        ConsoleConfig saved = connectors.save(ConsoleConfig.builder().connector(ALPHA_LOGS).build());
         LogsSource alpha = connectors.logsSource("alpha-logs").orElseThrow();
 
-        ConnectorsConfig removed = connectors.save(saved.toBuilder().clearConnectors().build());
+        ConsoleConfig removed = connectors.save(saved.toBuilder().clearConnectors().build());
         connectors.save(removed.toBuilder().connector(ALPHA_LOGS).build());
 
         assertThat(connectors.logsSource("alpha-logs")).get().isNotSameAs(alpha);
@@ -194,7 +206,7 @@ class ConnectorsTest {
 
     @Test
     void storesATypedSecretEncryptedAndBuildsTheSourceWithIt() {
-        connectors.save(ConnectorsConfig.builder().connector(ALPHA_LOGS.toBuilder().setting("tenant", "alpha-tenant").build()).build());
+        connectors.save(ConsoleConfig.builder().connector(ALPHA_LOGS.toBuilder().setting("tenant", "alpha-tenant").build()).build());
 
         assertThat((String) store.load().getConnectors().getFirst().getSettings().get("tenant")).startsWith(SecretCipher.PREFIX);
         assertThat(connectors.logsSource("alpha-logs")).get().extracting(source -> ((StubLogsSource) source).getTenant())
@@ -203,7 +215,7 @@ class ConnectorsTest {
 
     @Test
     void keepsASecretReferenceAsWritten() {
-        connectors.save(ConnectorsConfig.builder().connector(ALPHA_LOGS.toBuilder().setting("tenant", "${env:BETA_URL}").build()).build());
+        connectors.save(ConsoleConfig.builder().connector(ALPHA_LOGS.toBuilder().setting("tenant", "${env:BETA_URL}").build()).build());
 
         assertThat(store.load().getConnectors().getFirst().getSettings()).containsEntry("tenant", "${env:BETA_URL}");
     }
@@ -212,7 +224,7 @@ class ConnectorsTest {
     void refusesATypedSecretWithoutAMasterKey() {
         Connectors withoutKey = connectors(new SecretCipher(null, List.of()));
 
-        assertThatThrownBy(() -> withoutKey.save(ConnectorsConfig.builder()
+        assertThatThrownBy(() -> withoutKey.save(ConsoleConfig.builder()
                 .connector(ALPHA_LOGS.toBuilder().setting("tenant", "alpha-tenant").build())
                 .build()))
                 .isInstanceOfSatisfying(InvalidConnectorsException.class, e -> assertThat(e.getProblems()).containsExactly(
@@ -223,7 +235,7 @@ class ConnectorsTest {
     void encryptsASecretUnderAPreviousKeyAgainOnSave() {
         String underPreviousKey = new SecretCipher(PREVIOUS_KEY, List.of()).encrypt("alpha-tenant");
 
-        connectors.save(ConnectorsConfig.builder().connector(ALPHA_LOGS.toBuilder().setting("tenant", underPreviousKey).build()).build());
+        connectors.save(ConsoleConfig.builder().connector(ALPHA_LOGS.toBuilder().setting("tenant", underPreviousKey).build()).build());
 
         String stored = (String) store.load().getConnectors().getFirst().getSettings().get("tenant");
         assertThat(new SecretCipher(KEY, List.of()).decrypt(stored)).isEqualTo("alpha-tenant");
@@ -325,19 +337,19 @@ class ConnectorsTest {
         }
     }
 
-    static class MemoryStore implements ConnectorStore {
+    static class MemoryStore implements ConsoleConfigStore {
 
-        private ConnectorsConfig stored = ConnectorsConfig.EMPTY;
+        private ConsoleConfig stored = ConsoleConfig.EMPTY;
 
         @Override
-        public synchronized ConnectorsConfig load() {
+        public synchronized ConsoleConfig load() {
             return stored;
         }
 
         @Override
-        public synchronized ConnectorsConfig save(ConnectorsConfig config) {
+        public synchronized ConsoleConfig save(ConsoleConfig config) {
             if (config.getVersion() != stored.getVersion()) {
-                throw new StaleConnectorsException(config.getVersion(), stored.getVersion());
+                throw new StaleConsoleConfigException(config.getVersion(), stored.getVersion());
             }
             stored = config.toBuilder().version(config.getVersion() + 1).build();
             return stored;

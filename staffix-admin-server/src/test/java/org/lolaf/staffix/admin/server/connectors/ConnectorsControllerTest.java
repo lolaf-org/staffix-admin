@@ -2,7 +2,7 @@ package org.lolaf.staffix.admin.server.connectors;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.lolaf.staffix.admin.store.ConnectorStore;
+import org.lolaf.staffix.admin.store.ConsoleConfigStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -39,7 +39,7 @@ class ConnectorsControllerTest {
     @Autowired
     private MockMvc mockMvc;
     @Autowired
-    private ConnectorStore store;
+    private ConsoleConfigStore store;
     @Autowired
     private JsonMapper jsonMapper;
 
