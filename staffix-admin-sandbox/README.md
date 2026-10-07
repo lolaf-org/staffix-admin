@@ -45,10 +45,14 @@ map as histograms). Point the engines at it instead of the default collector:
 
 In Kibana, Discover the `logs-*` or `metrics-*` data views. The `console-es` profile runs the console with the
 connectors of `connectors-es.yaml`, which read Elasticsearch by default (instead of `console-prometheus-loki`: both
-listen on 8080):
+listen on 8080). They need the distribution's `staffix-admin-logs-elasticsearch` and
+`staffix-admin-metrics-elasticsearch` plugins, with `staffix-admin-logs-elasticsearch-common`, all in its `plugins/`:
 
 ```shell
 (cd staffix-admin-sandbox/docker && docker compose --profile console-es up -d)
+# or from the working copy (data/connectors.yaml replaced: keep a copy if you edited it)
+mkdir -p data && cp staffix-admin-sandbox/connectors-es.yaml data/connectors.yaml
+java -Dloader.path=$DIST/plugins -jar $DIST/staffix-admin.jar --staffix.admin.security.jaas-config=file:dev/console/jaas.conf
 ```
 
 Stop with `docker compose --profile kibana --profile console-es down`; add `-v` to also drop the indexed data and the
