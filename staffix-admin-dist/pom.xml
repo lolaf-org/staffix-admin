@@ -26,11 +26,19 @@
         </dependency>
         <dependency>
             <groupId>org.lolaf</groupId>
+            <artifactId>staffix-admin-metrics-elasticsearch</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.lolaf</groupId>
             <artifactId>staffix-admin-logs-loki</artifactId>
         </dependency>
         <dependency>
             <groupId>org.lolaf</groupId>
-            <artifactId>staffix-admin-connector-elasticsearch</artifactId>
+            <artifactId>staffix-admin-logs-elasticsearch</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.lolaf</groupId>
+            <artifactId>staffix-admin-logs-elasticsearch-common</artifactId>
         </dependency>
         <dependency>
             <groupId>org.lolaf</groupId>

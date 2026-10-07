@@ -10,9 +10,8 @@ serves a React UI and proxies the engines' HTTP admin connectors. The browser ne
 | `staffix-admin-server` | Spring Boot backend: REST API for the UI, engine proxy. Its controllers are the API contract |
 | `staffix-admin-ui` | React + Ant Design UI |
 | `staffix-admin-app` | The executable jar: the server with the UI inside |
-| `staffix-admin-metrics` | `staffix-admin-metrics-spi`, the SPI for metrics backends; `staffix-admin-metrics-prometheus`, metrics from Prometheus |
-| `staffix-admin-logs` | `staffix-admin-logs-spi`, the SPI for logs backends; `staffix-admin-logs-loki`, FIX message logs from Loki |
-| `staffix-admin-connector-elasticsearch` | Metrics and FIX message logs from Elasticsearch, one plugin for both kinds |
+| `staffix-admin-metrics` | `staffix-admin-metrics-spi`, the SPI for metrics backends; `staffix-admin-metrics-prometheus`, metrics from Prometheus; `staffix-admin-metrics-elasticsearch`, metrics from Elasticsearch |
+| `staffix-admin-logs` | `staffix-admin-logs-spi`, the SPI for logs backends; `staffix-admin-logs-loki`, FIX message logs from Loki; `staffix-admin-logs-elasticsearch`, FIX message logs from Elasticsearch; `staffix-admin-logs-elasticsearch-common`, the Elasticsearch client both Elasticsearch plugins use |
 | `staffix-admin-store` | `staffix-admin-store-spi`, where the connectors are kept; `staffix-admin-store-yaml`, a YAML file |
 | `staffix-admin-audit` | `staffix-admin-audit-spi`, where audit entries go; `staffix-admin-audit-log`, log lines |
 | `staffix-admin-connector-spi` | What a backend plugin declares about its settings: descriptions, secrets, secret references |

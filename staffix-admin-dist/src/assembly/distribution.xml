@@ -21,8 +21,10 @@
             <outputDirectory>plugins</outputDirectory>
             <includes>
                 <include>org.lolaf:staffix-admin-metrics-prometheus</include>
+                <include>org.lolaf:staffix-admin-metrics-elasticsearch</include>
                 <include>org.lolaf:staffix-admin-logs-loki</include>
-                <include>org.lolaf:staffix-admin-connector-elasticsearch</include>
+                <include>org.lolaf:staffix-admin-logs-elasticsearch</include>
+                <include>org.lolaf:staffix-admin-logs-elasticsearch-common</include>
                 <include>org.lolaf:staffix-admin-store-yaml</include>
                 <include>org.lolaf:staffix-admin-audit-log</include>
             </includes>
