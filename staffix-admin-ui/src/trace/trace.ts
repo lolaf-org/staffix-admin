@@ -120,6 +120,18 @@ export function fieldsOf(line: string): Map<string, string> {
   return fields
 }
 
+/**
+ * A value's description in the dictionary, each of several space separated values described, as the decoder does;
+ * undefined for a value it does not describe.
+ */
+export function meaningOf(values: Record<string, string>, value: string): string | undefined {
+  const meaning = value
+    .split(' ')
+    .map((one) => values[one] ?? one)
+    .join(' ')
+  return meaning === value ? undefined : meaning
+}
+
 export function separatorOf(line: string): string {
   return line.includes('\u0001') ? '\u0001' : '|'
 }

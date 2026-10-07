@@ -2,12 +2,21 @@ import { useState } from 'react'
 import { Alert, Card, Empty, Flex, Input, Select, Table, Tag, Tooltip, Typography } from 'antd'
 import { useQueries } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router'
-import { messageTypesQuery, useEngines, useTraceSettings, type DecodeTarget, type LogType, type TraceSettings } from '../api/queries'
+import {
+  messageTypesQuery,
+  sessionFieldsQuery,
+  useEngines,
+  useTraceSettings,
+  type DecodeTarget,
+  type FieldInfo,
+  type LogType,
+  type TraceSettings,
+} from '../api/queries'
 import { DecodedMessageModal } from '../telemetry/DecodedMessageModal'
 import { formatDateTime, formatLogTime } from '../telemetry/format'
 import { LOG_TYPES } from '../telemetry/LogsPanel'
 import { TimeRangeSelector, type Period } from '../telemetry/TimeRangeSelector'
-import { fieldsOf, LIMIT, MAX_IDS, MAX_ROUNDS, separatorOf, useTrace, type TraceEntry } from '../trace/trace'
+import { fieldsOf, LIMIT, meaningOf, MAX_IDS, MAX_ROUNDS, separatorOf, useTrace, type TraceEntry } from '../trace/trace'
 
 const EVERY_ENGINE = ''
 const DEFAULT_MINUTES = 1440
@@ -26,6 +35,8 @@ export function TracePage() {
   const trace = useTrace(id, engineIds, period, settings.data)
   const [decoding, setDecoding] = useState<DecodeTarget>()
   const messageTypes = useMessageTypeNames(trace.data?.entries ?? [])
+  const keyFields = settings.data?.keyFields ?? []
+  const sessionFields = useSessionFields(trace.data?.entries ?? [], keyFields)
 
   const update = (changes: Record<string, string | undefined>) => {
     const next = new URLSearchParams(params)
@@ -69,7 +80,8 @@ export function TracePage() {
             trace={trace}
             id={id}
             messageTypes={messageTypes}
-            keyFields={settings.data?.keyFields ?? []}
+            keyFields={keyFields}
+            sessionFields={sessionFields}
             onFollow={(value) => update({ id: value })}
             onDecode={(entry) =>
               setDecoding({
@@ -92,11 +104,12 @@ interface ResultProps {
   id: string
   messageTypes: Map<string, Map<string, string>>
   keyFields: TraceSettings['keyFields']
+  sessionFields: Map<string, Map<number, FieldInfo>>
   onFollow: (id: string) => void
   onDecode: (entry: TraceEntry) => void
 }
 
-function TraceResult({ trace, id, messageTypes, keyFields, onFollow, onDecode }: ResultProps) {
+function TraceResult({ trace, id, messageTypes, keyFields, sessionFields, onFollow, onDecode }: ResultProps) {
   if (trace.isError) return <Alert type="error" title={trace.error.message} />
   const ids = trace.data?.ids ?? [id]
   return (
@@ -171,7 +184,9 @@ function TraceResult({ trace, id, messageTypes, keyFields, onFollow, onDecode }:
           {
             title: 'Fields',
             key: 'fields',
-            render: (_: unknown, entry: TraceEntry) => <KeyFields line={entry.line} id={id} ids={ids} keyFields={keyFields} />,
+            render: (_: unknown, entry: TraceEntry) => (
+              <KeyFields line={entry.line} id={id} ids={ids} keyFields={keyFields} dictionary={sessionFields.get(sessionKey(entry))} />
+            ),
           },
         ]}
       />
@@ -179,7 +194,18 @@ function TraceResult({ trace, id, messageTypes, keyFields, onFollow, onDecode }:
   )
 }
 
-function KeyFields({ line, id, ids, keyFields }: { line: string; id: string; ids: string[]; keyFields: TraceSettings['keyFields'] }) {
+interface KeyFieldsProps {
+  line: string
+  id: string
+  ids: string[]
+  keyFields: TraceSettings['keyFields']
+  /**
+   * The key fields as the session's dictionaries define them, to describe enum values.
+   */
+  dictionary?: Map<number, FieldInfo>
+}
+
+function KeyFields({ line, id, ids, keyFields, dictionary }: KeyFieldsProps) {
   const fields = fieldsOf(line)
   const present = keyFields.filter((field) => fields.has(String(field.tag)))
   if (present.length === 0) {
@@ -189,9 +215,10 @@ function KeyFields({ line, id, ids, keyFields }: { line: string; id: string; ids
     <Flex wrap gap={4}>
       {present.map(({ tag, name }) => {
         const value = fields.get(String(tag))!
+        const meaning = meaningOf(dictionary?.get(tag)?.values ?? {}, value)
         return (
           <Tag key={tag} color={value === id ? 'gold' : ids.includes(value) ? 'blue' : undefined} style={{ marginInlineEnd: 0 }}>
-            {name}={value}
+            {name}={meaning ? `${meaning}(${value})` : value}
           </Tag>
         )
       })}
@@ -206,6 +233,26 @@ function useMessageTypeNames(entries: TraceEntry[]): Map<string, Map<string, str
   const engineIds = [...new Set(entries.map((entry) => entry.engineId))]
   const results = useQueries({ queries: engineIds.map((engineId) => messageTypesQuery({ engineId })) })
   return new Map(engineIds.map((engineId, i) => [engineId, new Map(results[i]?.data?.map((m) => [m.msgType, m.name]) ?? [])]))
+}
+
+/**
+ * The key fields by session, from each session's own dictionaries.
+ */
+function useSessionFields(entries: TraceEntry[], keyFields: TraceSettings['keyFields']): Map<string, Map<number, FieldInfo>> {
+  const sessions = [
+    ...new Map(
+      entries
+        .filter((entry) => entry.group != null && entry.sessionId != null)
+        .map((entry) => [sessionKey(entry), { engineId: entry.engineId, group: entry.group!, sessionId: entry.sessionId! }]),
+    ),
+  ]
+  const tags = keyFields.map((field) => field.tag)
+  const results = useQueries({ queries: sessions.map(([, ref]) => ({ ...sessionFieldsQuery(ref, tags), enabled: tags.length > 0 })) })
+  return new Map(sessions.map(([key], i) => [key, new Map(results[i]?.data?.map((field) => [field.tag, field]) ?? [])]))
+}
+
+function sessionKey(entry: TraceEntry): string {
+  return `${entry.engineId}|${entry.group}|${entry.sessionId}`
 }
 
 function periodOf(params: URLSearchParams): Period {

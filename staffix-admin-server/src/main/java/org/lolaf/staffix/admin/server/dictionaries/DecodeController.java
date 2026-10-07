@@ -14,8 +14,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -51,19 +53,41 @@ public class DecodeController {
     public List<MessageTypeInfo> listMessageTypes(@RequestParam String engineId,
                                                   @RequestParam(required = false) @Nullable String group,
                                                   @RequestParam(required = false) @Nullable String sessionId) {
-        TelemetryProblems.requireGroupForSession(group, sessionId);
         Map<String, MessageTypeInfo> byMsgType = new TreeMap<>();
-        gateway.listGroups(engineId).stream()
+        dictionaries(engineId, group, sessionId).forEach(dictionary -> dictionary.getMessages().values()
+                .forEach(m -> byMsgType.putIfAbsent(m.getMsgType(), new MessageTypeInfo(m.getMsgType(), m.getName()))));
+        return byMsgType.values().stream().sorted(Comparator.comparing(MessageTypeInfo::getName)).toList();
+    }
+
+    /**
+     * The fields of {@code tags} the dictionaries of the sessions in scope define, with their enum values, in the order
+     * asked. Ask for one session: dictionaries of different FIX versions give the same value different meanings.
+     */
+    @GetMapping("/api/messages/fields")
+    public List<FieldInfo> listFields(@RequestParam String engineId,
+                                      @RequestParam(required = false) @Nullable String group,
+                                      @RequestParam(required = false) @Nullable String sessionId,
+                                      @RequestParam List<Integer> tags) {
+        List<FixDictionary> dictionaries = dictionaries(engineId, group, sessionId);
+        return tags.stream()
+                .distinct()
+                .flatMap(tag -> dictionaries.stream().map(dictionary -> dictionary.field(tag)).filter(Objects::nonNull).findFirst().stream())
+                .map(field -> new FieldInfo(field.getTag(), field.getName(), field.getValues()))
+                .toList();
+    }
+
+    private List<FixDictionary> dictionaries(String engineId, @Nullable String group, @Nullable String sessionId) {
+        TelemetryProblems.requireGroupForSession(group, sessionId);
+        return gateway.listGroups(engineId).stream()
                 .filter(g -> group == null || g.getGroup().equals(group))
                 .flatMap(g -> g.getSessions().stream())
                 .flatMap(session -> session.getConfigIds().stream()
                         .filter(configId -> sessionId == null || configId.equals(sessionId))
                         .map(configId -> SessionRef.of(engineId, session.getGroup(), configId)))
                 .flatMap(config -> gateway.getDictionaries(config).stream())
-                .collect(Collectors.toMap(DictionaryRef::getHash, Function.identity(), (a, b) -> a))
-                .values()
-                .forEach(ref -> dictionaryCache.get(engineId, ref).getMessages().values()
-                        .forEach(m -> byMsgType.putIfAbsent(m.getMsgType(), new MessageTypeInfo(m.getMsgType(), m.getName()))));
-        return byMsgType.values().stream().sorted(Comparator.comparing(MessageTypeInfo::getName)).toList();
+                .collect(Collectors.toMap(DictionaryRef::getHash, Function.identity(), (a, b) -> a, LinkedHashMap::new))
+                .values().stream()
+                .map(ref -> dictionaryCache.get(engineId, ref))
+                .toList();
     }
 }

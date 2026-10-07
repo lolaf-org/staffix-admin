@@ -396,6 +396,20 @@ export function useTraceSettings() {
   })
 }
 
+export type FieldInfo = Schemas['FieldInfo']
+
+/**
+ * The fields of `tags` in the session's dictionaries, with their enum values: a session's own, as dictionaries of
+ * different FIX versions give a value different meanings.
+ */
+export function sessionFieldsQuery(ref: SessionRef, tags: number[]) {
+  return {
+    queryKey: ['fields', ref, tags],
+    queryFn: () => call(api.GET('/api/messages/fields', { params: { query: { ...ref, tags } } })),
+    staleTime: 5 * 60_000,
+  }
+}
+
 export function messageTypesQuery(scope: MetricScope) {
   return {
     queryKey: ['messageTypes', scope],

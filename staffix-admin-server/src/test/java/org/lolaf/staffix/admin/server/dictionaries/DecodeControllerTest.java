@@ -10,6 +10,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.hamcrest.Matchers.anEmptyMap;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -46,6 +48,15 @@ class DecodeControllerTest {
                 .andExpect(jsonPath("$[*].name", hasItem("NewOrderSingle")))
                 .andExpect(jsonPath("$[?(@.msgType == 'D')].name").value("NewOrderSingle"))
                 .andExpect(jsonPath("$[0].name").value("AdjustedPositionReport"));
+    }
+
+    @Test
+    void listsTheFieldsAskedWithTheirValuesInTheSessionsDictionary() throws Exception {
+        mockMvc.perform(get("/api/messages/fields?engineId=paris-prod&group=alpha&sessionId=trading&tags=39&tags=99999&tags=11"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].name", contains("OrdStatus", "ClOrdID")))
+                .andExpect(jsonPath("$[0].values.2").value("FILLED"))
+                .andExpect(jsonPath("$[1].values", anEmptyMap()));
     }
 
     @Test
