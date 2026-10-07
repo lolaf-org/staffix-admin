@@ -212,6 +212,19 @@ without a histogram (an `aggregate_metric_double`) has a rate and a mean but no 
 the engines' export step. A logs text filter matches whole words of the message, case insensitive (`body.text` is a
 text field), rather than any substring.
 
+### Order trace
+
+The Trace tab follows an id (ClOrdID, OrderID, QuoteReqID...) across the sessions of every engine, or of one: every
+logged message with a field equal to it, whatever the tag, oldest first. From the messages found it follows the linked
+ids (ClOrdID, OrigClOrdID, OrderID, QuoteReqID, QuoteID), so a trace from a ClOrdID also finds the executions carrying
+only the OrderID and the replaces. It stops after 3 rounds of linked ids, 20 ids, or 1000 messages per engine and
+round, and says so. A value in the decoded message links to its trace, and the URL holds the trace, to share it.
+
+The match is exact: `ORD-1` does not find `ORD-12`. Loki filters the lines itself; Elasticsearch finds the value as a
+phrase and the console keeps the exact matches. A message logged with SOH between fields matches like one logged with
+`|`. Loki has no index on the message content: a trace over a long period of busy engines reads all of their lines,
+so keep the period short where the logs are large.
+
 ## Plugins
 
 Every jar in `plugins/` (next to `staffix-admin.jar`; `-Dloader.path=...` names another directory) joins the

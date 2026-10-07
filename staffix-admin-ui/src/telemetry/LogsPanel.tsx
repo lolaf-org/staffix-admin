@@ -8,7 +8,7 @@ import { DecodedMessageModal } from './DecodedMessageModal'
 import { formatDateTime, formatLogTime } from './format'
 import { TimeRangeSelector, type Period } from './TimeRangeSelector'
 
-const TYPES: { value: LogType; label: string; icon: React.ReactNode }[] = [
+export const LOG_TYPES: { value: LogType; label: string; icon: React.ReactNode }[] = [
   { value: 'IN', label: 'in', icon: <ArrowDownOutlined /> },
   { value: 'OUT', label: 'out', icon: <ArrowUpOutlined /> },
   { value: 'EVENT', label: 'event', icon: <InfoCircleOutlined /> },
@@ -60,7 +60,7 @@ export function LogsPanel({ engineId, group, sessionId }: Props) {
         <Checkbox.Group
           value={types}
           onChange={(values) => setTypes(values as LogType[])}
-          options={TYPES.map((t) => ({ value: t.value, label: t.label }))}
+          options={LOG_TYPES.map((t) => ({ value: t.value, label: t.label }))}
         />
         <TimeRangeSelector value={period} onChange={setPeriod} live={live} onLiveChange={setLive} />
         <Select
@@ -123,7 +123,7 @@ export function LogsPanel({ engineId, group, sessionId }: Props) {
             dataIndex: 'type',
             width: 80,
             render: (type: LogType | null) => {
-              const known = TYPES.find((t) => t.value === type)
+              const known = LOG_TYPES.find((t) => t.value === type)
               return known ? <Tag icon={known.icon}>{known.label}</Tag> : null
             },
           },

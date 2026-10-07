@@ -128,6 +128,15 @@ class TelemetryControllersTest {
     }
 
     @Test
+    void filtersLogsByFieldValue() throws Exception {
+        String order = "ORD-" + (TO.getEpochSecond() - 10);
+        mockMvc.perform(get("/api/logs?engineId=paris-prod&group=alpha&sessionId=trading&fieldValues=" + order + "&fieldValues=NONE&limit=30" + LAST_HOUR))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries", hasSize(2)))
+                .andExpect(jsonPath("$.entries[*].line", everyItem(matchesPattern(".*\\|11=" + order + "\\|.*"))));
+    }
+
+    @Test
     void needsTheGroupOfASession() throws Exception {
         mockMvc.perform(get("/api/logs?engineId=paris-prod&sessionId=trading" + LAST_HOUR))
                 .andExpect(status().isBadRequest());

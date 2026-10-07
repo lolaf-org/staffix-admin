@@ -1,5 +1,5 @@
 import { Button, Flex, Layout, Segmented, Spin, Tabs, Tag, Typography, theme } from 'antd'
-import { ApiOutlined, AppstoreOutlined, AreaChartOutlined, DesktopOutlined, FileSearchOutlined, LogoutOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
+import { ApiOutlined, AppstoreOutlined, AreaChartOutlined, DesktopOutlined, FileSearchOutlined, LogoutOutlined, NodeIndexOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
 import { useQueryClient } from '@tanstack/react-query'
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router'
 import { isUnauthorized } from '../api/client'
@@ -13,6 +13,7 @@ const TABS = [
   { path: '/', label: 'Sessions', icon: <AppstoreOutlined /> },
   { path: '/metrics', label: 'Metrics', icon: <AreaChartOutlined /> },
   { path: '/logs', label: 'Logs', icon: <FileSearchOutlined /> },
+  { path: '/trace', label: 'Trace', icon: <NodeIndexOutlined /> },
   { path: '/connectors', label: 'Connectors', icon: <ApiOutlined /> },
 ]
 

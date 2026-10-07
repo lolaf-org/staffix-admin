@@ -32,6 +32,7 @@ final class DemoLogsSource implements LogsSource {
         parameters.put("text", query.getText());
         parameters.put("types", String.join(",", query.getTypes().stream().map(LogType::name).toList()));
         parameters.put("msgTypes", String.join(",", query.getMsgTypes()));
+        parameters.put("fieldValues", String.join(",", query.getFieldValues()));
         parameters.put("limit", query.getLimit());
         JsonNode response = client.get("/demo/logs", parameters, LogsSourceException::new);
         return StreamSupport.stream(response.spliterator(), false)

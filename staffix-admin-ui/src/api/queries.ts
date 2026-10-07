@@ -380,11 +380,15 @@ export function useDecodedMessage(target: DecodeTarget | undefined) {
  * The message types the dictionaries of the sessions in scope define.
  */
 export function useMessageTypes(scope: MetricScope) {
-  return useQuery({
+  return useQuery(messageTypesQuery(scope))
+}
+
+export function messageTypesQuery(scope: MetricScope) {
+  return {
     queryKey: ['messageTypes', scope],
     queryFn: () => call(api.GET('/api/messages/types', { params: { query: scope } })),
     staleTime: 5 * 60_000,
-  })
+  }
 }
 
 export type ConnectorsConfig = Schemas['ConnectorsConfig']

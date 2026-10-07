@@ -78,7 +78,7 @@ class TelemetryResolutionTest {
                             .isEqualTo("The metrics of engine alpha are not collected: no metrics connector is assigned to its emitters, "
                                     + "or they export nothing a backend reads");
                 });
-        assertThatThrownBy(() -> logsController.queryLogs("alpha", "beta", "trading", FROM, TO, null, List.of(), List.of(), 10))
+        assertThatThrownBy(() -> logsController.queryLogs("alpha", "beta", "trading", FROM, TO, null, List.of(), List.of(), List.of(), 10))
                 .isInstanceOfSatisfying(ErrorResponseException.class, e -> {
                     assertThat(e.getStatusCode().value()).isEqualTo(404);
                     assertThat(e.getBody().getDetail()).startsWith("The logs of session beta.trading of engine alpha are not collected");
@@ -90,7 +90,7 @@ class TelemetryResolutionTest {
         LogsSource initiators = query -> List.of(entry(10));
         when(sources.logs("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(initiators), List.of("beta.drop-copy"), Map.of()));
 
-        assertThat(logsController.queryLogs("alpha", null, null, FROM, TO, null, List.of(), List.of(), 10).getNotCollected())
+        assertThat(logsController.queryLogs("alpha", null, null, FROM, TO, null, List.of(), List.of(), List.of(), 10).getNotCollected())
                 .containsExactly("beta.drop-copy");
     }
 
@@ -98,7 +98,7 @@ class TelemetryResolutionTest {
     void reportsAConnectorWhoseStoredSettingsAreInvalid() {
         when(sources.logs("alpha", null, null)).thenThrow(new IllegalArgumentException("unknown setting tenat"));
 
-        assertThatThrownBy(() -> logsController.queryLogs("alpha", null, null, FROM, TO, null, List.of(), List.of(), 10))
+        assertThatThrownBy(() -> logsController.queryLogs("alpha", null, null, FROM, TO, null, List.of(), List.of(), List.of(), 10))
                 .isInstanceOfSatisfying(ErrorResponseException.class, e -> {
                     assertThat(e.getStatusCode().value()).isEqualTo(502);
                     assertThat(e.getBody().getDetail()).isEqualTo("The logs connector is invalid: unknown setting tenat");
@@ -111,7 +111,7 @@ class TelemetryResolutionTest {
         LogsSource clients = query -> List.of(entry(20), entry(40));
         when(sources.logs("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(initiators, clients), List.of(), Map.of()));
 
-        assertThat(logsController.queryLogs("alpha", null, null, FROM, TO, null, List.of(), List.of(), 4).getEntries())
+        assertThat(logsController.queryLogs("alpha", null, null, FROM, TO, null, List.of(), List.of(), List.of(), 4).getEntries())
                 .extracting(LogEntry::getLine).containsExactly("line 10", "line 20", "line 30", "line 40");
     }
 

@@ -16,6 +16,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SplittableRandom;
 import java.util.function.ToDoubleFunction;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Metrics and FIX logs for the running configs, shaped as the console's metrics and logs SPIs return them. Values
@@ -130,7 +132,8 @@ class DemoTelemetry {
      * Newest first, at most {@code limit}.
      */
     List<Entry> logs(List<SimulatedSession> sessions, Instant from, Instant to, @Nullable String text, Set<String> types,
-                     Set<String> msgTypes, int limit) {
+                     Set<String> msgTypes, Set<String> fieldValues, int limit) {
+        Pattern fieldValue = Pattern.compile("(^|\\|)[0-9]+=(" + fieldValues.stream().map(Pattern::quote).collect(Collectors.joining("|")) + ")(\\||$)");
         List<Entry> entries = new ArrayList<>();
         long earliest = Math.max(from.getEpochSecond(), to.getEpochSecond() - MAX_SECONDS_SCANNED / Math.max(sessions.size(), 1));
         for (long second = to.getEpochSecond(); second >= earliest && entries.size() < limit; second--) {
@@ -140,6 +143,7 @@ class DemoTelemetry {
                     .filter(e -> types.isEmpty() || types.contains(e.type()))
                     .filter(e -> text == null || e.line().contains(text))
                     .filter(e -> msgTypes.isEmpty() || msgTypes.stream().anyMatch(t -> e.line().contains("|35=" + t + "|")))
+                    .filter(e -> fieldValues.isEmpty() || fieldValue.matcher(e.line()).find())
                     .filter(e -> !e.timestamp().isAfter(to))
                     .sorted(Comparator.comparing(Entry::timestamp).reversed())
                     .limit(limit - entries.size())

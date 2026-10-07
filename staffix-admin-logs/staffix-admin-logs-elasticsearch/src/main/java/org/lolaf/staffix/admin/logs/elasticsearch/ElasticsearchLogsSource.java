@@ -57,7 +57,7 @@ public class ElasticsearchLogsSource implements LogsSource {
         search.put("fields", List.of(Map.of("field", TIMESTAMP, "format", NANOS), GROUP, SESSION, LOG_TYPE, BODY));
         search.put("sort", List.of(Map.of(TIMESTAMP, Map.of("order", "desc"))));
         search.put("query", Map.of("bool", Map.of("filter", filters(query))));
-        return entries(client.search(search));
+        return entries(client.search(search), query);
     }
 
     private static List<Object> filters(LogQuery query) {
@@ -71,6 +71,13 @@ public class ElasticsearchLogsSource implements LogsSource {
         if (query.getText() != null) {
             filters.add(Map.of("match_phrase", Map.of(BODY, query.getText())));
         }
+        if (!query.getFieldValues().isEmpty()) {
+            // body.text is analyzed: a phrase finds the value whatever its case or tag, the hits are checked exactly
+            filters.add(Map.of("bool", Map.of("minimum_should_match", 1, "should", query.getFieldValues().stream()
+                    .sorted()
+                    .map(value -> Map.of("match_phrase", Map.of(BODY, value)))
+                    .toList())));
+        }
         filters.add(timeRange(query.getFrom().toString(), query.getTo().toString(), NANOS));
         return filters;
     }
@@ -79,7 +86,7 @@ public class ElasticsearchLogsSource implements LogsSource {
         return Map.of("terms", Map.of(field, values.stream().sorted().toList()));
     }
 
-    private static List<LogEntry> entries(JsonNode response) {
+    private static List<LogEntry> entries(JsonNode response, LogQuery query) {
         return response.path("hits").path("hits").valueStream()
                 .map(hit -> hit.path("fields"))
                 .map(fields -> LogEntry.builder()
@@ -89,6 +96,7 @@ public class ElasticsearchLogsSource implements LogsSource {
                         .type(type(text(fields, LOG_TYPE)))
                         .line(Objects.requireNonNullElse(text(fields, BODY), ""))
                         .build())
+                .filter(entry -> query.hasFieldValue(entry.getLine()))
                 .toList();
     }
 

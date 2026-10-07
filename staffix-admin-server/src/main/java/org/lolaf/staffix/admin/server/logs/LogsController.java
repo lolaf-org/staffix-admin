@@ -40,6 +40,7 @@ public class LogsController {
                                     @RequestParam(required = false) @Nullable String text,
                                     @RequestParam(defaultValue = "") List<LogType> types,
                                     @RequestParam(defaultValue = "") List<String> msgTypes,
+                                    @RequestParam(defaultValue = "") List<String> fieldValues,
                                     @RequestParam(defaultValue = "500") @Min(1) @Max(5000) int limit) {
         TelemetrySources.Resolved<LogsSource> resolved = TelemetryProblems.requireSources("logs", engineId, group, sessionId,
                 () -> telemetrySources.logs(engineId, group, sessionId));
@@ -53,6 +54,7 @@ public class LogsController {
                 .text(text == null || text.isBlank() ? null : text)
                 .types(types)
                 .msgTypes(msgTypes)
+                .fieldValues(fieldValues)
                 .limit(limit)
                 .build();
         try {

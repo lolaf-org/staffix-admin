@@ -1,8 +1,11 @@
 import { Alert, Flex, Modal, Segmented, Skeleton, Table, Tag, Typography, theme } from 'antd'
 import { useState } from 'react'
+import { Link } from 'react-router'
 import type { Schemas } from '../api/client'
 import { useDecodedMessage, type DecodeTarget, type FixedPeriod } from '../api/queries'
 import { MetricsPanel } from './MetricsPanel'
+import { traceRoute } from './routes'
+import { LINKING_TAGS } from '../trace/trace'
 
 type DecodedField = Schemas['DecodedField']
 
@@ -61,7 +64,7 @@ export function DecodedMessageModal({ target, onClose }: { target: DecodeTarget 
               <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0 }}>{target?.message}</pre>
             </Typography.Paragraph>
           ) : (
-            <FieldsTable fields={decoded.data.fields} />
+            <FieldsTable fields={decoded.data.fields} onTrace={onClose} />
           )}
         </Flex>
       )}
@@ -76,7 +79,7 @@ function periodAround(epochMillis: number): FixedPeriod {
   }
 }
 
-function FieldsTable({ fields }: { fields: DecodedField[] }) {
+function FieldsTable({ fields, onTrace }: { fields: DecodedField[]; onTrace: () => void }) {
   const { token } = theme.useToken()
   const mono = { fontFamily: token.fontFamilyCode, fontSize: 12 }
   const rows = fields.map((field, index) => ({ ...field, key: index, firstOfSection: index === 0 || fields[index - 1]!.section !== field.section }))
@@ -115,9 +118,14 @@ function FieldsTable({ fields }: { fields: DecodedField[] }) {
         {
           title: 'Value',
           dataIndex: 'value',
-          render: (value: string, row) => (
-            <span style={{ ...mono, wordBreak: 'break-all' }}>{row.meaning ? `${row.meaning}(${value})` : value}</span>
-          ),
+          render: (value: string, row) =>
+            LINKING_TAGS.includes(String(row.tag)) ? (
+              <Link to={traceRoute(value)} onClick={onTrace} title="Trace this id across sessions" style={{ ...mono, wordBreak: 'break-all' }}>
+                {value}
+              </Link>
+            ) : (
+              <span style={{ ...mono, wordBreak: 'break-all' }}>{row.meaning ? `${row.meaning}(${value})` : value}</span>
+            ),
         },
       ]}
     />

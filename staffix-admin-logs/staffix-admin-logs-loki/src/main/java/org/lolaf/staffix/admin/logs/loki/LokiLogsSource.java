@@ -114,6 +114,12 @@ public class LokiLogsSource implements LogsSource {
         if (query.getText() != null) {
             pipeline.append(" |= ").append(quote(query.getText()));
         }
+        if (query.getFieldValues().size() == 1) {
+            pipeline.append(" |= ").append(quote("=" + query.getFieldValues().iterator().next()));
+        }
+        if (!query.getFieldValues().isEmpty()) {
+            pipeline.append(" |~ ").append(quote("(^|[|\\x01])[0-9]+=(" + anyOf(query.getFieldValues()) + ")([|\\x01]|$)"));
+        }
         match(selector, pipeline, LokiLabel.FIX_EID, "=", query.getEngineId());
         if (query.getGroup() != null) {
             match(selector, pipeline, LokiLabel.FIX_SG, "=", query.getGroup());

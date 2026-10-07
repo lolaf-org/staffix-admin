@@ -99,6 +99,21 @@ class LokiLogsSourceTest {
     }
 
     @Test
+    void filtersAFieldValueWithASubstringThenAnchoredOnTheSeparators() {
+        source(null).query(query().fieldValue("ALPHA-1.2").build());
+
+        assertThat(params.get("query")).isEqualTo("{service_name=~\".+\"} |= \"=ALPHA-1.2\" |~ \"(^|[|\\\\x01])[0-9]+=(ALPHA-1\\\\.2)([|\\\\x01]|$)\""
+                + " | fix_eid=\"alpha\" | fix_sg=\"beta\" | fix_sn=\"trading\"");
+    }
+
+    @Test
+    void filtersSeveralFieldValuesWithTheRegexOnly() {
+        source(null).query(query().fieldValue("BETA-2").fieldValue("ALPHA-1").build());
+
+        assertThat(params.get("query")).startsWith("{service_name=~\".+\"} |~ \"(^|[|\\\\x01])[0-9]+=(ALPHA-1|BETA-2)([|\\\\x01]|$)\" | ");
+    }
+
+    @Test
     void matchesIndexedLabelsInTheStreamSelector() {
         source(Set.of(LokiLabel.FIX_EID, LokiLabel.FIX_LOG_TYPE), null).query(query().type(LogType.IN).msgType("8").build());
 

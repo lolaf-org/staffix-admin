@@ -30,6 +30,7 @@ class SimulatedLogsSource implements LogsSource {
                         .filter(e -> query.getTypes().isEmpty() || query.getTypes().contains(e.getType()))
                         .filter(e -> query.getText() == null || e.getLine().contains(query.getText()))
                         .filter(e -> query.getMsgTypes().isEmpty() || query.getMsgTypes().stream().anyMatch(t -> e.getLine().contains("|35=" + t + "|")))
+                        .filter(e -> query.hasFieldValue(e.getLine()))
                         .limit(query.getLimit() - entries.size())
                         .forEach(entries::add);
             }

@@ -108,6 +108,24 @@ class ElasticsearchLogsSourceTest {
     }
 
     @Test
+    void searchesFieldValuesAsPhrasesAndKeepsTheExactMatches() {
+        response = """
+                {"hits":{"hits":[
+                 {"fields":{"@timestamp":["2026-10-02T08:00:05Z"],"fix.log.type":["out"],"body.text":["35=D|11=ALPHA-1|"]}},
+                 {"fields":{"@timestamp":["2026-10-02T08:00:04Z"],"fix.log.type":["out"],"body.text":["35=D|11=alpha-1|"]}},
+                 {"fields":{"@timestamp":["2026-10-02T08:00:03Z"],"fix.log.type":["in"],"body.text":["35=8|37=BETA-2\\u0001"]}}]}}
+                """;
+
+        List<LogEntry> entries = source(null, null, null).query(query().fieldValue("BETA-2").fieldValue("ALPHA-1").build());
+
+        JsonNode anyValue = search.path("query").path("bool").path("filter").get(3).path("bool");
+        assertThat(anyValue.path("minimum_should_match").asInt()).isEqualTo(1);
+        assertThat(anyValue.path("should").toString())
+                .isEqualTo("[{\"match_phrase\":{\"body.text\":\"ALPHA-1\"}},{\"match_phrase\":{\"body.text\":\"BETA-2\"}}]");
+        assertThat(entries).extracting(LogEntry::getLine).containsExactly("35=D|11=ALPHA-1|", "35=8|37=BETA-2\u0001");
+    }
+
+    @Test
     void readsTheConfiguredIndex() {
         new ElasticsearchLogsSource(new ElasticsearchLogsSettings(url(), Duration.ofSeconds(2), "fix-logs,other-logs", null, null, null),
                 RestClient.builder(), JSON).query(query().build());

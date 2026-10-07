@@ -6,3 +6,9 @@ export function metricsRoute(scope: MetricScope): string {
   if (scope.sessionId) params.set('session', scope.sessionId)
   return `/metrics?${params}`
 }
+
+export function traceRoute(id: string, engineId?: string): string {
+  const params = new URLSearchParams({ id })
+  if (engineId) params.set('engine', engineId)
+  return `/trace?${params}`
+}
