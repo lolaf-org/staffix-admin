@@ -25,7 +25,30 @@ export function formatDateTime(epochMillis: number): string {
   return new Date(epochMillis).toLocaleString([], { dateStyle: 'short', timeStyle: 'medium' })
 }
 
-export function formatLogTime(iso: string): string {
-  const date = new Date(iso)
-  return `${date.toLocaleTimeString([], { hour12: false })}.${String(date.getMilliseconds()).padStart(3, '0')}`
+/**
+ * The finest precision the entries carry, at least milliseconds: an ISO instant drops trailing zero groups, so one
+ * microsecond timestamp falling on a whole millisecond would otherwise print three digits.
+ */
+export function logTimeDigits(timestamps: string[]): number {
+  return timestamps.reduce((digits, timestamp) => Math.max(digits, fractionOf(timestamp).length), 3)
+}
+
+/**
+ * The time to the millisecond, then the microsecond and nanosecond groups the precision calls for. The fraction is
+ * read from the text: a `Date` keeps only milliseconds.
+ */
+export function logTimeParts(iso: string, digits: number): { millis: string; finer: string[] } {
+  const fraction = fractionOf(iso).padEnd(digits, '0')
+  return {
+    millis: `${new Date(iso).toLocaleTimeString([], { hour12: false })}.${fraction.slice(0, 3)}`,
+    finer: fraction.slice(3, digits).match(/\d{3}/g) ?? [],
+  }
+}
+
+export function logTimeWidth(digits: number): number {
+  return 110 + 9 * (digits - 3)
+}
+
+function fractionOf(iso: string): string {
+  return /\.(\d+)/.exec(iso)?.[1] ?? ''
 }

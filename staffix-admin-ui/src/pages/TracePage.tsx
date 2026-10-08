@@ -13,7 +13,8 @@ import {
   type TraceSettings,
 } from '../api/queries'
 import { DecodedMessageModal } from '../telemetry/DecodedMessageModal'
-import { formatDateTime, formatLogTime } from '../telemetry/format'
+import { formatDateTime, logTimeDigits, logTimeWidth } from '../telemetry/format'
+import { LogTime } from '../telemetry/LogTime'
 import { LOG_TYPES } from '../telemetry/LogsPanel'
 import { TimeRangeSelector, type Period } from '../telemetry/TimeRangeSelector'
 import { fieldsOf, LIMIT, meaningOf, MAX_IDS, MAX_ROUNDS, separatorOf, useTrace, type TraceEntry } from '../trace/trace'
@@ -112,6 +113,7 @@ interface ResultProps {
 function TraceResult({ trace, id, messageTypes, keyFields, sessionFields, onFollow, onDecode }: ResultProps) {
   if (trace.isError) return <Alert type="error" title={trace.error.message} />
   const ids = trace.data?.ids ?? [id]
+  const timeDigits = logTimeDigits((trace.data?.entries ?? []).map((entry) => entry.timestamp))
   return (
     <Flex vertical gap={12}>
       <Flex wrap gap={4} align="center">
@@ -147,10 +149,10 @@ function TraceResult({ trace, id, messageTypes, keyFields, sessionFields, onFoll
           {
             title: 'Time',
             dataIndex: 'timestamp',
-            width: 110,
+            width: logTimeWidth(timeDigits),
             render: (timestamp: string) => (
               <Tooltip title={formatDateTime(Date.parse(timestamp))}>
-                <Typography.Text style={{ fontFamily: 'monospace', fontSize: 12 }}>{formatLogTime(timestamp)}</Typography.Text>
+                <LogTime timestamp={timestamp} digits={timeDigits} />
               </Tooltip>
             ),
           },

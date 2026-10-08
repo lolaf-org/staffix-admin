@@ -5,7 +5,8 @@ import { isNotCollected, type Schemas } from '../api/client'
 import { NotCollectedNotice } from './NotCollectedNotice'
 import { useLogs, useMessageTypes, type DecodeTarget, type LogType } from '../api/queries'
 import { DecodedMessageModal } from './DecodedMessageModal'
-import { formatDateTime, formatLogTime } from './format'
+import { formatDateTime, logTimeDigits, logTimeWidth } from './format'
+import { LogTime } from './LogTime'
 import { TimeRangeSelector, type Period } from './TimeRangeSelector'
 
 export const LOG_TYPES: { value: LogType; label: string; icon: React.ReactNode }[] = [
@@ -33,6 +34,7 @@ export function LogsPanel({ engineId, group, sessionId }: Props) {
   const [limit, setLimit] = useState(100)
   const [decoding, setDecoding] = useState<DecodeTarget>()
   const logs = useLogs({ engineId, group, sessionId, period, text, types, msgTypes, limit }, engineId !== '', live)
+  const timeDigits = logTimeDigits((logs.data?.entries ?? []).map((entry) => entry.timestamp))
 
   return (
     <Flex vertical gap={12}>
@@ -101,10 +103,10 @@ export function LogsPanel({ engineId, group, sessionId }: Props) {
           {
             title: 'Time',
             dataIndex: 'timestamp',
-            width: 110,
+            width: logTimeWidth(timeDigits),
             render: (timestamp: string) => (
               <Tooltip title={formatDateTime(Date.parse(timestamp))}>
-                <Typography.Text style={{ fontFamily: 'monospace', fontSize: 12 }}>{formatLogTime(timestamp)}</Typography.Text>
+                <LogTime timestamp={timestamp} digits={timeDigits} />
               </Tooltip>
             ),
           },
