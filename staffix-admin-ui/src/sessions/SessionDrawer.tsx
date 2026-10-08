@@ -1,7 +1,6 @@
 import { Alert, Drawer, Skeleton, Tabs } from 'antd'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import { useSession, type SessionRef } from '../api/queries'
-import { statusOf } from './health'
 import { StatusBadge } from './StatusBadge'
 import { SendMessageTab } from './SendMessageTab'
 import { SessionSettingsTab } from './SessionSettingsTab'
@@ -21,7 +20,7 @@ export function SessionDrawer() {
       open
       onClose={() => navigate({ pathname: '/', search: location.search })}
       size={760}
-      title={session.data ? <StatusBadge status={statusOf(session.data.summary)} text={title} /> : title}
+      title={session.data ? <StatusBadge status={session.data.summary.status} text={title} /> : title}
     >
       {session.isPending && <Skeleton active />}
       {session.isError && <Alert type="error" title={session.error.message} />}

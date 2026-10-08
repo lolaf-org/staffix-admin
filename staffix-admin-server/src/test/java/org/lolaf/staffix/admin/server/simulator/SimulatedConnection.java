@@ -3,7 +3,6 @@ package org.lolaf.staffix.admin.server.simulator;
 import org.jspecify.annotations.Nullable;
 import org.lolaf.staffix.admin.server.engines.GatewayException;
 import org.lolaf.staffix.admin.server.sessions.SessionConfig;
-import org.lolaf.staffix.admin.server.sessions.SessionHealth;
 import org.lolaf.staffix.admin.server.sessions.SessionSummary;
 import org.lolaf.staffix.admin.server.sessions.SessionType;
 import tools.jackson.databind.JsonNode;
@@ -76,10 +75,7 @@ class SimulatedConnection {
                 .configIds(configs.stream().map(c -> c.id).toList())
                 .runningConfigId(running.id)
                 .identity(running.identity)
-                .health(SessionHealth.of(running.loggedIn, running.withinSessionTime))
-                .loggedIn(running.loggedIn)
-                .connected(running.loggedIn)
-                .withinSessionTime(running.withinSessionTime)
+                .status(running.status())
                 .desiredState(running.desiredState)
                 .messagesLoggerInstanceId(emitters.messagesLogger())
                 .monitoringInstanceId(emitters.monitoring())

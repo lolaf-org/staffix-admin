@@ -35,7 +35,7 @@ class SimulatedMeters {
             meters.add(Meter.builder().name("session.clock.offset").type(Meter.Type.GAUGE).unit(TimeUnit.NANOSECONDS)
                     .description("The counterparty's clock minus this engine's.").build());
         }
-        meters.add(Meter.builder().name("session.logon.state").type(Meter.Type.GAUGE).description("1 while logged on.").build());
+        meters.add(Meter.builder().name("session.logon.status").type(Meter.Type.GAUGE).description("Where the session stands for an operator: 1 LOGGED_IN, 3 LOGGED_OUT_BY_OPERATOR, 2 LOGGED_OUT_OUTSIDE_SESSION_TIME, 0 LOGGED_OUT_INSIDE_SESSION_TIME.").build());
         if (!clients) {
             meters.add(Meter.builder().name(CUSTOM_TIMER).type(Meter.Type.TIMER).description("Pricing an order.")
                     .tagKey(CUSTOM_TAG).percentiles(true).custom(true).build());

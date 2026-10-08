@@ -39,7 +39,7 @@ const BUILT_IN: Record<string, { label: string; title: string }> = {
 /**
  * The logon state is what the session status already shows; charted, it says nothing more.
  */
-const NOT_CHARTED = ['session.logon.state']
+const NOT_CHARTED = ['session.logon.status']
 const MESSAGE_RATE_DESCRIPTION =
   'FIX messages per second, per message type: received ones counted by the read timer, sent ones by the write timer.'
 

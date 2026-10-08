@@ -42,6 +42,7 @@ class SimulatedFixSession {
                     case "isLoggedIn", "isConnected" -> session.loggedIn;
                     case "isWithinSessionTime" -> session.withinSessionTime;
                     case "getDesiredState" -> session.desiredState;
+                    case "getStatus" -> session.status();
                     case "equals" -> proxy == args[0];
                     case "hashCode" -> System.identityHashCode(proxy);
                     case "toString" -> "simulated " + session.fixSessionId();

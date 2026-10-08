@@ -33,11 +33,8 @@ public class SessionSummary {
      * Of the selected config: a backup may connect with other comp ids.
      */
     FixIdentity identity;
-    SessionHealth health;
-    boolean loggedIn;
-    boolean connected;
-    boolean withinSessionTime;
-    SessionState desiredState;
+    SessionStatus status;
+    SessionDesiredState desiredState;
     /**
      * The engine's messages logger instance the session's logs go through, the same for all its configs; it selects
      * the connector they are read from.

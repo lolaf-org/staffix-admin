@@ -3,7 +3,7 @@ import { App, Descriptions, Divider, Flex, InputNumber, Modal, Select, Table, Ta
 import { useLocation, useNavigate } from 'react-router'
 import { type Schemas } from '../api/client'
 import { useActivateConfig, useLogon, useLogout, useRemoveSession, useResetSession, useSetSeqNums, type SessionRef } from '../api/queries'
-import { HEALTH_LABELS, statusOf } from './health'
+import { STATUS_LABELS } from './status'
 import { StatusBadge } from './StatusBadge'
 import { formatCompIds } from './identity'
 import { RESET_MODES } from './resetModes'
@@ -26,7 +26,7 @@ export function SessionStatusTab({ sessionRef, detail }: Props) {
         column={1}
         bordered
         items={[
-          { label: 'Status', children: <StatusBadge status={statusOf(summary)} text={HEALTH_LABELS[summary.health]} /> },
+          { label: 'Status', children: <StatusBadge status={summary.status} text={STATUS_LABELS[summary.status]} /> },
           { label: 'Group', children: summary.group },
           { label: 'Session', children: summary.id },
           { label: 'Instance', children: `${summary.type.toLowerCase()} ${summary.instanceId}` },
@@ -35,8 +35,6 @@ export function SessionStatusTab({ sessionRef, detail }: Props) {
           ...(summary.identity.defaultApplVerId ? [{ label: 'DefaultApplVerID', children: summary.identity.defaultApplVerId }] : []),
           { label: 'Sender', children: <Typography.Text copyable>{formatCompIds(summary.identity.sender)}</Typography.Text> },
           { label: 'Target', children: <Typography.Text copyable>{formatCompIds(summary.identity.target)}</Typography.Text> },
-          { label: 'Connected', children: yesNo(summary.connected) },
-          { label: 'Within session time', children: yesNo(summary.withinSessionTime) },
           {
             label: 'Desired state',
             children: summary.desiredState === 'LOGGED_OUT' ? <Tag color="orange">logged out by an operator</Tag> : summary.desiredState.toLowerCase().replace('_', ' '),
@@ -201,8 +199,4 @@ function Configs({ sessionRef, detail }: Props) {
       />
     </div>
   )
-}
-
-function yesNo(value: boolean) {
-  return value ? 'yes' : 'no'
 }

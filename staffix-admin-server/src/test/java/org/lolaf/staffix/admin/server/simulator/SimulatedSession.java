@@ -2,7 +2,8 @@ package org.lolaf.staffix.admin.server.simulator;
 
 import lombok.Builder;
 import org.lolaf.staffix.admin.server.sessions.FixIdentity;
-import org.lolaf.staffix.admin.server.sessions.SessionState;
+import org.lolaf.staffix.admin.server.sessions.SessionDesiredState;
+import org.lolaf.staffix.admin.server.sessions.SessionStatus;
 import org.lolaf.staffix.admin.server.sessions.SessionType;
 import tools.jackson.databind.JsonNode;
 
@@ -24,13 +25,13 @@ class SimulatedSession {
 
     boolean loggedIn;
     boolean withinSessionTime;
-    SessionState desiredState;
+    SessionDesiredState desiredState;
     long incomingSeqNum = 1;
     long outgoingSeqNum = 1;
 
     @Builder
     private SimulatedSession(String id, String group, FixIdentity identity, SessionType type, JsonNode settings,
-                             String connectAddress, boolean withinSessionTime, SessionState desiredState) {
+                             String connectAddress, boolean withinSessionTime, SessionDesiredState desiredState) {
         this.id = id;
         this.group = group;
         this.identity = identity;
@@ -38,17 +39,17 @@ class SimulatedSession {
         this.settings = settings;
         this.connectAddress = connectAddress;
         this.withinSessionTime = withinSessionTime;
-        this.desiredState = desiredState == null ? SessionState.LOGGED_IN : desiredState;
+        this.desiredState = desiredState == null ? SessionDesiredState.LOGGED_IN : desiredState;
         reconnect();
     }
 
     void logon() {
-        desiredState = SessionState.LOGGED_IN;
+        desiredState = SessionDesiredState.LOGGED_IN;
         reconnect();
     }
 
     void logout() {
-        desiredState = SessionState.LOGGED_OUT;
+        desiredState = SessionDesiredState.LOGGED_OUT;
         loggedIn = false;
     }
 
@@ -56,7 +57,17 @@ class SimulatedSession {
      * Logs on again when it should be logged on, as after a reset or a switch to it.
      */
     void reconnect() {
-        loggedIn = withinSessionTime && desiredState == SessionState.LOGGED_IN;
+        loggedIn = withinSessionTime && desiredState.equals(SessionDesiredState.LOGGED_IN);
+    }
+
+    SessionStatus status() {
+        if (loggedIn) {
+            return SessionStatus.LOGGED_IN;
+        }
+        if (desiredState.equals(SessionDesiredState.LOGGED_OUT)) {
+            return SessionStatus.LOGGED_OUT_BY_OPERATOR;
+        }
+        return withinSessionTime ? SessionStatus.LOGGED_OUT_INSIDE_SESSION_TIME : SessionStatus.LOGGED_OUT_OUTSIDE_SESSION_TIME;
     }
 
     void resetSeqNums(long next) {

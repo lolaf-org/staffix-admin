@@ -153,7 +153,7 @@ class PrometheusMetricsSourceTest {
                  {"metric":{"fix_sg":"beta","fix_sn":"trading"},"values":[[1790928000,"1"]]}]}}
                 """;
 
-        List<MetricSeries> series = source(TimeUnit.MILLISECONDS).query(perSession("session.logon.state", MetricStatistic.VALUE));
+        List<MetricSeries> series = source(TimeUnit.MILLISECONDS).query(perSession("session.logon.status", MetricStatistic.VALUE));
 
         assertThat(series.getFirst().getPoints()).extracting(MetricPoint::getValue).containsExactly(1.0);
         assertThat(series.getFirst().getRateWindow()).isNull();

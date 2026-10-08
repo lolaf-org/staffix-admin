@@ -1,6 +1,6 @@
 import { useSearchParams } from 'react-router'
 import type { Schemas } from '../api/client'
-import { statusOf, type Status } from './health'
+import type { Status } from './status'
 import { formatIdentity } from './identity'
 
 /**
@@ -28,7 +28,7 @@ export function useSessionFilters() {
       .toLowerCase()
 
   const matches = (session: Schemas['SessionSummary']) =>
-    (statuses.length === 0 || statuses.includes(statusOf(session))) &&
+    (statuses.length === 0 || statuses.includes(session.status)) &&
     (text === '' || searchable(session).includes(text.toLowerCase()))
 
   return {

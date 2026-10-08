@@ -24,7 +24,7 @@ export function SendMessageTab({ sessionRef, summary }: { sessionRef: SessionRef
 
   return (
     <Form<MessageForm> form={form} layout="vertical" initialValues={{ messages: '', separator: '|', possDup: false }}>
-      {!summary.loggedIn && <Alert type="warning" title="The session is not logged in: the engine will refuse the messages." style={{ marginBottom: 16 }} />}
+      {summary.status !== 'LOGGED_IN' && <Alert type="warning" title="The session is not logged in: the engine will refuse the messages." style={{ marginBottom: 16 }} />}
       <Typography.Paragraph type="secondary">
         One message per line, sent in order; the engine stops at the first it refuses, those before it being sent. It
         fills in the header (BeginString, BodyLength, MsgSeqNum, SenderCompID, TargetCompID, SendingTime) and the

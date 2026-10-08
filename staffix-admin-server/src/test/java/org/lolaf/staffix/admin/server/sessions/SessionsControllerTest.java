@@ -45,7 +45,7 @@ class SessionsControllerTest {
         mockMvc.perform(get("/api/engines/paris-prod/groups"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[*].group", hasItem("alpha")))
-                .andExpect(jsonPath("$[0].sessions[0].health").exists())
+                .andExpect(jsonPath("$[0].sessions[0].status").exists())
                 .andExpect(jsonPath("$[0].sessions[0].instanceId").exists())
                 .andExpect(jsonPath("$[0].sessions[0].identity.target.compId").exists());
     }
@@ -55,10 +55,10 @@ class SessionsControllerTest {
         mockMvc.perform(post(ACME_TRADING + "/logout").with(csrf())).andExpect(status().isNoContent());
         mockMvc.perform(get(ACME_TRADING))
                 .andExpect(jsonPath("$.summary.desiredState").value("LOGGED_OUT"))
-                .andExpect(jsonPath("$.summary.loggedIn").value(false));
+                .andExpect(jsonPath("$.summary.status").value("LOGGED_OUT_BY_OPERATOR"));
 
         mockMvc.perform(post(ACME_TRADING + "/logon").with(csrf())).andExpect(status().isNoContent());
-        mockMvc.perform(get(ACME_TRADING)).andExpect(jsonPath("$.summary.loggedIn").value(true));
+        mockMvc.perform(get(ACME_TRADING)).andExpect(jsonPath("$.summary.status").value("LOGGED_IN"));
     }
 
     @Test

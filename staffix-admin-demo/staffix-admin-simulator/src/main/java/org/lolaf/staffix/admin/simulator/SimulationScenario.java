@@ -6,9 +6,9 @@ import org.lolaf.staffix.api.application.FixApplicationSessionSettingDescriptor;
 import org.lolaf.staffix.api.logging.FixMessagesLoggerSettings;
 import org.lolaf.staffix.api.monitoring.FixSessionsMonitoringManager;
 import org.lolaf.staffix.api.session.FixSession.FixSessionType;
+import org.lolaf.staffix.api.session.FixSessionDesiredState;
 import org.lolaf.staffix.api.session.FixSessionId;
 import org.lolaf.staffix.api.session.FixSessionSettings;
-import org.lolaf.staffix.api.session.FixSessionState;
 import org.lolaf.staffix.api.session.plugins.FixSessionsPluginSettings;
 import org.lolaf.staffix.api.version.FixRegularVersion;
 import org.lolaf.staffix.monitoring.micrometer.otlp.OtlpMicrometerMonitoringManagerSettings;
@@ -178,7 +178,7 @@ class SimulationScenario {
                     .fixSessionId(FixSessionId.of(FixRegularVersion.VERSION_44, FixSessionId.FixSessionIdBuilder.builder()
                             .group(connection.group).name(name).senderCompID(compId).targetCompID(counterparty).build()))
                     .fixSessionType(connection.type)
-                    .desiredSessionState(connection.loggedOut ? FixSessionState.LOGGED_OUT : FixSessionState.LOGGED_IN)
+                    .desiredSessionState(connection.loggedOut ? FixSessionDesiredState.LOGGED_OUT : FixSessionDesiredState.LOGGED_IN)
                     .fixMessageLoggerInstanceId(connection.messagesLogger)
                     .fixApplicationSessionSetting(LOGON_PASSWORD, "demo-" + connection.group)
                     .fixApplicationSessionSetting(ACCOUNT, counterparty + "-1");

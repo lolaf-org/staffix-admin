@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router'
 import type { Schemas } from '../api/client'
 import { sessionRoute, useEngines, useGroups } from '../api/queries'
-import { STATUS_LABELS, STATUSES, statusOf, type Status } from '../sessions/health'
+import { STATUS_LABELS, STATUSES, type Status } from '../sessions/status'
 import { AddSessionModal } from '../sessions/AddSessionModal'
 import { StatusBadge } from '../sessions/StatusBadge'
 import { SessionBox } from '../sessions/SessionBox'
@@ -68,7 +68,7 @@ function EngineCard({ engine }: { engine: Schemas['Engine'] }) {
     .filter((group) => group.sessions.length > 0)
   const counts = STATUSES.map((status) => ({
     status,
-    count: (groups.data ?? []).flatMap((g) => g.sessions).filter((s) => statusOf(s) === status).length,
+    count: (groups.data ?? []).flatMap((g) => g.sessions).filter((s) => s.status === status).length,
   }))
 
   return (

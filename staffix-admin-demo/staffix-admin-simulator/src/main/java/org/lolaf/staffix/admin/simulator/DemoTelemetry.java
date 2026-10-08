@@ -177,7 +177,7 @@ class DemoTelemetry {
             case "MEAN" -> meter.equals("session.rtt") ? (350 + 150 * wave + 60 * random) * MICROS : 1.2 * latency(median, 0.5, random);
             case "VALUE" -> switch (meter) {
                 case "session.clock.offset" -> (40 * Math.sin(2 * Math.PI * second / 3600.0 + key.hashCode()) + 8 * (random - 0.5)) * MICROS;
-                case "session.logon.state" -> 1;
+                case "session.logon.status" -> 1;
                 default -> 0;
             };
             default -> throw new IllegalArgumentException("Unknown statistic " + statistic);

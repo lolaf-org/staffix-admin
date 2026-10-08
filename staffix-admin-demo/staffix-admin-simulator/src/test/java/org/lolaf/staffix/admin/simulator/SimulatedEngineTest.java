@@ -8,9 +8,9 @@ import org.lolaf.staffix.api.monitoring.FixMeterDescriptor;
 import org.lolaf.staffix.api.monitoring.FixSessionsMonitoringContext;
 import org.lolaf.staffix.api.session.FixSession.FixSessionType;
 import org.lolaf.staffix.api.session.FixSession;
+import org.lolaf.staffix.api.session.FixSessionDesiredState;
 import org.lolaf.staffix.api.session.FixSessionId;
 import org.lolaf.staffix.api.session.FixSessionSettings;
-import org.lolaf.staffix.api.session.FixSessionState;
 import org.lolaf.staffix.api.version.FixRegularVersion;
 
 import java.util.List;
@@ -44,7 +44,7 @@ class SimulatedEngineTest {
         List<FixMeterDescriptor> meters = paris.getFixSessionMeters(trading);
 
         assertThat(meters).extracting(FixMeterDescriptor::getName)
-                .contains("messages.read.latency", "messages.write.latency", "session.logon.state", SimulatedMonitoring.PRICING_TIMER);
+                .contains("messages.read.latency", "messages.write.latency", "session.logon.status", SimulatedMonitoring.PRICING_TIMER);
         assertThat(meters).filteredOn(FixMeterDescriptor::isCustom).singleElement()
                 .satisfies(pricing -> assertThat(pricing.getTagKeys()).containsExactly(SimulatedMonitoring.VENUE));
         assertThat(session("alpha", "trading").getPluginContext(FixSessionsMonitoringContext.class)).get()
@@ -116,10 +116,10 @@ class SimulatedEngineTest {
         ticks(3);
         FixSessionSettings acme = settingsOf("acme", "trading");
 
-        paris.updateFixSessionSettings(acme.getFixSessionId(), acme.toBuilder().desiredSessionState(FixSessionState.LOGGED_OUT).build());
+        paris.updateFixSessionSettings(acme.getFixSessionId(), acme.toBuilder().desiredSessionState(FixSessionDesiredState.LOGGED_OUT).build());
 
         assertThat(session("acme", "trading").isLoggedIn()).isFalse();
-        assertThat(settingsOf("acme", "trading").getDesiredSessionState()).isEqualTo(FixSessionState.LOGGED_OUT);
+        assertThat(settingsOf("acme", "trading").getDesiredSessionState()).isEqualTo(FixSessionDesiredState.LOGGED_OUT);
     }
 
     @Test

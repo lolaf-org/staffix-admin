@@ -1,6 +1,6 @@
 import { Badge } from 'antd'
 import type { ReactNode } from 'react'
-import { STATUS_COLORS, STATUS_LABELS, type Status } from './health'
+import { STATUS_COLORS, STATUS_LABELS, type Status } from './status'
 
 interface Props {
   status: Status

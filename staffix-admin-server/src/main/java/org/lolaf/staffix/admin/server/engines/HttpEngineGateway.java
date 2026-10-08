@@ -8,10 +8,10 @@ import org.lolaf.staffix.admin.server.sessions.FixIdentity;
 import org.lolaf.staffix.admin.server.sessions.ApplicationSetting;
 import org.lolaf.staffix.admin.server.sessions.ResetMode;
 import org.lolaf.staffix.admin.server.sessions.SessionConfig;
+import org.lolaf.staffix.admin.server.sessions.SessionDesiredState;
 import org.lolaf.staffix.admin.server.sessions.SessionDetail;
 import org.lolaf.staffix.admin.server.sessions.SessionGroup;
-import org.lolaf.staffix.admin.server.sessions.SessionHealth;
-import org.lolaf.staffix.admin.server.sessions.SessionState;
+import org.lolaf.staffix.admin.server.sessions.SessionStatus;
 import org.lolaf.staffix.admin.server.sessions.SessionSummary;
 import org.lolaf.staffix.admin.server.metrics.SessionMeters;
 import org.lolaf.staffix.admin.server.sessions.SessionComponents;
@@ -331,11 +331,8 @@ class HttpEngineGateway implements EngineGateway {
                 .configIds(description.getConfigs().stream().map(ConnectorSessions.Config::getName).toList())
                 .runningConfigId(status.getSelectedConfig())
                 .identity(identity(session.selectedConfig().getIdentity()))
-                .health(SessionHealth.of(status.isLoggedIn(), status.isWithinSessionTime()))
-                .loggedIn(status.isLoggedIn())
-                .connected(status.isConnected())
-                .withinSessionTime(status.isWithinSessionTime())
-                .desiredState(SessionState.valueOf(status.getDesiredState()))
+                .status(SessionStatus.valueOf(status.getStatus()))
+                .desiredState(SessionDesiredState.valueOf(status.getDesiredState()))
                 .messagesLoggerInstanceId(description.getMessagesLoggerInstanceId())
                 .monitoringInstanceId(description.getMonitoringInstanceId())
                 .build();

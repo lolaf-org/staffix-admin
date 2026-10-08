@@ -27,10 +27,8 @@ class ConnectorStatus {
         String group;
         String name;
         String selectedConfig;
-        boolean loggedIn;
-        boolean connected;
-        boolean withinSessionTime;
         String desiredState;
+        String status;
         long incomingSeqNum;
         long outgoingSeqNum;
     }

@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.lolaf.staffix.admin.server.sessions.CompIds;
 import org.lolaf.staffix.admin.server.sessions.FixIdentity;
-import org.lolaf.staffix.admin.server.sessions.SessionState;
+import org.lolaf.staffix.admin.server.sessions.SessionDesiredState;
 import org.lolaf.staffix.admin.server.sessions.SessionType;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -48,7 +48,7 @@ class SimulationScenario {
         engine.emitters("slf4j", null);
         engine.acceptor("uat-client-1", "trading", "uat-acceptor");
         engine.acceptor("uat-client-2", "trading", "uat-acceptor");
-        engine.acceptor("uat-client-3", "trading", "uat-acceptor").desiredState(SessionState.LOGGED_OUT);
+        engine.acceptor("uat-client-3", "trading", "uat-acceptor").desiredState(SessionDesiredState.LOGGED_OUT);
         return engine.build();
     }
 

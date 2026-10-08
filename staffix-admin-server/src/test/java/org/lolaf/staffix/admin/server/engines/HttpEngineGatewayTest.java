@@ -13,10 +13,10 @@ import org.lolaf.staffix.admin.server.dictionaries.DictionaryRef;
 import org.lolaf.staffix.admin.server.onboarding.EngineAnnouncement;
 import org.lolaf.staffix.admin.server.sessions.ApplicationSetting;
 import org.lolaf.staffix.admin.server.sessions.ResetMode;
+import org.lolaf.staffix.admin.server.sessions.SessionDesiredState;
 import org.lolaf.staffix.admin.server.sessions.SessionDetail;
 import org.lolaf.staffix.admin.server.sessions.SessionGroup;
-import org.lolaf.staffix.admin.server.sessions.SessionHealth;
-import org.lolaf.staffix.admin.server.sessions.SessionState;
+import org.lolaf.staffix.admin.server.sessions.SessionStatus;
 import org.lolaf.staffix.admin.server.sessions.SessionSummary;
 import org.lolaf.staffix.admin.server.sessions.SessionComponents;
 import org.lolaf.staffix.admin.server.sessions.SessionSettingsStore;
@@ -73,11 +73,11 @@ class HttpEngineGatewayTest {
     private static final String STATUS = """
             {"instanceId":"alpha-engine","sessionsVersion":"%s","sessions":[
              {"group":"beta","name":"drop-copy","selectedConfig":"drop-copy",
-              "loggedIn":false,"connected":false,"withinSessionTime":true,"desiredState":"LOGGED_OUT","incomingSeqNum":1,"outgoingSeqNum":1},
+              "desiredState":"LOGGED_OUT","status":"LOGGED_OUT_BY_OPERATOR","incomingSeqNum":1,"outgoingSeqNum":1},
              {"group":"alpha","name":"trading","selectedConfig":"trading-drp",
-              "loggedIn":true,"connected":true,"withinSessionTime":true,"desiredState":"LOGGED_IN","incomingSeqNum":12,"outgoingSeqNum":34},
+              "desiredState":"LOGGED_IN","status":"LOGGED_IN","incomingSeqNum":12,"outgoingSeqNum":34},
              {"group":"alpha","name":"added-since","selectedConfig":"added-since",
-              "loggedIn":true,"connected":true,"withinSessionTime":true,"desiredState":"LOGGED_IN","incomingSeqNum":1,"outgoingSeqNum":1}]}
+              "desiredState":"LOGGED_IN","status":"LOGGED_IN","incomingSeqNum":1,"outgoingSeqNum":1}]}
             """;
 
     private volatile String sessionsVersion = "v1";
@@ -181,12 +181,12 @@ class HttpEngineGatewayTest {
         assertThat(trading.getId()).isEqualTo("trading");
         assertThat(trading.getConfigIds()).containsExactly("trading", "trading-drp");
         assertThat(trading.getRunningConfigId()).isEqualTo("trading-drp");
-        assertThat(trading.getHealth()).isEqualTo(SessionHealth.LOGGED_IN);
+        assertThat(trading.getStatus()).isEqualTo(SessionStatus.LOGGED_IN);
         assertThat(trading.getIdentity().getSender().getSubId()).isEqualTo("DR");
         assertThat(trading.getIdentity().getDefaultApplVerId()).isNull();
         SessionSummary dropCopy = groups.get(1).getSessions().get(0);
-        assertThat(dropCopy.getHealth()).isEqualTo(SessionHealth.LOGGED_OUT_WITHIN_SESSION_TIME);
-        assertThat(dropCopy.getDesiredState()).isEqualTo(SessionState.LOGGED_OUT);
+        assertThat(dropCopy.getStatus()).isEqualTo(SessionStatus.LOGGED_OUT_BY_OPERATOR);
+        assertThat(dropCopy.getDesiredState()).isEqualTo(SessionDesiredState.LOGGED_OUT);
         assertThat(dropCopy.getIdentity().getTarget().getLocationId()).isEqualTo("LDN");
     }
 

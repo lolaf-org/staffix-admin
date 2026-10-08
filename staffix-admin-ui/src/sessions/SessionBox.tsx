@@ -1,7 +1,7 @@
 import { Flex, Tooltip, Typography, theme } from 'antd'
 import { PauseCircleOutlined } from '@ant-design/icons'
 import type { Schemas } from '../api/client'
-import { HEALTH_LABELS, STATUS_COLORS, STATUS_LABELS, statusOf } from './health'
+import { STATUS_COLORS, STATUS_LABELS } from './status'
 import { formatIdentity } from './identity'
 
 interface Props {
@@ -22,7 +22,7 @@ export function SessionBox({ session, selected, onClick }: Props) {
     warning: { background: token.colorWarningBg, border: token.colorWarning },
     orange: { background: token.orange1, border: token.orange },
     error: { background: token.colorErrorBg, border: token.colorError },
-  }[STATUS_COLORS[statusOf(session)]]
+  }[STATUS_COLORS[session.status]]
   const operatorLoggedOut = session.desiredState === 'LOGGED_OUT'
   const mono = { fontFamily: token.fontFamilyCode, fontSize: 12 }
 
@@ -32,15 +32,14 @@ export function SessionBox({ session, selected, onClick }: Props) {
       title={
         <>
           <div>{formatIdentity(session.identity)}</div>
-          <div>{HEALTH_LABELS[session.health]}</div>
-          {operatorLoggedOut && <div>{STATUS_LABELS.LOGGED_OUT_BY_OPERATOR}</div>}
+          <div>{STATUS_LABELS[session.status]}</div>
         </>
       }
     >
       <button
         type="button"
         onClick={onClick}
-        aria-label={`${session.group}.${session.id}, ${STATUS_LABELS[statusOf(session)]}`}
+        aria-label={`${session.group}.${session.id}, ${STATUS_LABELS[session.status]}`}
         style={{
           width: 220,
           padding: '8px 10px',

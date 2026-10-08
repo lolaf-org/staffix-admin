@@ -1,9 +1,10 @@
 package org.lolaf.staffix.admin.simulator;
 
 import org.jspecify.annotations.Nullable;
+import org.lolaf.staffix.api.session.FixSessionDesiredState;
 import org.lolaf.staffix.api.session.FixSessionId;
 import org.lolaf.staffix.api.session.FixSessionSettings;
-import org.lolaf.staffix.api.session.FixSessionState;
+import org.lolaf.staffix.api.session.FixSessionStatus;
 
 import java.util.Random;
 
@@ -32,7 +33,7 @@ final class SimulatedSession {
 
     boolean loggedIn;
     boolean withinSessionTime;
-    FixSessionState desiredState;
+    FixSessionDesiredState desiredState;
     long incomingSeqNum = 1;
     long outgoingSeqNum = 1;
     private int ticksToLogon = RECONNECT_TICKS;
@@ -79,24 +80,34 @@ final class SimulatedSession {
             } else if (flaky && random.nextInt(40) == 0) {
                 drop(2 + random.nextInt(6));
             }
-        } else if (withinSessionTime && desiredState == FixSessionState.LOGGED_IN && --ticksToLogon <= 0) {
+        } else if (withinSessionTime && desiredState.equals(FixSessionDesiredState.LOGGED_IN) && --ticksToLogon <= 0) {
             loggedIn = true;
         }
     }
 
     void logon() {
-        desiredState = FixSessionState.LOGGED_IN;
+        desiredState = FixSessionDesiredState.LOGGED_IN;
         ticksToLogon = 1;
     }
 
     void logout() {
-        desiredState = FixSessionState.LOGGED_OUT;
+        desiredState = FixSessionDesiredState.LOGGED_OUT;
         loggedIn = false;
     }
 
     void drop(int ticksBeforeReconnect) {
         loggedIn = false;
         ticksToLogon = ticksBeforeReconnect;
+    }
+
+    FixSessionStatus status() {
+        if (loggedIn) {
+            return FixSessionStatus.LOGGED_IN;
+        }
+        if (desiredState.equals(FixSessionDesiredState.LOGGED_OUT)) {
+            return FixSessionStatus.LOGGED_OUT_BY_OPERATOR;
+        }
+        return withinSessionTime ? FixSessionStatus.LOGGED_OUT_INSIDE_SESSION_TIME : FixSessionStatus.LOGGED_OUT_OUTSIDE_SESSION_TIME;
     }
 
     void resetSeqNums(long next) {
