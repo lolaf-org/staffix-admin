@@ -1,7 +1,7 @@
 # staffix-admin sandbox
 
 Three staffix engines trading with each other, announced to a locally running console, with their metrics in
-Prometheus and their FIX logs in Loki. Like the console, it builds against the staffix snapshot (see the main README).
+Prometheus and their FIX logs in Loki. Like the console, it builds against the staffix snapshot (see [Building](../docs/development.md#building)).
 
 ## Run
 

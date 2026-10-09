@@ -1,4 +1,4 @@
-# Read from config/ of the directory the console starts in; see the README for every setting.
+# Read from config/ of the directory the console starts in; every setting is in docs/configuration.md.
 staffix:
   admin:
     data-dir: data
