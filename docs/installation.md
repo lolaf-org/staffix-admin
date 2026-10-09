@@ -9,7 +9,7 @@ unpacked under `staffix-admin-dist/target/staffix-admin/`). The console builds a
 | Path | Content |
 |---|---|
 | `staffix-admin.jar` | The console, with the UI inside |
-| `plugins/` | The YAML store, the audit log, and the Prometheus, Loki and Elasticsearch connectors: see [Plugins](plugins.md) |
+| `plugins/` | The YAML store, the audit log, and the Prometheus, Loki, Elasticsearch and ClickHouse connectors: see [Plugins](plugins.md) |
 | `config/` | `application.yml`, `jaas.conf` and `users.properties`, read from the directory the console starts in |
 
 `users.properties` defines no user until you add one, so a fresh install lets nobody in. Hash a password, add the

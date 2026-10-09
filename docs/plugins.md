@@ -16,10 +16,10 @@ The console provides Spring Boot (web, RestClient), Jackson, the SPIs above and 
 them as `provided`, as `staffix-admin-logs/staffix-admin-logs-loki/pom.xml` does. Anything else it needs, it shades
 into its jar or ships as more jars in `plugins/`.
 
-The distribution's own `plugins/` holds the YAML store, the audit log and the Prometheus, Loki and Elasticsearch
-connectors (the demo distribution adds the demo connector). The console refuses to start without a store and an audit
-sink; the connectors you do not use can go. In the Docker image, add plugins by building on it rather than mounting
-over `plugins/`: see [Installation](installation.md#docker-image).
+The distribution's own `plugins/` holds the YAML store, the audit log and the Prometheus, Loki, Elasticsearch and
+ClickHouse connectors (the demo distribution adds the demo connector). The console refuses to start without a store
+and an audit sink; the connectors you do not use can go. In the Docker image, add plugins by building on it rather than
+mounting over `plugins/`: see [Installation](installation.md#docker-image).
 
 ## Writing an audit sink
 

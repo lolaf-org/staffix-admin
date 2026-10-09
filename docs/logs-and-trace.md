@@ -23,9 +23,9 @@ ids (ClOrdID, OrigClOrdID, OrderID, QuoteReqID, QuoteID), so a trace from a ClOr
 only the OrderID and the replaces. It stops after 3 rounds of linked ids, 20 ids, or 1000 messages per engine and
 round, and says so. The URL holds the trace, to share it.
 
-The match is exact: `ORD-1` does not find `ORD-12`. Loki filters the lines itself; Elasticsearch finds the value as a
-phrase and the console keeps the exact matches. A message logged with SOH between fields matches like one logged with
-`|`.
+The match is exact: `ORD-1` does not find `ORD-12`. Loki and ClickHouse filter the lines themselves; Elasticsearch
+finds the value as a phrase and the console keeps the exact matches. A message logged with SOH between fields matches
+like one logged with `|`.
 
 ### Trace settings
 
@@ -50,4 +50,4 @@ limit.
 Loki indexes labels, not the message content: it finds a value by reading the selected sessions' lines, newest
 first, and stops once it has the limit's worth of matches. A value with few matches, such as an order id, makes it
 read the whole period, so a trace or a text search over days of sessions logging a lot costs Loki that much, and may
-hit its query limits. Elasticsearch finds the value through its index whatever the period.
+hit its query limits. Elasticsearch and ClickHouse find the value through their index whatever the period.

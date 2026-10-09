@@ -8,8 +8,9 @@ engine at a glance, control and configure them, and read their metrics and FIX l
 - **One console, many engines.** Engines announce themselves through staffix's HTTP admin API connector; nothing to
   register by hand. The console calls each engine with the token it announced.
 - **The browser only talks to the console.** Engine URLs and tokens never reach it.
-- **Telemetry from your backends, not from the engines.** Metrics come from Prometheus or Elasticsearch, FIX logs from
-  Loki or Elasticsearch, as staffix exports them through OpenTelemetry. Searching days of logs never loads an engine.
+- **Telemetry from your backends, not from the engines.** Metrics come from Prometheus, Elasticsearch or ClickHouse,
+  FIX logs from Loki, Elasticsearch or ClickHouse, as staffix exports them through OpenTelemetry. Searching days of
+  logs never loads an engine.
 - **Pluggable.** Backends, secret schemes, the audit sink and the configuration store are plugins: jars dropped into
   `plugins/`.
 - **Roles and audit.** Operators log in through JAAS as `READER` or `WRITER`; every change, and every refused one, is
@@ -48,7 +49,7 @@ Open http://localhost:8080 and log in as `reader` or `writer` (password = name).
 [demo's README](staffix-admin-demo/README.md).
 
 To run it for your own engines, see [Installation](docs/installation.md); to try it with real engines, Prometheus,
-Loki or Elasticsearch, the [sandbox](staffix-admin-sandbox/README.md).
+Loki, Elasticsearch or ClickHouse, the [sandbox](staffix-admin-sandbox/README.md).
 
 ## Documentation
 
@@ -57,7 +58,7 @@ Loki or Elasticsearch, the [sandbox](staffix-admin-sandbox/README.md).
 | [Installation](docs/installation.md) | Distribution, users, Docker image, connecting engines |
 | [Configuration](docs/configuration.md) | Every setting and its default |
 | [Connectors](docs/connectors.md) | Metrics and logs backends, `console.yaml`, credentials |
-| [Backends](docs/backends.md) | Prometheus, Loki, Elasticsearch and OpenTelemetry collector setup |
+| [Backends](docs/backends.md) | Prometheus, Loki, Elasticsearch, ClickHouse and OpenTelemetry collector setup |
 | [Sessions](docs/sessions.md) | Statuses, control, settings, sending, availability |
 | [Metrics](docs/metrics.md) | Meters, statistics, rate windows |
 | [Logs and trace](docs/logs-and-trace.md) | Log search, decoding, CSV, order trace |

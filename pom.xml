@@ -103,6 +103,21 @@
             </dependency>
             <dependency>
                 <groupId>org.lolaf</groupId>
+                <artifactId>staffix-admin-metrics-clickhouse</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.lolaf</groupId>
+                <artifactId>staffix-admin-logs-clickhouse</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.lolaf</groupId>
+                <artifactId>staffix-admin-logs-clickhouse-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.lolaf</groupId>
                 <artifactId>staffix-admin-connector-demo</artifactId>
                 <version>${project.version}</version>
             </dependency>

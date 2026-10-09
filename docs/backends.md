@@ -1,7 +1,8 @@
 # Backends
 
-What each backend needs so the console can read what staffix exports. `staffix-admin-sandbox/docker` holds working
-configurations of all of them: see the [sandbox](../staffix-admin-sandbox/README.md).
+What each backend needs so the console can read what staffix exports: Prometheus, Loki, Elasticsearch or
+ClickHouse. `staffix-admin-sandbox/docker` holds working configurations of all of them: see the
+[sandbox](../staffix-admin-sandbox/README.md).
 
 ## Prometheus
 
@@ -52,3 +53,21 @@ the engines' export step.
 
 A logs text filter matches whole words of the message, case insensitive (`body.text` is a text field), rather than
 any substring.
+
+## ClickHouse
+
+The ClickHouse connectors read what the OpenTelemetry collector's `clickhouse` exporter (in the collector's contrib
+distribution) writes in its own schema: `otel_logs`, `otel_metrics_histogram` and `otel_metrics_gauge` of the `otel`
+database by default (each connector's `database` and tables). Let the exporter create them (`create_schema: true`),
+as `staffix-admin-sandbox/docker/conf/otel-collector-clickhouse.yaml` does. The console talks to ClickHouse's HTTP
+interface (port 8123) as a user that only needs to read those tables.
+
+**Logs.** The exporter's schema indexes the lowercased message body by token, so a search for an id (a trace, a
+field value) reads only the parts of the table holding its tokens, whatever the period: the case where Loki has to
+read everything. Text is matched case sensitive, as with Loki. A session's lines are found through the bloom filters on
+the attribute maps.
+
+**Metrics.** Timers are stored as cumulative histograms, one row per export: the console takes the difference between
+consecutive exports of each series (an engine restart starts a new series), then computes rates, means and quantiles
+per window, a quantile interpolated within the histogram's buckets. No collector processor is needed. Set
+`minRateWindow` to twice the engines' export step.

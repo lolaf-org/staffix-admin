@@ -1,0 +1,21 @@
+version: 0
+connectors:
+  - id: sandbox-clickhouse-metrics
+    name: Sandbox ClickHouse metrics
+    kind: clickhouse-metrics
+    settings:
+      url: http://localhost:8123
+      username: otel
+      password: otel
+      timerBaseUnit: microseconds
+      minRateWindow: 10s
+  - id: sandbox-clickhouse-logs
+    name: Sandbox ClickHouse logs
+    kind: clickhouse-logs
+    settings:
+      url: http://localhost:8123
+      username: otel
+      password: otel
+defaults:
+  metrics: sandbox-clickhouse-metrics
+  logs: sandbox-clickhouse-logs

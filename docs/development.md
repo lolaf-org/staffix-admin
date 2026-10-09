@@ -7,14 +7,14 @@
 | `staffix-admin-server` | Spring Boot backend: REST API for the UI, engine proxy. Its controllers are the API contract |
 | `staffix-admin-ui` | React + Ant Design UI |
 | `staffix-admin-app` | The executable jar: the server with the UI inside |
-| `staffix-admin-metrics` | `staffix-admin-metrics-spi`, the SPI for metrics backends; `staffix-admin-metrics-prometheus` and `staffix-admin-metrics-elasticsearch`, its plugins |
-| `staffix-admin-logs` | `staffix-admin-logs-spi`, the SPI for logs backends; `staffix-admin-logs-loki` and `staffix-admin-logs-elasticsearch`, its plugins; `staffix-admin-logs-elasticsearch-common`, the Elasticsearch client both Elasticsearch plugins use |
+| `staffix-admin-metrics` | `staffix-admin-metrics-spi`, the SPI for metrics backends; `staffix-admin-metrics-prometheus`, `staffix-admin-metrics-elasticsearch` and `staffix-admin-metrics-clickhouse`, its plugins |
+| `staffix-admin-logs` | `staffix-admin-logs-spi`, the SPI for logs backends; `staffix-admin-logs-loki`, `staffix-admin-logs-elasticsearch` and `staffix-admin-logs-clickhouse`, its plugins; `staffix-admin-logs-elasticsearch-common` and `staffix-admin-logs-clickhouse-common`, the client each pair of plugins shares |
 | `staffix-admin-store` | `staffix-admin-store-spi`, where the console configuration is kept; `staffix-admin-store-yaml`, a YAML file |
 | `staffix-admin-audit` | `staffix-admin-audit-spi`, where audit entries go; `staffix-admin-audit-log`, log lines |
 | `staffix-admin-connector-spi` | What a backend plugin declares about its settings: descriptions, secrets, secret references |
 | `staffix-admin-dist` | The distribution: the console's jar, its plugins and an example configuration; a Docker image |
 | `staffix-admin-demo` | Simulated engines and the distribution reading their telemetry: see its [README](../staffix-admin-demo/README.md) |
-| `staffix-admin-sandbox` | Real staffix engines trading with each other, with Prometheus, Loki and Elasticsearch (profile `sandbox`): see its [README](../staffix-admin-sandbox/README.md) |
+| `staffix-admin-sandbox` | Real staffix engines trading with each other, with Prometheus, Loki, Elasticsearch or ClickHouse (profile `sandbox`): see its [README](../staffix-admin-sandbox/README.md) |
 
 ## Building
 
@@ -51,5 +51,5 @@ backend and run `npm run generate-api:live`.
 
 - The [demo](../staffix-admin-demo/README.md): simulated engines with generated metrics and logs, no backend to
   install.
-- The [sandbox](../staffix-admin-sandbox/README.md): real staffix engines exporting to Prometheus, Loki or
-  Elasticsearch through an OpenTelemetry collector.
+- The [sandbox](../staffix-admin-sandbox/README.md): real staffix engines exporting to Prometheus, Loki,
+  Elasticsearch or ClickHouse through an OpenTelemetry collector.

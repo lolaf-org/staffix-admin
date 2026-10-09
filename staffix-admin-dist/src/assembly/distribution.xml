@@ -25,6 +25,9 @@
                 <include>org.lolaf:staffix-admin-logs-loki</include>
                 <include>org.lolaf:staffix-admin-logs-elasticsearch</include>
                 <include>org.lolaf:staffix-admin-logs-elasticsearch-common</include>
+                <include>org.lolaf:staffix-admin-metrics-clickhouse</include>
+                <include>org.lolaf:staffix-admin-logs-clickhouse</include>
+                <include>org.lolaf:staffix-admin-logs-clickhouse-common</include>
                 <include>org.lolaf:staffix-admin-store-yaml</include>
                 <include>org.lolaf:staffix-admin-audit-log</include>
             </includes>

@@ -10,6 +10,8 @@ Loki per environment.
 | `elasticsearch-metrics` | Metrics from Elasticsearch |
 | `loki` | FIX logs from Loki |
 | `elasticsearch-logs` | FIX logs from Elasticsearch |
+| `clickhouse-metrics` | Metrics from ClickHouse |
+| `clickhouse-logs` | FIX logs from ClickHouse |
 
 Each backend needs some setup on the OpenTelemetry collector or the backend itself: see [Backends](backends.md).
 Plugins can add kinds: see [Plugins](plugins.md).
@@ -60,6 +62,14 @@ connectors:
       url: https://elasticsearch:9200
       index: logs-*.otel-*          # the default
       apiKey: ${env:ES_API_KEY}     # or username and password
+  - id: prod-clickhouse-logs
+    name: Production ClickHouse logs
+    kind: clickhouse-logs
+    settings:
+      url: http://clickhouse:8123   # the HTTP interface
+      database: otel                # the default, with table otel_logs
+      username: fix_reader
+      password: ${env:CLICKHOUSE_PASSWORD}
 defaults:
   metrics: prod-prometheus
   logs: prod-loki

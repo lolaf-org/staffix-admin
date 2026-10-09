@@ -18,5 +18,6 @@
         <module>staffix-admin-metrics-spi</module>
         <module>staffix-admin-metrics-prometheus</module>
         <module>staffix-admin-metrics-elasticsearch</module>
+        <module>staffix-admin-metrics-clickhouse</module>
     </modules>
 </project>

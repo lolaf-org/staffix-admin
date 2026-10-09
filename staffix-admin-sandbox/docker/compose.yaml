@@ -59,6 +59,17 @@ services:
       - ../console-es.yaml:/etc/staffix-admin/console.yaml:ro
       - console-es-data:/data
 
+  # the same console, with the ClickHouse connectors as defaults
+  console-clickhouse:
+    <<: *console
+    profiles: [ console-clickhouse ]
+    volumes:
+      - ../../staffix-admin-dist/target/staffix-admin/staffix-admin:/app:ro
+      - ./conf/console/jaas.conf:/etc/staffix-admin/jaas.conf:ro
+      - ./conf/console/users.properties:/etc/staffix-admin/users.properties:ro
+      - ../console-clickhouse.yaml:/etc/staffix-admin/console.yaml:ro
+      - console-clickhouse-data:/data
+
   # Elasticsearch and Kibana behind their own collector on 4320: run the engines with -DotlpUrl=http://localhost:4320
   otel-collector-elastic:
     image: otel/opentelemetry-collector-contrib:0.158.0
@@ -133,5 +144,6 @@ services:
 volumes:
   console-data:
   console-es-data:
+  console-clickhouse-data:
   elasticsearch-data:
   clickhouse-data:

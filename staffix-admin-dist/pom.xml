@@ -42,6 +42,18 @@
         </dependency>
         <dependency>
             <groupId>org.lolaf</groupId>
+            <artifactId>staffix-admin-metrics-clickhouse</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.lolaf</groupId>
+            <artifactId>staffix-admin-logs-clickhouse</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.lolaf</groupId>
+            <artifactId>staffix-admin-logs-clickhouse-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.lolaf</groupId>
             <artifactId>staffix-admin-store-yaml</artifactId>
         </dependency>
         <dependency>

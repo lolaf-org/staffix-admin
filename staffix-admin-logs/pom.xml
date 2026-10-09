@@ -19,5 +19,7 @@
         <module>staffix-admin-logs-loki</module>
         <module>staffix-admin-logs-elasticsearch-common</module>
         <module>staffix-admin-logs-elasticsearch</module>
+        <module>staffix-admin-logs-clickhouse-common</module>
+        <module>staffix-admin-logs-clickhouse</module>
     </modules>
 </project>

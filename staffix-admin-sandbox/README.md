@@ -1,7 +1,7 @@
 # staffix-admin sandbox
 
 Three staffix engines trading with each other, announced to a locally running console, with their metrics in
-Prometheus and their FIX logs in Loki (or Elasticsearch). Like the console, it builds against the
+Prometheus and their FIX logs in Loki (or Elasticsearch, or ClickHouse). Like the console, it builds against the
 staffix snapshot (see [Building](../docs/development.md#building)).
 
 ## Run
@@ -63,15 +63,22 @@ connectors this console stored.
 
 The `clickhouse` profile starts ClickHouse (HTTP on :8123, user and password `otel`, database `otel`) and a third
 OpenTelemetry collector on port 4321, whose `clickhouse` exporter creates the `otel_logs`, `otel_traces` and
-`otel_metrics_<type>` tables, to look at the data:
+`otel_metrics_<type>` tables. The `console-clickhouse` profile runs the console with the connectors of
+`console-clickhouse.yaml`, which read ClickHouse by default (instead of the other consoles: all listen on 8080):
 
 ```shell
 (cd staffix-admin-sandbox/docker && docker compose --profile clickhouse up -d)
 ./mvnw exec:java -Psandbox -pl staffix-admin-sandbox -DotlpUrl=http://localhost:4321
+(cd staffix-admin-sandbox/docker && docker compose --profile console-clickhouse up -d)
+# or from the working copy (data/console.yaml replaced: keep a copy if you edited it)
+mkdir -p data && cp staffix-admin-sandbox/console-clickhouse.yaml data/console.yaml
+java -Dloader.path=$DIST/plugins -jar $DIST/staffix-admin.jar --staffix.admin.security.jaas-config=file:staffix-admin-sandbox/console/jaas.conf
+# to query the tables yourself
 (cd staffix-admin-sandbox/docker && docker compose exec clickhouse clickhouse-client --user otel --password otel --database otel)
 ```
 
-Stop with `docker compose --profile clickhouse down`; add `-v` to also drop the data.
+Stop with `docker compose --profile clickhouse --profile console-clickhouse down`; add `-v` to also drop the data and
+the connectors this console stored.
 
 ## What runs
 

@@ -8,7 +8,7 @@ command. Then come back here.
 | [Installation](installation.md) | How do I install the console, create its users, run it in Docker, and get my engines to show up? |
 | [Configuration](configuration.md) | Which settings does the console take, and what are their defaults? |
 | [Connectors](connectors.md) | How does the console find each session's metrics and logs, and where do I keep the backends' credentials? |
-| [Backends](backends.md) | What do Prometheus, Loki, Elasticsearch and the OpenTelemetry collector need so the console can read what staffix exports? |
+| [Backends](backends.md) | What do Prometheus, Loki, Elasticsearch, ClickHouse and the OpenTelemetry collector need so the console can read what staffix exports? |
 | [Sessions](sessions.md) | What do the colours mean, and how do I log a session on, reset its numbers, edit its settings, send messages or see its availability? |
 | [Metrics](metrics.md) | Which meters can I chart, and what sets the finest rate a chart can show? |
 | [Logs and trace](logs-and-trace.md) | How do I search FIX logs, decode a message, follow an order across engines, and what does a search cost the backend? |
