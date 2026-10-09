@@ -13,11 +13,11 @@ import {
   type TraceSettings,
 } from '../api/queries'
 import { DecodedMessageModal } from '../telemetry/DecodedMessageModal'
-import { formatDateTime, logTimeDigits, logTimeWidth } from '../telemetry/format'
+import { formatDateTime, logTimeDigits, logTimeWidth, separatorOf } from '../telemetry/format'
 import { LogTime } from '../telemetry/LogTime'
 import { LOG_TYPES } from '../telemetry/LogsPanel'
 import { TimeRangeSelector, type Period } from '../telemetry/TimeRangeSelector'
-import { fieldsOf, LIMIT, meaningOf, MAX_IDS, MAX_ROUNDS, separatorOf, useTrace, type TraceEntry } from '../trace/trace'
+import { fieldsOf, LIMIT, meaningOf, MAX_IDS, MAX_ROUNDS, useTrace, type TraceEntry } from '../trace/trace'
 
 const EVERY_ENGINE = ''
 const DEFAULT_MINUTES = 1440

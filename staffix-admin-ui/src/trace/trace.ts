@@ -132,10 +132,6 @@ export function meaningOf(values: Record<string, string>, value: string): string
   return meaning === value ? undefined : meaning
 }
 
-export function separatorOf(line: string): string {
-  return line.includes('\u0001') ? '\u0001' : '|'
-}
-
 /**
  * Down to the nanosecond the backends keep, which `Date` drops.
  */

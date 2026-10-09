@@ -52,3 +52,7 @@ export function logTimeWidth(digits: number): number {
 function fractionOf(iso: string): string {
   return /\.(\d+)/.exec(iso)?.[1] ?? ''
 }
+
+export function separatorOf(line: string): string {
+  return line.includes('\u0001') ? '\u0001' : '|'
+}

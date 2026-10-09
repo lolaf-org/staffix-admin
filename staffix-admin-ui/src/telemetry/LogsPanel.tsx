@@ -5,7 +5,7 @@ import { isNotCollected, type Schemas } from '../api/client'
 import { NotCollectedNotice } from './NotCollectedNotice'
 import { useLogs, useMessageTypes, type DecodeTarget, type LogType } from '../api/queries'
 import { DecodedMessageModal } from './DecodedMessageModal'
-import { formatDateTime, logTimeDigits, logTimeWidth } from './format'
+import { formatDateTime, logTimeDigits, logTimeWidth, separatorOf } from './format'
 import { LogTime } from './LogTime'
 import { TimeRangeSelector, type Period } from './TimeRangeSelector'
 
@@ -92,7 +92,7 @@ export function LogsPanel({ engineId, group, sessionId }: Props) {
                   setDecoding({
                     ref: { engineId, group: entry.group!, sessionId: entry.sessionId! },
                     message: entry.line,
-                    separator: '|',
+                    separator: separatorOf(entry.line),
                     timestamp: entry.timestamp,
                   }),
                 style: { cursor: 'pointer' },
