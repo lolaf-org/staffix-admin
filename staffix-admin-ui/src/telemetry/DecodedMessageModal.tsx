@@ -1,10 +1,10 @@
-import { Alert, Flex, Modal, Segmented, Skeleton, Table, Tag, Typography, theme } from 'antd'
+import { Alert, Button, Flex, Modal, Segmented, Skeleton, Table, Tag, Typography, theme } from 'antd'
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import type { Schemas } from '../api/client'
-import { useDecodedMessage, useTraceSettings, type DecodeTarget, type FixedPeriod } from '../api/queries'
+import { useDecodedMessage, useGroups, useTraceSettings, type DecodeTarget, type FixedPeriod, type SessionRef } from '../api/queries'
 import { MetricsPanel } from './MetricsPanel'
-import { traceRoute } from './routes'
+import { sessionRoute, traceRoute } from './routes'
 
 type DecodedField = Schemas['DecodedField']
 
@@ -36,6 +36,7 @@ export function DecodedMessageModal({ target, onClose }: { target: DecodeTarget 
             <Typography.Text type="secondary" style={{ fontSize: 12, fontWeight: 'normal' }}>
               {target?.ref.group}.{target?.ref.sessionId}, dictionary {decoded.data.dictionaryIds.join(' + ')}
             </Typography.Text>
+            {target && <OpenSessionButton configRef={target.ref} onOpen={onClose} />}
           </Flex>
         ) : (
           'Decoding'
@@ -68,6 +69,37 @@ export function DecodedMessageModal({ target, onClose }: { target: DecodeTarget 
         </Flex>
       )}
     </Modal>
+  )
+}
+
+/**
+ * Hidden where the session's panel is already open, as from its own Logs or Send message tab.
+ */
+function OpenSessionButton({ configRef, onOpen }: { configRef: SessionRef; onOpen: () => void }) {
+  const groups = useGroups(configRef.engineId)
+  const navigate = useNavigate()
+  const location = useLocation()
+  const session = groups.data
+    ?.find((group) => group.group === configRef.group)
+    ?.sessions.find((candidate) => candidate.configIds.includes(configRef.sessionId))
+  if (!session) {
+    return null
+  }
+  const route = sessionRoute({ ...configRef, sessionId: session.id })
+  if (location.pathname === route) {
+    return null
+  }
+  return (
+    <Button
+      size="small"
+      type="link"
+      onClick={() => {
+        onOpen()
+        navigate(route)
+      }}
+    >
+      Open session
+    </Button>
   )
 }
 

@@ -10,7 +10,8 @@ are filtered by text, message type and direction (in, out, event), over a [perio
 of up to 7 days, live, or a custom range, newest first and up to a line limit (50 to 500).
 
 - **Decode**: a message opens decoded with its session's own dictionaries, field by field with repeating groups, as
-  raw, or with the session's [metrics around it](metrics.md#around-a-logged-message). Its ids link to their trace.
+  raw, or with the session's [metrics around it](metrics.md#around-a-logged-message). Its ids link to their trace,
+  and **Open session** opens the panel of the session that handled it.
 - **CSV**: exports the lines found, every page: time as the backend keeps it (down to the nanosecond), engine, group,
   session, type and message.
 

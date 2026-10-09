@@ -1,4 +1,4 @@
-import type { MetricScope } from '../api/queries'
+import type { MetricScope, SessionRef } from '../api/queries'
 
 export function metricsRoute(scope: MetricScope): string {
   const params = new URLSearchParams({ engine: scope.engineId })
@@ -11,4 +11,8 @@ export function traceRoute(id: string, engineId?: string): string {
   const params = new URLSearchParams({ id })
   if (engineId) params.set('engine', engineId)
   return `/trace?${params}`
+}
+
+export function sessionRoute(ref: SessionRef): string {
+  return `/engines/${encodeURIComponent(ref.engineId)}/groups/${encodeURIComponent(ref.group)}/sessions/${encodeURIComponent(ref.sessionId)}`
 }
