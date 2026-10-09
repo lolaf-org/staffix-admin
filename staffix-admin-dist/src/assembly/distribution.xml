@@ -29,7 +29,7 @@
     <dependencySets>
         <dependencySet>
             <includes>
-                <include>org.lolaf:staffix-admin-app</include>
+                <include>org.lolaf.staffix.admin:staffix-admin-app</include>
             </includes>
             <useTransitiveDependencies>false</useTransitiveDependencies>
             <outputFileNameMapping>staffix-admin.jar</outputFileNameMapping>
@@ -37,16 +37,16 @@
         <dependencySet>
             <outputDirectory>plugins</outputDirectory>
             <includes>
-                <include>org.lolaf:staffix-admin-metrics-prometheus</include>
-                <include>org.lolaf:staffix-admin-metrics-elasticsearch</include>
-                <include>org.lolaf:staffix-admin-logs-loki</include>
-                <include>org.lolaf:staffix-admin-logs-elasticsearch</include>
-                <include>org.lolaf:staffix-admin-logs-elasticsearch-common</include>
-                <include>org.lolaf:staffix-admin-metrics-clickhouse</include>
-                <include>org.lolaf:staffix-admin-logs-clickhouse</include>
-                <include>org.lolaf:staffix-admin-logs-clickhouse-common</include>
-                <include>org.lolaf:staffix-admin-store-yaml</include>
-                <include>org.lolaf:staffix-admin-audit-log</include>
+                <include>org.lolaf.staffix.admin:staffix-admin-metrics-prometheus</include>
+                <include>org.lolaf.staffix.admin:staffix-admin-metrics-elasticsearch</include>
+                <include>org.lolaf.staffix.admin:staffix-admin-logs-loki</include>
+                <include>org.lolaf.staffix.admin:staffix-admin-logs-elasticsearch</include>
+                <include>org.lolaf.staffix.admin:staffix-admin-logs-elasticsearch-common</include>
+                <include>org.lolaf.staffix.admin:staffix-admin-metrics-clickhouse</include>
+                <include>org.lolaf.staffix.admin:staffix-admin-logs-clickhouse</include>
+                <include>org.lolaf.staffix.admin:staffix-admin-logs-clickhouse-common</include>
+                <include>org.lolaf.staffix.admin:staffix-admin-store-yaml</include>
+                <include>org.lolaf.staffix.admin:staffix-admin-audit-log</include>
             </includes>
             <useTransitiveDependencies>false</useTransitiveDependencies>
         </dependencySet>

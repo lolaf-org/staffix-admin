@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>org.lolaf</groupId>
+        <groupId>org.lolaf.staffix.admin</groupId>
         <artifactId>staffix-admin-metrics</artifactId>
         <version>0.1.0-SNAPSHOT</version>
     </parent>
@@ -21,12 +21,12 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>org.lolaf</groupId>
+            <groupId>org.lolaf.staffix.admin</groupId>
             <artifactId>staffix-admin-connector-spi</artifactId>
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>org.lolaf</groupId>
+            <groupId>org.lolaf.staffix.admin</groupId>
             <artifactId>staffix-admin-metrics-spi</artifactId>
             <scope>provided</scope>
         </dependency>

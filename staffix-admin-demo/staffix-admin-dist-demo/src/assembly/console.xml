@@ -28,7 +28,7 @@
     <dependencySets>
         <dependencySet>
             <includes>
-                <include>org.lolaf:staffix-admin-dist:zip</include>
+                <include>org.lolaf.staffix.admin:staffix-admin-dist:zip</include>
             </includes>
             <unpack>true</unpack>
             <unpackOptions>
@@ -41,7 +41,7 @@
         <dependencySet>
             <outputDirectory>staffix-admin/plugins</outputDirectory>
             <includes>
-                <include>org.lolaf:staffix-admin-connector-demo</include>
+                <include>org.lolaf.staffix.admin:staffix-admin-connector-demo</include>
             </includes>
             <useTransitiveDependencies>false</useTransitiveDependencies>
         </dependencySet>

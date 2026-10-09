@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>org.lolaf</groupId>
+        <groupId>org.lolaf.staffix.admin</groupId>
         <artifactId>staffix-admin-parent</artifactId>
         <version>0.1.0-SNAPSHOT</version>
     </parent>
@@ -16,48 +16,48 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.lolaf</groupId>
+            <groupId>org.lolaf.staffix.admin</groupId>
             <artifactId>staffix-admin-app</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.lolaf</groupId>
+            <groupId>org.lolaf.staffix.admin</groupId>
             <artifactId>staffix-admin-metrics-prometheus</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.lolaf</groupId>
+            <groupId>org.lolaf.staffix.admin</groupId>
             <artifactId>staffix-admin-metrics-elasticsearch</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.lolaf</groupId>
+            <groupId>org.lolaf.staffix.admin</groupId>
             <artifactId>staffix-admin-logs-loki</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.lolaf</groupId>
+            <groupId>org.lolaf.staffix.admin</groupId>
             <artifactId>staffix-admin-logs-elasticsearch</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.lolaf</groupId>
+            <groupId>org.lolaf.staffix.admin</groupId>
             <artifactId>staffix-admin-logs-elasticsearch-common</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.lolaf</groupId>
+            <groupId>org.lolaf.staffix.admin</groupId>
             <artifactId>staffix-admin-metrics-clickhouse</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.lolaf</groupId>
+            <groupId>org.lolaf.staffix.admin</groupId>
             <artifactId>staffix-admin-logs-clickhouse</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.lolaf</groupId>
+            <groupId>org.lolaf.staffix.admin</groupId>
             <artifactId>staffix-admin-logs-clickhouse-common</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.lolaf</groupId>
+            <groupId>org.lolaf.staffix.admin</groupId>
             <artifactId>staffix-admin-store-yaml</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.lolaf</groupId>
+            <groupId>org.lolaf.staffix.admin</groupId>
             <artifactId>staffix-admin-audit-log</artifactId>
         </dependency>
     </dependencies>
