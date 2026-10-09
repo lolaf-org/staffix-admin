@@ -29,6 +29,7 @@ import org.lolaf.staffix.admin.server.connectors.TelemetrySources;
 import org.lolaf.staffix.admin.server.engines.EngineGateway;
 import org.lolaf.staffix.admin.server.web.TelemetryProblems;
 import org.lolaf.staffix.admin.server.web.TimeRange;
+import org.lolaf.staffix.api.monitoring.FixMessageDirection;
 import org.lolaf.staffix.api.monitoring.FixMonitoringAttributes;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -63,10 +64,10 @@ public class MetricsController {
      * staffix registers each message timer for both directions but records it in one only.
      */
     private static final Map<String, String> RECORDED_DIRECTION = Map.of(
-            READ, "in",
-            "messages.decoding.latency", "in",
-            WRITE, "out",
-            "messages.encoding.latency", "out");
+            READ, FixMessageDirection.IN.getValue(),
+            "messages.decoding.latency", FixMessageDirection.IN.getValue(),
+            WRITE, FixMessageDirection.OUT.getValue(),
+            "messages.encoding.latency", FixMessageDirection.OUT.getValue());
 
     private final TelemetrySources telemetrySources;
     private final EngineGateway gateway;
@@ -134,8 +135,8 @@ public class MetricsController {
                                            @RequestParam Instant to,
                                            @RequestParam(required = false) @Nullable Duration rateWindow) {
         return query(engineId, group, sessionId, from, to, rateWindow, MetricStatistic.RATE, List.of(
-                messageRate(READ, "in"),
-                messageRate(WRITE, "out")));
+                messageRate(READ, FixMessageDirection.IN.getValue()),
+                messageRate(WRITE, FixMessageDirection.OUT.getValue())));
     }
 
     private static MetricQuery.MetricQueryBuilder messageRate(String timer, String direction) {

@@ -23,6 +23,7 @@ import org.lolaf.staffix.admin.logs.LogQuery;
 import org.lolaf.staffix.admin.logs.LogType;
 import org.lolaf.staffix.admin.logs.LogsSource;
 import org.lolaf.staffix.admin.logs.LogsSourceException;
+import org.lolaf.staffix.api.monitoring.FixMessageDirection;
 import org.lolaf.staffix.api.monitoring.FixMonitoringAttributes;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
@@ -32,7 +33,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -51,9 +51,8 @@ public class ClickHouseLogsSource implements LogsSource {
 
     private static final String ATTRIBUTES = "LogAttributes";
     private static final String LOWER_BODY = "lower(Body)";
-    private static final String LOG_TYPE = FixMonitoringAttributes.FIX_LOG_TYPE.getKey();
+    private static final String DIRECTION = FixMonitoringAttributes.FIX_MESSAGE_DIRECTION.getKey();
     private static final String MSG_TYPE = FixMonitoringAttributes.FIX_MESSAGE_TYPE.getKey();
-    private static final Map<LogType, String> LOG_TYPES = Map.of(LogType.IN, "in", LogType.OUT, "out", LogType.EVENT, "event");
     private static final String REGEX_SPECIALS = "\\.+*?()|[]{}^$";
 
     private final ClickHouseClient client;
@@ -75,7 +74,7 @@ public class ClickHouseLogsSource implements LogsSource {
         String sql = "SELECT toUnixTimestamp64Nano(Timestamp) AS nanos, "
                 + attribute(ATTRIBUTES, GROUP, parameters) + " AS sg, "
                 + attribute(ATTRIBUTES, SESSION, parameters) + " AS sn, "
-                + attribute(ATTRIBUTES, LOG_TYPE, parameters) + " AS lt, "
+                + attribute(ATTRIBUTES, DIRECTION, parameters) + " AS md, "
                 + "Body AS line FROM " + parameters.add("Identifier", table)
                 + " WHERE " + String.join(" AND ", conditions(query, parameters))
                 + " ORDER BY Timestamp DESC LIMIT " + parameters.add("UInt32", query.getLimit());
@@ -88,8 +87,8 @@ public class ClickHouseLogsSource implements LogsSource {
         conditions.add("Timestamp < fromUnixTimestamp64Nano(" + parameters.add("Int64", nanos(query.getTo())) + ")");
         conditions.addAll(scope(ATTRIBUTES, query.getEngineId(), query.getGroup(), query.getSessionId(), parameters));
         if (!query.getTypes().isEmpty()) {
-            conditions.add(attribute(ATTRIBUTES, LOG_TYPE, parameters) + " IN ("
-                    + parameters.strings(query.getTypes().stream().map(LOG_TYPES::get).toList()) + ")");
+            conditions.add(attribute(ATTRIBUTES, DIRECTION, parameters) + " IN ("
+                    + parameters.strings(query.getTypes().stream().map(ClickHouseLogsSource::directionValue).toList()) + ")");
         }
         if (!query.getMsgTypes().isEmpty()) {
             conditions.add(attribute(ATTRIBUTES, MSG_TYPE, parameters) + " IN (" + parameters.strings(query.getMsgTypes()) + ")");
@@ -190,7 +189,7 @@ public class ClickHouseLogsSource implements LogsSource {
                 .timestamp(Instant.ofEpochSecond(0, row.path("nanos").asLong()))
                 .group(blankAsNull(row.path("sg").asString()))
                 .sessionId(blankAsNull(row.path("sn").asString()))
-                .type(type(row.path("lt").asString()))
+                .type(LogType.ofDirectionValue(row.path("md").asString()))
                 .line(row.path("line").asString())
                 .build();
     }
@@ -202,12 +201,9 @@ public class ClickHouseLogsSource implements LogsSource {
         return value.isEmpty() ? null : value;
     }
 
-    private static @Nullable LogType type(String logType) {
-        return switch (logType) {
-            case "in" -> LogType.IN;
-            case "out" -> LogType.OUT;
-            case "event" -> LogType.EVENT;
-            default -> null;
-        };
+    // an event has no fix.md, which the map lookup answers as the empty string
+    private static String directionValue(LogType type) {
+        FixMessageDirection direction = type.getDirection();
+        return direction == null ? "" : direction.getValue();
     }
 }

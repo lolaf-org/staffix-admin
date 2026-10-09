@@ -28,6 +28,6 @@ class LokiLabelTest {
     void namesEachConstantAfterTheLabelLokiGivesItsAttribute() {
         assertThat(Arrays.stream(LokiLabel.values()))
                 .allSatisfy(label -> assertThat(label.label()).isEqualTo(label.name().toLowerCase(Locale.ROOT)));
-        assertThat(LokiLabel.FIX_LOG_TYPE.label()).isEqualTo("fix_log_type");
+        assertThat(LokiLabel.FIX_MD.label()).isEqualTo("fix_md");
     }
 }

@@ -78,7 +78,7 @@ class DemoSourcesTest {
     void readsTheSimulatorsSeries() {
         List<MetricSeries> series = new DemoMetricsSourceFactory(RestClient.builder()).create(settings).query(MetricQuery.builder()
                 .engineId("paris-prod").group("alpha").meter("messages.read.latency").statistic(MetricStatistic.RATE)
-                .splitBy("fix.msg.type").tagFilter("fix.msg.dir", "in").from(FROM).to(FROM.plusSeconds(60))
+                .splitBy("fix.mt").tagFilter("fix.md", "i").from(FROM).to(FROM.plusSeconds(60))
                 .step(Duration.ofSeconds(5)).rateWindow(Duration.ofSeconds(20)).build());
 
         assertThat(series).singleElement().satisfies(one -> {
@@ -86,7 +86,7 @@ class DemoSourcesTest {
             assertThat(one.getPoints()).containsExactly(new MetricPoint(FROM, 12.5));
             assertThat(one.getRateWindow()).isEqualTo(Duration.ofSeconds(20));
         });
-        assertThat(query).contains("engineId=paris-prod", "group=alpha", "meter=messages.read.latency", "statistic=RATE", "splitBy=fix.msg.type", "tagFilters=fix.msg.dir=in", "step=5", "rateWindow=20");
+        assertThat(query).contains("engineId=paris-prod", "group=alpha", "meter=messages.read.latency", "statistic=RATE", "splitBy=fix.mt", "tagFilters=fix.md=i", "step=5", "rateWindow=20");
     }
 
     @Test

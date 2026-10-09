@@ -53,8 +53,8 @@ class ClickHouseLogsSourceTest {
     private volatile String sql;
     private volatile int status = 200;
     private volatile String response = """
-            {"nanos":1790928005123456789,"sg":"beta","sn":"trading","lt":"out","line":"8=FIX.4.4|35=D|11=ALPHA-1|"}
-            {"nanos":1790928004000000000,"sg":"beta","sn":"trading","lt":"","line":"Logon received"}
+            {"nanos":1790928005123456789,"sg":"beta","sn":"trading","md":"o","line":"8=FIX.4.4|35=D|11=ALPHA-1|"}
+            {"nanos":1790928004000000000,"sg":"beta","sn":"trading","md":"","line":"Logon received"}
             """;
 
     @BeforeEach
@@ -85,7 +85,7 @@ class ClickHouseLogsSourceTest {
         assertThat(bound()).isEqualTo("SELECT toUnixTimestamp64Nano(Timestamp) AS nanos, "
                 + "if(mapContains(LogAttributes, 'fix.sg'), LogAttributes['fix.sg'], ResourceAttributes['fix.sg']) AS sg, "
                 + "if(mapContains(LogAttributes, 'fix.sn'), LogAttributes['fix.sn'], ResourceAttributes['fix.sn']) AS sn, "
-                + "if(mapContains(LogAttributes, 'fix.log.type'), LogAttributes['fix.log.type'], ResourceAttributes['fix.log.type']) AS lt, "
+                + "if(mapContains(LogAttributes, 'fix.md'), LogAttributes['fix.md'], ResourceAttributes['fix.md']) AS md, "
                 + "Body AS line FROM 'otel_logs' "
                 + "WHERE Timestamp >= fromUnixTimestamp64Nano('1790928000000000000') AND Timestamp < fromUnixTimestamp64Nano('1790928600000000000') "
                 + "AND (LogAttributes['fix.eid'] = 'alpha' OR ResourceAttributes['fix.eid'] = 'alpha') "
@@ -96,7 +96,8 @@ class ClickHouseLogsSourceTest {
         assertThat(entries).containsExactly(
                 LogEntry.builder().timestamp(Instant.parse("2026-10-02T08:00:05.123456789Z")).group("beta").sessionId("trading")
                         .type(LogType.OUT).line("8=FIX.4.4|35=D|11=ALPHA-1|").build(),
-                LogEntry.builder().timestamp(FROM.plusSeconds(4)).group("beta").sessionId("trading").line("Logon received").build());
+                LogEntry.builder().timestamp(FROM.plusSeconds(4)).group("beta").sessionId("trading")
+                        .type(LogType.EVENT).line("Logon received").build());
     }
 
     @Test
@@ -105,9 +106,16 @@ class ClickHouseLogsSourceTest {
                 .type(LogType.OUT).type(LogType.IN).msgType("D").msgType("8").limit(10).build());
 
         assertThat(bound())
-                .contains("AND if(mapContains(LogAttributes, 'fix.log.type'), LogAttributes['fix.log.type'], ResourceAttributes['fix.log.type']) IN ('in', 'out')")
-                .contains("AND if(mapContains(LogAttributes, 'fix.msg.type'), LogAttributes['fix.msg.type'], ResourceAttributes['fix.msg.type']) IN ('8', 'D')")
+                .contains("AND if(mapContains(LogAttributes, 'fix.md'), LogAttributes['fix.md'], ResourceAttributes['fix.md']) IN ('i', 'o')")
+                .contains("AND if(mapContains(LogAttributes, 'fix.mt'), LogAttributes['fix.mt'], ResourceAttributes['fix.mt']) IN ('8', 'D')")
                 .doesNotContain("fix.sg'] = ");
+    }
+
+    @Test
+    void filtersEventsAsTheRecordsWithoutDirection() {
+        source().query(query().type(LogType.EVENT).type(LogType.IN).build());
+
+        assertThat(bound()).contains("AND if(mapContains(LogAttributes, 'fix.md'), LogAttributes['fix.md'], ResourceAttributes['fix.md']) IN ('', 'i')");
     }
 
     @Test

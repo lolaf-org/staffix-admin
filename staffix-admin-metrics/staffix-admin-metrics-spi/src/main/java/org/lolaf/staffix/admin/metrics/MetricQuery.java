@@ -28,7 +28,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * One meter of staffix's monitoring, read for an engine, a group or a session. Tags are named as staffix's
- * monitoring names them ({@code fix.msg.type}, {@code fix.sg}...), whatever the backend calls them.
+ * monitoring names them ({@code fix.mt}, {@code fix.sg}...), whatever the backend calls them.
  */
 @Value
 @Builder(toBuilder = true)
@@ -61,7 +61,7 @@ public class MetricQuery {
     @Singular("splitBy")
     List<String> splitBy;
     /**
-     * Only the meter's series with these tag values, such as {@code fix.msg.dir=in}.
+     * Only the meter's series with these tag values, such as {@code fix.md=i}.
      */
     @Singular
     Map<String, String> tagFilters;

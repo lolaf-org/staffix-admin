@@ -15,11 +15,34 @@
  */
 package org.lolaf.staffix.admin.logs;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
+import org.lolaf.staffix.api.monitoring.FixMessageDirection;
+
 /**
- * staffix's {@code fix.log.type}: a message received, a message sent, or a session event.
+ * A staffix message log record: a message received, a message sent, or a session event, which staffix writes without
+ * {@code fix.md}.
  */
+@Getter
+@RequiredArgsConstructor
 public enum LogType {
-    IN,
-    OUT,
-    EVENT
+    IN(FixMessageDirection.IN),
+    OUT(FixMessageDirection.OUT),
+    EVENT(null);
+
+    /**
+     * Null for {@link #EVENT}.
+     */
+    private final @Nullable FixMessageDirection direction;
+
+    /**
+     * Reads a record's {@code fix.md} value, missing or empty for an event; null for a value staffix does not write.
+     */
+    public static @Nullable LogType ofDirectionValue(@Nullable String value) {
+        if (value == null || value.isEmpty()) {
+            return EVENT;
+        }
+        return FixMessageDirection.ofValue(value).map(direction -> direction == FixMessageDirection.IN ? IN : OUT).orElse(null);
+    }
 }

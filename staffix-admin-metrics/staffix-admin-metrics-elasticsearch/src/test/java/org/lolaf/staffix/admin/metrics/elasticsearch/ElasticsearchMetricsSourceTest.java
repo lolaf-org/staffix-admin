@@ -98,17 +98,17 @@ class ElasticsearchMetricsSourceTest {
                 + "{\"term\":{\"fix.eid\":\"alpha\"}},"
                 + "{\"term\":{\"fix.sg\":\"beta\"}},"
                 + "{\"term\":{\"fix.sn\":\"trading\"}},"
-                + "{\"term\":{\"fix.msg.dir\":\"in\"}},"
+                + "{\"term\":{\"fix.md\":\"i\"}},"
                 + "{\"exists\":{\"field\":\"metrics.messages.read.latency\"}},"
                 + "{\"range\":{\"@timestamp\":{\"gte\":" + (FROM_MILLIS - 10_000) + ",\"lt\":" + (FROM_MILLIS + 10_000) + ",\"format\":\"epoch_millis\"}}}]");
         JsonNode split = search.path("aggs").path("split");
-        assertThat(split.path("terms").path("field").asString()).isEqualTo("fix.msg.type");
+        assertThat(split.path("terms").path("field").asString()).isEqualTo("fix.mt");
         JsonNode histogram = split.path("aggs").path("series");
         assertThat(histogram.path("date_histogram").path("fixed_interval").asString()).isEqualTo("5000ms");
         assertThat(histogram.path("date_histogram").path("extended_bounds").path("min").asLong()).isEqualTo(FROM_MILLIS - 10_000);
         assertThat(histogram.path("aggs").path("count").path("value_count").path("field").asString()).isEqualTo("metrics.messages.read.latency");
         assertThat(series).containsExactly(MetricSeries.builder()
-                .label("fix.msg.type", "R")
+                .label("fix.mt", "R")
                 .point(new MetricPoint(FROM, 3))
                 .point(new MetricPoint(FROM.plusSeconds(5), 5))
                 .rateWindow(Duration.ofSeconds(10))
@@ -294,8 +294,8 @@ class ElasticsearchMetricsSourceTest {
                 .meter(meter)
                 .statistic(statistic)
                 .quantile(statistic == MetricStatistic.QUANTILE ? 0.99 : null)
-                .splitBy("fix.msg.type")
-                .tagFilter("fix.msg.dir", "in")
+                .splitBy("fix.mt")
+                .tagFilter("fix.md", "i")
                 .from(FROM)
                 .to(FROM.plusSeconds(10))
                 .step(step)

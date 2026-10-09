@@ -21,6 +21,7 @@ import org.lolaf.staffix.admin.logs.LogQuery;
 import org.lolaf.staffix.admin.logs.LogType;
 import org.lolaf.staffix.admin.logs.LogsSource;
 import org.lolaf.staffix.admin.logs.LogsSourceException;
+import org.lolaf.staffix.api.monitoring.FixMessageDirection;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
 import org.springframework.boot.http.client.HttpClientSettings;
 import org.springframework.boot.http.client.HttpRedirects;
@@ -52,7 +53,6 @@ import java.util.stream.Collectors;
 public class LokiLogsSource implements LogsSource {
 
     private static final Pattern REGEX_METACHARACTER = Pattern.compile("[\\\\.+*?()|\\[\\]{}^$]");
-    private static final Map<LogType, String> LOG_TYPES = Map.of(LogType.IN, "in", LogType.OUT, "out", LogType.EVENT, "event");
 
     private final RestClient client;
     private final URI queryRangeUrl;
@@ -143,12 +143,24 @@ public class LokiLogsSource implements LogsSource {
             match(selector, pipeline, LokiLabel.FIX_SN, "=", query.getSessionId());
         }
         if (!query.getTypes().isEmpty()) {
-            match(selector, pipeline, LokiLabel.FIX_LOG_TYPE, "=~", anyOf(query.getTypes().stream().map(LOG_TYPES::get).toList()));
+            matchTypes(selector, pipeline, query.getTypes());
         }
         if (!query.getMsgTypes().isEmpty()) {
-            match(selector, pipeline, LokiLabel.FIX_MSG_TYPE, "=~", anyOf(query.getMsgTypes()));
+            match(selector, pipeline, LokiLabel.FIX_MT, "=~", anyOf(query.getMsgTypes()));
         }
         return "{" + String.join(", ", selector) + "}" + pipeline;
+    }
+
+    // a pipeline regex never matches a missing label, so an event (no fix_md) needs an equality; a selector's does
+    private void matchTypes(List<String> selector, StringBuilder pipeline, Collection<LogType> types) {
+        List<String> directions = types.stream().map(LokiLogsSource::directionValue).sorted().toList();
+        if (indexedLabels.contains(LokiLabel.FIX_MD)) {
+            selector.add(LokiLabel.FIX_MD.label() + "=~" + quote(anyOf(directions)));
+        } else {
+            pipeline.append(" | ").append(directions.stream()
+                    .map(direction -> LokiLabel.FIX_MD.label() + "=" + quote(direction))
+                    .collect(Collectors.joining(" or ")));
+        }
     }
 
     private void match(List<String> selector, StringBuilder pipeline, LokiLabel label, String operator, String value) {
@@ -183,7 +195,7 @@ public class LokiLogsSource implements LogsSource {
                             .timestamp(instant(value.get(0).asString()))
                             .group(text(labels, "fix_sg"))
                             .sessionId(text(labels, "fix_sn"))
-                            .type(type(text(labels, "fix_log_type")))
+                            .type(LogType.ofDirectionValue(text(labels, LokiLabel.FIX_MD.label())))
                             .line(value.get(1).asString())
                             .build());
                 })
@@ -197,13 +209,10 @@ public class LokiLogsSource implements LogsSource {
         return value == null ? null : value.asString();
     }
 
-    private static @Nullable LogType type(@Nullable String logType) {
-        return switch (logType) {
-            case "in" -> LogType.IN;
-            case "out" -> LogType.OUT;
-            case "event" -> LogType.EVENT;
-            case null, default -> null;
-        };
+    // an event has no fix_md, which a label matcher sees as the empty value
+    private static String directionValue(LogType type) {
+        FixMessageDirection direction = type.getDirection();
+        return direction == null ? "" : direction.getValue();
     }
 
     private static Instant instant(String epochNanos) {

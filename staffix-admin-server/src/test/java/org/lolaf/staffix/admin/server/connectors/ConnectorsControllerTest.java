@@ -127,7 +127,7 @@ class ConnectorsControllerTest {
         mockMvc.perform(put("/api/connectors").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(config))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.problems[0]").value("connector alpha-loki: setting indexed-labels[1]: service_name is not one of "
-                        + "fix_eid, fix_sg, fix_sn, fix_log_type, fix_msg_type"));
+                        + "fix_eid, fix_sg, fix_sn, fix_md, fix_mt"));
     }
 
     @Test

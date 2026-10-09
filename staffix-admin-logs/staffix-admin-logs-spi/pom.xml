@@ -15,6 +15,10 @@
 
     <dependencies>
         <dependency>
+            <groupId>org.lolaf.staffix</groupId>
+            <artifactId>staffix-api</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.jspecify</groupId>
             <artifactId>jspecify</artifactId>
         </dependency>

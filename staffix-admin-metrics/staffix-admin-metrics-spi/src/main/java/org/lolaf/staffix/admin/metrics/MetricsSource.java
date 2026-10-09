@@ -23,7 +23,7 @@ import java.util.List;
  * rather than the engines, which do not serve their own history.
  *
  * <p>Series are selected by the labels staffix tags its meters with: {@code fix.eid} (engine), {@code fix.sg}
- * (group), {@code fix.sn} (session name, unique per group only), {@code fix.msg.type} and {@code fix.msg.dir}.
+ * (group), {@code fix.sn} (session name, unique per group only), {@code fix.mt} and {@code fix.md}.
  */
 public interface MetricsSource {
 

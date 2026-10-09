@@ -21,6 +21,7 @@ import org.lolaf.staffix.admin.metrics.MetricQuery;
 import org.lolaf.staffix.admin.metrics.MetricSeries;
 import org.lolaf.staffix.admin.metrics.MetricStatistic;
 import org.lolaf.staffix.admin.metrics.MetricsSource;
+import org.lolaf.staffix.api.monitoring.FixMessageDirection;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -36,8 +37,8 @@ import java.util.Objects;
 @RequiredArgsConstructor
 class SimulatedMetricsSource implements MetricsSource {
 
-    private static final String MESSAGE_TYPE = "fix.msg.type";
-    private static final String DIRECTION = "fix.msg.dir";
+    private static final String MESSAGE_TYPE = "fix.mt";
+    private static final String DIRECTION = "fix.md";
     private static final String GROUP = "fix.sg";
     private static final String SESSION = "fix.sn";
     private static final List<String> MESSAGE_TYPES = List.of("0", "8", "D");
@@ -95,7 +96,7 @@ class SimulatedMetricsSource implements MetricsSource {
         }
         return switch (tag) {
             case MESSAGE_TYPE -> MESSAGE_TYPES;
-            case DIRECTION -> List.of("in", "out");
+            case DIRECTION -> List.of(FixMessageDirection.IN.getValue(), FixMessageDirection.OUT.getValue());
             case SimulatedMeters.CUSTOM_TAG -> VENUES;
             default -> List.of("default");
         };

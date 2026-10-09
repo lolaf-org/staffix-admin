@@ -30,9 +30,9 @@ class DemoTelemetryTest {
     private static final Instant TO = FROM.plusSeconds(600);
     private static final Duration STEP = Duration.ofSeconds(5);
     private static final String READ = "messages.read.latency";
-    private static final List<String> BY_MESSAGE = List.of("fix.msg.type", "fix.msg.dir");
+    private static final List<String> BY_MESSAGE = List.of("fix.mt", "fix.md");
     private static final List<String> BY_SESSION = List.of("fix.sg", "fix.sn");
-    private static final Map<String, String> IN = Map.of("fix.msg.dir", "in");
+    private static final Map<String, String> IN = Map.of("fix.md", "i");
 
     private final List<SimulatedSession> sessions = SimulationScenario.engines().getFirst().runningConfigs();
 
@@ -66,8 +66,8 @@ class DemoTelemetryTest {
     void splitsByTheTagsAskedKeepingOnlyTheFilteredValues() {
         assertThat(DemoTelemetry.metrics(sessions, READ, "QUANTILE", 0.99, null, BY_MESSAGE, IN, FROM, TO, STEP, null))
                 .extracting(DemoTelemetry.Series::labels)
-                .containsExactly(Map.of("fix.msg.type", "0", "fix.msg.dir", "in"), Map.of("fix.msg.type", "8", "fix.msg.dir", "in"),
-                        Map.of("fix.msg.type", "D", "fix.msg.dir", "in"));
+                .containsExactly(Map.of("fix.mt", "0", "fix.md", "i"), Map.of("fix.mt", "8", "fix.md", "i"),
+                        Map.of("fix.mt", "D", "fix.md", "i"));
         assertThat(DemoTelemetry.metrics(sessions, "orders.pricing", "MEAN", null, null, List.of(), Map.of(), FROM, TO, STEP, null))
                 .singleElement().satisfies(one -> assertThat(one.labels()).isEmpty());
     }

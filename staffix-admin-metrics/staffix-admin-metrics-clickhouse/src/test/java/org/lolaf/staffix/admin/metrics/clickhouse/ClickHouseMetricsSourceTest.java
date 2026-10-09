@@ -86,19 +86,19 @@ class ClickHouseMetricsSourceTest {
         List<MetricSeries> series = source(TimeUnit.MICROSECONDS).query(messages(MetricStatistic.RATE, Duration.ofSeconds(5)));
 
         assertThat(bound())
-                .contains("if(mapContains(Attributes, 'fix.msg.type'), Attributes['fix.msg.type'], ResourceAttributes['fix.msg.type']) AS l0, ")
+                .contains("if(mapContains(Attributes, 'fix.mt'), Attributes['fix.mt'], ResourceAttributes['fix.mt']) AS l0, ")
                 .contains("toInt64(Count) - toInt64(prevCount) AS dCount")
                 .contains("FROM 'otel_metrics_histogram' WHERE MetricName = 'messages.read.latency' "
                         + "AND TimeUnix >= toDateTime('" + (FROM.getEpochSecond() - 310) + "') AND TimeUnix <= toDateTime('" + (FROM.getEpochSecond() + 10) + "') "
                         + "AND (Attributes['fix.eid'] = 'alpha' OR ResourceAttributes['fix.eid'] = 'alpha') "
                         + "AND (Attributes['fix.sg'] = 'beta' OR ResourceAttributes['fix.sg'] = 'beta') "
                         + "AND (Attributes['fix.sn'] = 'trading' OR ResourceAttributes['fix.sn'] = 'trading') "
-                        + "AND (Attributes['fix.msg.dir'] = 'in' OR ResourceAttributes['fix.msg.dir'] = 'in')")
+                        + "AND (Attributes['fix.md'] = 'i' OR ResourceAttributes['fix.md'] = 'i')")
                 .contains("PARTITION BY ResourceAttributes, Attributes, StartTimeUnix ORDER BY TimeUnix")
                 .contains("WHERE (n > 1 OR StartTimeUnix >= toDateTime('" + (FROM.getEpochSecond() - 310) + "')) AND bucket >= '" + (FROM_MILLIS - 10_000) + "'")
                 .endsWith("GROUP BY l0, bucket FORMAT JSONEachRow");
         assertThat(series).containsExactly(MetricSeries.builder()
-                .label("fix.msg.type", "D")
+                .label("fix.mt", "D")
                 .point(new MetricPoint(FROM, 3))
                 .point(new MetricPoint(FROM.plusSeconds(5), 5))
                 .rateWindow(Duration.ofSeconds(10))
@@ -216,8 +216,8 @@ class ClickHouseMetricsSourceTest {
                 .sessionId("trading")
                 .meter("messages.read.latency")
                 .statistic(statistic)
-                .splitBy("fix.msg.type")
-                .tagFilter("fix.msg.dir", "in")
+                .splitBy("fix.mt")
+                .tagFilter("fix.md", "i")
                 .from(FROM)
                 .to(FROM.plusSeconds(10))
                 .step(step)

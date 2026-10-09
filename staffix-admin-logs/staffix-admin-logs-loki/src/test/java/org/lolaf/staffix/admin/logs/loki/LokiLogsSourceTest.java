@@ -47,9 +47,9 @@ class LokiLogsSourceTest {
     private static final Instant FROM = Instant.parse("2026-10-02T08:00:00Z");
     private static final String TWO_STREAMS = """
             {"status":"success","data":{"resultType":"streams","result":[
-             {"stream":{"fix_eid":"alpha","fix_sg":"beta","fix_sn":"trading","fix_log_type":"in","fix_msg_type":"8"},
+             {"stream":{"fix_eid":"alpha","fix_sg":"beta","fix_sn":"trading","fix_md":"i","fix_mt":"8"},
               "values":[["1790928005000000123","8=FIX.4.4|35=8|"],["1790928001000000000","8=FIX.4.4|35=8|older"]]},
-             {"stream":{"fix_eid":"alpha","fix_sg":"beta","fix_sn":"trading","fix_log_type":"event"},
+             {"stream":{"fix_eid":"alpha","fix_sg":"beta","fix_sn":"trading"},
               "values":[["1790928003000000000","Logon received"]]}]}}
             """;
 
@@ -110,7 +110,14 @@ class LokiLogsSourceTest {
         source(null).query(query().text("ALPHA \"US\"").type(LogType.OUT).type(LogType.IN).msgType("8").msgType("D").build());
 
         assertThat(params.get("query")).isEqualTo("{service_name=~\".+\"} |= \"ALPHA \\\"US\\\"\" | fix_eid=\"alpha\" | fix_sg=\"beta\""
-                + " | fix_sn=\"trading\" | fix_log_type=~\"in|out\" | fix_msg_type=~\"8|D\"");
+                + " | fix_sn=\"trading\" | fix_md=\"i\" or fix_md=\"o\" | fix_mt=~\"8|D\"");
+    }
+
+    @Test
+    void filtersEventsAsTheRecordsWithoutDirection() {
+        source(null).query(query().type(LogType.EVENT).type(LogType.IN).build());
+
+        assertThat(params.get("query")).endsWith(" | fix_md=\"\" or fix_md=\"i\"");
     }
 
     @Test
@@ -130,17 +137,24 @@ class LokiLogsSourceTest {
 
     @Test
     void matchesIndexedLabelsInTheStreamSelector() {
-        source(Set.of(LokiLabel.FIX_EID, LokiLabel.FIX_LOG_TYPE), null).query(query().type(LogType.IN).msgType("8").build());
+        source(Set.of(LokiLabel.FIX_EID, LokiLabel.FIX_MD), null).query(query().type(LogType.IN).msgType("8").build());
 
-        assertThat(params.get("query")).isEqualTo("{service_name=~\".+\", fix_eid=\"alpha\", fix_log_type=~\"in\"}"
-                + " | fix_sg=\"beta\" | fix_sn=\"trading\" | fix_msg_type=~\"8\"");
+        assertThat(params.get("query")).isEqualTo("{service_name=~\".+\", fix_eid=\"alpha\", fix_md=~\"i\"}"
+                + " | fix_sg=\"beta\" | fix_sn=\"trading\" | fix_mt=~\"8\"");
+    }
+
+    @Test
+    void matchesEventsOfAnIndexedDirectionAsAnEmptyValue() {
+        source(Set.of(LokiLabel.FIX_EID, LokiLabel.FIX_MD), null).query(query().type(LogType.EVENT).type(LogType.OUT).build());
+
+        assertThat(params.get("query")).startsWith("{service_name=~\".+\", fix_eid=\"alpha\", fix_md=~\"|o\"}");
     }
 
     @Test
     void escapesRegexMetacharactersInMessageTypes() {
         source(null).query(LogQuery.builder().engineId("alpha").from(FROM).to(FROM.plusSeconds(600)).msgType("A.B").limit(10).build());
 
-        assertThat(params.get("query")).endsWith("| fix_msg_type=~\"A\\\\.B\"");
+        assertThat(params.get("query")).endsWith("| fix_mt=~\"A\\\\.B\"");
     }
 
     @Test

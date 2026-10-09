@@ -49,10 +49,10 @@ class TelemetryControllersTest {
     @Test
     void givesOneSeriesPerMessageTypeInTheDirectionTheTimerIsRecorded() throws Exception {
         mockMvc.perform(get("/api/metrics?engineId=paris-prod&group=acme&sessionId=trading&meter=messages.read.latency&statistic=QUANTILE"
-                        + "&quantile=0.99&splitBy=fix.msg.type&splitBy=fix.msg.dir" + LAST_HOUR))
+                        + "&quantile=0.99&splitBy=fix.mt&splitBy=fix.md" + LAST_HOUR))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.series", hasSize(3)))
-                .andExpect(jsonPath("$.series[*].labels['fix.msg.dir']", everyItem(is("in"))))
+                .andExpect(jsonPath("$.series[*].labels['fix.md']", everyItem(is("i"))))
                 .andExpect(jsonPath("$.series[0].points", hasSize(241)));
     }
 

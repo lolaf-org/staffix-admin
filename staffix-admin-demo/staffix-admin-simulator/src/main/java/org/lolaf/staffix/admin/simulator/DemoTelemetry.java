@@ -17,6 +17,7 @@ package org.lolaf.staffix.admin.simulator;
 
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
+import org.lolaf.staffix.api.monitoring.FixMessageDirection;
 import org.lolaf.staffix.api.session.FixSession.FixSessionType;
 
 import java.time.Duration;
@@ -24,6 +25,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -42,8 +44,8 @@ import java.util.stream.Collectors;
 @UtilityClass
 class DemoTelemetry {
 
-    private static final String MESSAGE_TYPE = "fix.msg.type";
-    private static final String DIRECTION = "fix.msg.dir";
+    private static final String MESSAGE_TYPE = "fix.mt";
+    private static final String DIRECTION = "fix.md";
     private static final String GROUP = "fix.sg";
     private static final String SESSION = "fix.sn";
     private static final Map<String, Double> MESSAGES_PER_SECOND = Map.of("D", 12.0, "8", 18.0, "0", 1 / 30.0);
@@ -53,7 +55,7 @@ class DemoTelemetry {
             "messages.decoding.latency", 3.0,
             "messages.encoding.latency", 2.0,
             "session.rtt", 450.0);
-    private static final List<String> DIRECTIONS = List.of("in", "out");
+    private static final List<String> DIRECTIONS = Arrays.stream(FixMessageDirection.values()).map(FixMessageDirection::getValue).toList();
     private static final double MICROS = 1e-6;
     private static final DateTimeFormatter SENDING_TIME = DateTimeFormatter.ofPattern("yyyyMMdd-HH:mm:ss.SSS").withZone(ZoneOffset.UTC);
     private static final List<String> SYMBOLS = List.of("AAPL", "MSFT", "AIRP.PA", "VOD.L", "EURUSD", "ESZ6");

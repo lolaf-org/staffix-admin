@@ -61,7 +61,7 @@ class TelemetryResolutionTest {
     }
 
     private static MetricSeries series(String messageType, double... values) {
-        MetricSeries.MetricSeriesBuilder series = MetricSeries.builder().label("fix.msg.type", messageType);
+        MetricSeries.MetricSeriesBuilder series = MetricSeries.builder().label("fix.mt", messageType);
         for (int i = 0; i < values.length; i++) {
             series.point(new MetricPoint(FROM.plusSeconds(60L * i), values[i]));
         }
@@ -69,13 +69,13 @@ class TelemetryResolutionTest {
     }
 
     private MetricsResult readLatency(MetricStatistic statistic, @Nullable Duration rateWindow) {
-        return metricsController.queryMetrics("alpha", null, null, "messages.read.latency", statistic, 0.99, List.of("fix.msg.type"), null,
+        return metricsController.queryMetrics("alpha", null, null, "messages.read.latency", statistic, 0.99, List.of("fix.mt"), null,
                 FROM, TO, rateWindow);
     }
 
     private static MetricSeries rate(String messageType, Duration rateWindow) {
         return MetricSeries.builder()
-                .label("fix.msg.type", messageType)
+                .label("fix.mt", messageType)
                 .point(new MetricPoint(FROM, 1))
                 .rateWindow(rateWindow)
                 .build();
@@ -200,8 +200,8 @@ class TelemetryResolutionTest {
 
         assertThat(queries).extracting(MetricQuery::getMeter, MetricQuery::getStatistic, MetricQuery::getTagFilters, MetricQuery::getSplitBy)
                 .containsExactly(
-                        tuple("messages.read.latency", MetricStatistic.RATE, Map.of("fix.msg.dir", "in"), List.of("fix.msg.type", "fix.msg.dir")),
-                        tuple("messages.write.latency", MetricStatistic.RATE, Map.of("fix.msg.dir", "out"), List.of("fix.msg.type", "fix.msg.dir")));
+                        tuple("messages.read.latency", MetricStatistic.RATE, Map.of("fix.md", "i"), List.of("fix.mt", "fix.md")),
+                        tuple("messages.write.latency", MetricStatistic.RATE, Map.of("fix.md", "o"), List.of("fix.mt", "fix.md")));
     }
 
     @Test
@@ -217,13 +217,13 @@ class TelemetryResolutionTest {
         metricsController.queryMetrics("alpha", null, null, "orders.pricing", MetricStatistic.QUANTILE, 0.9, List.of("venue"), null, FROM, TO, null);
 
         assertThat(queries).extracting(MetricQuery::getTagFilters, MetricQuery::getQuantile, MetricQuery::getSplitBy).containsExactly(
-                tuple(Map.of("fix.msg.dir", "out"), null, List.of()),
+                tuple(Map.of("fix.md", "o"), null, List.of()),
                 tuple(Map.of(), 0.9, List.of("venue")));
     }
 
     @Test
     void listsEachMeterOfTheScopesSessionsOnce() {
-        Meter read = Meter.builder().name("messages.read.latency").type(Meter.Type.TIMER).description("Read").tagKey("fix.msg.type").build();
+        Meter read = Meter.builder().name("messages.read.latency").type(Meter.Type.TIMER).description("Read").tagKey("fix.mt").build();
         Meter pricingAtAlpha = Meter.builder().name("orders.pricing").type(Meter.Type.TIMER).description("Pricing").tagKey("venue").custom(true).build();
         Meter pricingAtBeta = pricingAtAlpha.toBuilder().clearTagKeys().tagKey("desk").percentiles(true).build();
         when(gateway.getMeters("alpha")).thenReturn(List.of(

@@ -36,8 +36,8 @@ import { TimeRangeSelector, type Period } from './TimeRangeSelector'
 import { durationSeconds, parseDuration } from '../settings/duration'
 
 const MESSAGES = 'messages'
-const MESSAGE_TYPE = 'fix.msg.type'
-const DIRECTION = 'fix.msg.dir'
+const MESSAGE_TYPE = 'fix.mt'
+const DIRECTION = 'fix.md'
 const READ = 'messages.read.latency'
 const WRITE = 'messages.write.latency'
 /**
@@ -64,8 +64,8 @@ const RATE = 'rate'
 const AUTO = 'auto'
 const RATE_WINDOWS = ['PT1S', 'PT2S', 'PT5S', 'PT10S', 'PT30S', 'PT1M', 'PT5M']
 const DIRECTIONS = [
-  { value: 'in', title: 'incoming' },
-  { value: 'out', title: 'outgoing' },
+  { value: 'i', title: 'incoming' },
+  { value: 'o', title: 'outgoing' },
 ]
 
 interface Facet {

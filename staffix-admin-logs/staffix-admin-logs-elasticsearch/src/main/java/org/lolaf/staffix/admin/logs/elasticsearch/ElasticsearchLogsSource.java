@@ -22,17 +22,20 @@ import org.lolaf.staffix.admin.logs.LogQuery;
 import org.lolaf.staffix.admin.logs.LogType;
 import org.lolaf.staffix.admin.logs.LogsSource;
 import org.lolaf.staffix.admin.logs.LogsSourceException;
+import org.lolaf.staffix.api.monitoring.FixMessageDirection;
 import org.lolaf.staffix.api.monitoring.FixMonitoringAttributes;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import static org.lolaf.staffix.admin.elasticsearch.ElasticsearchQueries.GROUP;
 import static org.lolaf.staffix.admin.elasticsearch.ElasticsearchQueries.SESSION;
@@ -47,10 +50,9 @@ import static org.lolaf.staffix.admin.elasticsearch.ElasticsearchQueries.timeRan
 public class ElasticsearchLogsSource implements LogsSource {
 
     private static final String BODY = "body.text";
-    private static final String LOG_TYPE = FixMonitoringAttributes.FIX_LOG_TYPE.getKey();
+    private static final String DIRECTION = FixMonitoringAttributes.FIX_MESSAGE_DIRECTION.getKey();
     private static final String MSG_TYPE = FixMonitoringAttributes.FIX_MESSAGE_TYPE.getKey();
     private static final String NANOS = "strict_date_optional_time_nanos";
-    private static final Map<LogType, String> LOG_TYPES = Map.of(LogType.IN, "in", LogType.OUT, "out", LogType.EVENT, "event");
 
     private final ElasticsearchClient client;
 
@@ -69,7 +71,7 @@ public class ElasticsearchLogsSource implements LogsSource {
         search.put("size", query.getLimit());
         search.put("track_total_hits", false);
         search.put("_source", false);
-        search.put("fields", List.of(Map.of("field", TIMESTAMP, "format", NANOS), GROUP, SESSION, LOG_TYPE, BODY));
+        search.put("fields", List.of(Map.of("field", TIMESTAMP, "format", NANOS), GROUP, SESSION, DIRECTION, BODY));
         search.put("sort", List.of(Map.of(TIMESTAMP, Map.of("order", "desc"))));
         search.put("query", Map.of("bool", Map.of("filter", filters(query))));
         return entries(client.search(search), query);
@@ -78,7 +80,7 @@ public class ElasticsearchLogsSource implements LogsSource {
     private static List<Object> filters(LogQuery query) {
         List<Object> filters = scope(query.getEngineId(), query.getGroup(), query.getSessionId());
         if (!query.getTypes().isEmpty()) {
-            filters.add(terms(LOG_TYPE, query.getTypes().stream().map(LOG_TYPES::get).toList()));
+            filters.add(types(query.getTypes()));
         }
         if (!query.getMsgTypes().isEmpty()) {
             filters.add(terms(MSG_TYPE, query.getMsgTypes()));
@@ -97,6 +99,22 @@ public class ElasticsearchLogsSource implements LogsSource {
         return filters;
     }
 
+    private static Map<String, Object> types(Set<LogType> types) {
+        List<String> directions = types.stream()
+                .map(LogType::getDirection)
+                .filter(Objects::nonNull)
+                .map(FixMessageDirection::getValue)
+                .toList();
+        List<Map<String, Object>> anyOf = new ArrayList<>();
+        if (!directions.isEmpty()) {
+            anyOf.add(terms(DIRECTION, directions));
+        }
+        if (types.contains(LogType.EVENT)) {
+            anyOf.add(Map.of("bool", Map.of("must_not", Map.of("exists", Map.of("field", DIRECTION)))));
+        }
+        return anyOf.size() == 1 ? anyOf.getFirst() : Map.of("bool", Map.of("minimum_should_match", 1, "should", anyOf));
+    }
+
     private static Map<String, Object> terms(String field, Collection<String> values) {
         return Map.of("terms", Map.of(field, values.stream().sorted().toList()));
     }
@@ -108,7 +126,7 @@ public class ElasticsearchLogsSource implements LogsSource {
                         .timestamp(Instant.parse(Objects.requireNonNull(text(fields, TIMESTAMP), "a hit without @timestamp")))
                         .group(text(fields, GROUP))
                         .sessionId(text(fields, SESSION))
-                        .type(type(text(fields, LOG_TYPE)))
+                        .type(LogType.ofDirectionValue(text(fields, DIRECTION)))
                         .line(Objects.requireNonNullElse(text(fields, BODY), ""))
                         .build())
                 .filter(entry -> query.hasFieldValue(entry.getLine()))
@@ -121,14 +139,5 @@ public class ElasticsearchLogsSource implements LogsSource {
     private static @Nullable String text(JsonNode fields, String name) {
         JsonNode value = fields.path(name).path(0);
         return value.isMissingNode() || value.isNull() ? null : value.asString();
-    }
-
-    private static @Nullable LogType type(@Nullable String logType) {
-        return switch (logType) {
-            case "in" -> LogType.IN;
-            case "out" -> LogType.OUT;
-            case "event" -> LogType.EVENT;
-            case null, default -> null;
-        };
     }
 }

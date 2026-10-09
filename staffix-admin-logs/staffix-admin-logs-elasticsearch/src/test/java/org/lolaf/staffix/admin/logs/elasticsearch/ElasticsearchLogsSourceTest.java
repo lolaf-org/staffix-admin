@@ -47,9 +47,9 @@ class ElasticsearchLogsSourceTest {
     private static final String TWO_HITS = """
             {"took":3,"timed_out":false,"hits":{"max_score":null,"hits":[
              {"_index":".ds-logs-generic.otel-default","_id":"a","fields":{"@timestamp":["2026-10-02T08:00:05.000000123Z"],
-              "fix.sg":["beta"],"fix.sn":["trading"],"fix.log.type":["in"],"body.text":["8=FIX.4.4|35=8|"]}},
+              "fix.sg":["beta"],"fix.sn":["trading"],"fix.md":["i"],"body.text":["8=FIX.4.4|35=8|"]}},
              {"_index":".ds-logs-generic.otel-default","_id":"b","fields":{"@timestamp":["2026-10-02T08:00:03Z"],
-              "fix.sg":["beta"],"fix.sn":["trading"],"fix.log.type":["event"],"body.text":["Logon received"]}}]}}
+              "fix.sg":["beta"],"fix.sn":["trading"],"body.text":["Logon received"]}}]}}
             """;
 
     private HttpServer elasticsearch;
@@ -110,14 +110,25 @@ class ElasticsearchLogsSourceTest {
     }
 
     @Test
+    void filtersEventsAsTheRecordsWithoutDirection() {
+        source(null, null, null).query(LogQuery.builder().engineId("alpha").from(FROM).to(FROM.plusSeconds(600))
+                .type(LogType.EVENT).type(LogType.IN).limit(10).build());
+
+        JsonNode anyType = search.path("query").path("bool").path("filter").path(1).path("bool");
+        assertThat(anyType.path("minimum_should_match").asInt()).isEqualTo(1);
+        assertThat(anyType.path("should").toString())
+                .isEqualTo("[{\"terms\":{\"fix.md\":[\"i\"]}},{\"bool\":{\"must_not\":{\"exists\":{\"field\":\"fix.md\"}}}}]");
+    }
+
+    @Test
     void filtersTextTypesAndMessageTypes() {
         source(null, null, null).query(LogQuery.builder().engineId("alpha").from(FROM).to(FROM.plusSeconds(600))
                 .text("ALPHA \"US\"").type(LogType.OUT).type(LogType.IN).msgType("D").msgType("8").limit(10).build());
 
         assertThat(search.path("query").path("bool").path("filter").toString()).isEqualTo("["
                 + "{\"term\":{\"fix.eid\":\"alpha\"}},"
-                + "{\"terms\":{\"fix.log.type\":[\"in\",\"out\"]}},"
-                + "{\"terms\":{\"fix.msg.type\":[\"8\",\"D\"]}},"
+                + "{\"terms\":{\"fix.md\":[\"i\",\"o\"]}},"
+                + "{\"terms\":{\"fix.mt\":[\"8\",\"D\"]}},"
                 + "{\"match_phrase\":{\"body.text\":\"ALPHA \\\"US\\\"\"}},"
                 + "{\"range\":{\"@timestamp\":{\"gte\":\"2026-10-02T08:00:00Z\",\"lt\":\"2026-10-02T08:10:00Z\",\"format\":\"strict_date_optional_time_nanos\"}}}]");
     }
@@ -126,9 +137,9 @@ class ElasticsearchLogsSourceTest {
     void searchesFieldValuesAsPhrasesAndKeepsTheExactMatches() {
         response = """
                 {"hits":{"hits":[
-                 {"fields":{"@timestamp":["2026-10-02T08:00:05Z"],"fix.log.type":["out"],"body.text":["35=D|11=ALPHA-1|"]}},
-                 {"fields":{"@timestamp":["2026-10-02T08:00:04Z"],"fix.log.type":["out"],"body.text":["35=D|11=alpha-1|"]}},
-                 {"fields":{"@timestamp":["2026-10-02T08:00:03Z"],"fix.log.type":["in"],"body.text":["35=8|37=BETA-2\\u0001"]}}]}}
+                 {"fields":{"@timestamp":["2026-10-02T08:00:05Z"],"fix.md":["o"],"body.text":["35=D|11=ALPHA-1|"]}},
+                 {"fields":{"@timestamp":["2026-10-02T08:00:04Z"],"fix.md":["o"],"body.text":["35=D|11=alpha-1|"]}},
+                 {"fields":{"@timestamp":["2026-10-02T08:00:03Z"],"fix.md":["i"],"body.text":["35=8|37=BETA-2\\u0001"]}}]}}
                 """;
 
         List<LogEntry> entries = source(null, null, null).query(query().fieldValue("BETA-2").fieldValue("ALPHA-1").build());

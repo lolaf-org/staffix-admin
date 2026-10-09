@@ -25,8 +25,8 @@ public enum LokiLabel {
     FIX_EID(FixMonitoringAttributes.FIX_ENGINE_ID),
     FIX_SG(FixMonitoringAttributes.FIX_SESSION_GROUP),
     FIX_SN(FixMonitoringAttributes.FIX_SESSION_NAME),
-    FIX_LOG_TYPE(FixMonitoringAttributes.FIX_LOG_TYPE),
-    FIX_MSG_TYPE(FixMonitoringAttributes.FIX_MESSAGE_TYPE);
+    FIX_MD(FixMonitoringAttributes.FIX_MESSAGE_DIRECTION),
+    FIX_MT(FixMonitoringAttributes.FIX_MESSAGE_TYPE);
 
     private final String label;
 

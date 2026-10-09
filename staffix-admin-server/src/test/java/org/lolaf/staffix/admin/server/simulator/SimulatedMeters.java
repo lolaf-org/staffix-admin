@@ -60,6 +60,6 @@ class SimulatedMeters {
 
     private static Meter messages(String name, String description) {
         return Meter.builder().name(name).type(Meter.Type.TIMER).description(description)
-                .tagKey("fix.msg.type").tagKey("fix.msg.dir").percentiles(true).build();
+                .tagKey("fix.mt").tagKey("fix.md").percentiles(true).build();
     }
 }
