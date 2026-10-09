@@ -16,7 +16,7 @@ Prometheus and their FIX logs in Loki. Like the console, it builds against the s
 #    or from the working copy, with the connectors in data/ (git ignores it, so editing them changes no tracked file)
 [ -f data/console.yaml ] || { mkdir -p data && cp staffix-admin-sandbox/console-prometheus-loki.yaml data/console.yaml; }
 DIST=staffix-admin-dist/target/staffix-admin/staffix-admin
-java -Dloader.path=$DIST/plugins -jar $DIST/staffix-admin.jar --staffix.admin.security.jaas-config=file:dev/console/jaas.conf
+java -Dloader.path=$DIST/plugins -jar $DIST/staffix-admin.jar --staffix.admin.security.jaas-config=file:staffix-admin-sandbox/console/jaas.conf
 
 # 3. The engines
 ./mvnw install -Psandbox -pl staffix-admin-sandbox
@@ -52,7 +52,7 @@ listen on 8080). They need the distribution's `staffix-admin-logs-elasticsearch`
 (cd staffix-admin-sandbox/docker && docker compose --profile console-es up -d)
 # or from the working copy (data/console.yaml replaced: keep a copy if you edited it)
 mkdir -p data && cp staffix-admin-sandbox/console-es.yaml data/console.yaml
-java -Dloader.path=$DIST/plugins -jar $DIST/staffix-admin.jar --staffix.admin.security.jaas-config=file:dev/console/jaas.conf
+java -Dloader.path=$DIST/plugins -jar $DIST/staffix-admin.jar --staffix.admin.security.jaas-config=file:staffix-admin-sandbox/console/jaas.conf
 ```
 
 Stop with `docker compose --profile kibana --profile console-es down`; add `-v` to also drop the indexed data and the
