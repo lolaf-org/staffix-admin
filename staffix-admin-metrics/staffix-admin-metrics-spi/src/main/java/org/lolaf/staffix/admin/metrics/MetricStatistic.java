@@ -19,5 +19,10 @@ public enum MetricStatistic {
     /**
      * A gauge's value.
      */
-    VALUE
+    VALUE,
+    /**
+     * The share, 0 to 1, of each step a gauge held {@link MetricQuery#getValue()}. The shares of every value add up to
+     * less than 1 where samples are missing.
+     */
+    SHARE
 }

@@ -50,6 +50,11 @@ class DemoTelemetry {
             "Logout received: end of session time");
     private static final long MAX_SECONDS_SCANNED = 200_000;
     private static final int MAX_NOISE_SAMPLES_PER_WINDOW = 12;
+    private static final int MAX_SHARE_SAMPLES_PER_STEP = 120;
+    private static final long LOGON_CYCLE_SECONDS = 3 * 3600;
+    private static final long OUTAGE_SECONDS = 4 * 60;
+    private static final long OPERATOR_LOGOUT_START = LOGON_CYCLE_SECONDS / 2;
+    private static final long OPERATOR_LOGOUT_SECONDS = 2 * 60;
 
     /**
      * {@code rateWindow} in seconds, null when the kind is not a rate.
@@ -72,9 +77,9 @@ class DemoTelemetry {
      * when null), so a narrow window shows a noisier chart as a real backend would.
      */
     List<Series> metrics(List<SimulatedSession> sessions, String meter, String statistic, @Nullable Double quantile,
-                         List<String> splitBy, Map<String, String> filters, Instant from, Instant to, Duration step,
+                         @Nullable Double heldValue, List<String> splitBy, Map<String, String> filters, Instant from, Instant to, Duration step,
                          @Nullable Duration rateWindow) {
-        Duration window = statistic.equals("VALUE") ? null : rateWindow == null ? step : rateWindow;
+        Duration window = statistic.equals("VALUE") || statistic.equals("SHARE") ? null : rateWindow == null ? step : rateWindow;
         boolean perSession = splitBy.contains(GROUP) || splitBy.contains(SESSION);
         List<Map<String, String>> combinations = new ArrayList<>(List.of(Map.of()));
         for (String tag : splitBy) {
@@ -105,12 +110,12 @@ class DemoTelemetry {
                         labels.put(SESSION, session.name());
                     }
                     String key = key(session) + suffix;
-                    series.add(series(labels, from, to, step, window, t -> value(meter, statistic, quantile, window, key, messageType, t)));
+                    series.add(series(labels, from, to, step, window, t -> value(meter, statistic, quantile, heldValue, window, step, key, messageType, t)));
                 });
             } else {
                 List<String> keys = sessions.stream().map(session -> key(session) + suffix).toList();
                 series.add(series(combination, from, to, step, window, t -> keys.stream()
-                        .mapToDouble(key -> value(meter, statistic, quantile, window, key, messageType, t))
+                        .mapToDouble(key -> value(meter, statistic, quantile, heldValue, window, step, key, messageType, t))
                         .reduce(0, statistic.equals("RATE") ? Double::sum : Math::max)));
             }
         }
@@ -164,8 +169,8 @@ class DemoTelemetry {
         return new Series(new LinkedHashMap<>(labels), points, rateWindow == null ? null : rateWindow.toSeconds());
     }
 
-    private static double value(String meter, String statistic, @Nullable Double quantile, @Nullable Duration rateWindow, String key,
-                                @Nullable String messageType, Instant t) {
+    private static double value(String meter, String statistic, @Nullable Double quantile, @Nullable Double heldValue,
+                                @Nullable Duration rateWindow, Duration step, String key, @Nullable String messageType, Instant t) {
         long second = t.getEpochSecond();
         double random = rateWindow == null ? noise(key, second) : averageNoise(key, second, rateWindow.toSeconds());
         double wave = 1 + 0.5 * Math.sin(2 * Math.PI * second / 7200.0 + key.hashCode());
@@ -177,9 +182,10 @@ class DemoTelemetry {
             case "MEAN" -> meter.equals("session.rtt") ? (350 + 150 * wave + 60 * random) * MICROS : 1.2 * latency(median, 0.5, random);
             case "VALUE" -> switch (meter) {
                 case "session.clock.offset" -> (40 * Math.sin(2 * Math.PI * second / 3600.0 + key.hashCode()) + 8 * (random - 0.5)) * MICROS;
-                case "session.logon.status" -> 1;
+                case "session.logon.status" -> logonStatus(key, second);
                 default -> 0;
             };
+            case "SHARE" -> meter.equals("session.logon.status") && heldValue != null ? logonStatusShare(key, second, step.toSeconds(), heldValue) : 0;
             default -> throw new IllegalArgumentException("Unknown statistic " + statistic);
         };
     }
@@ -232,6 +238,26 @@ class DemoTelemetry {
 
     private static Entry entry(SimulatedSession session, Instant t, String type, String line) {
         return new Entry(t, session.group(), session.name(), type, line);
+    }
+
+    /**
+     * Logged in, but for a short outage and an operator logout every few hours, at a time that differs per session.
+     */
+    private static int logonStatus(String key, long second) {
+        long phase = Math.floorMod(second + key.hashCode(), LOGON_CYCLE_SECONDS);
+        if (phase < OUTAGE_SECONDS) {
+            return 0;
+        }
+        return phase >= OPERATOR_LOGOUT_START && phase < OPERATOR_LOGOUT_START + OPERATOR_LOGOUT_SECONDS ? 3 : 1;
+    }
+
+    private static double logonStatusShare(String key, long lastSecond, long stepSeconds, double heldValue) {
+        int samples = (int) Math.max(1, Math.min(stepSeconds, MAX_SHARE_SAMPLES_PER_STEP));
+        int held = 0;
+        for (int i = 0; i < samples; i++) {
+            held += logonStatus(key, lastSecond - i * stepSeconds / samples) == heldValue ? 1 : 0;
+        }
+        return (double) held / samples;
     }
 
     private static double averageNoise(String key, long lastSecond, long windowSeconds) {

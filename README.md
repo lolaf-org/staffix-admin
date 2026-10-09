@@ -238,6 +238,19 @@ phrase and the console keeps the exact matches. A message logged with SOH betwee
 `|`. Loki has no index on the message content: a trace over a long period of busy engines reads all of their lines,
 so keep the period short where the logs are large.
 
+### Session availability
+
+A session's Status tab shows its status over a period as a band, from the `session.logon.status` gauge its monitoring
+plugin exports: logged in, logged out within session time, by an operator, outside session time, or no data. The
+availability is the time logged in over the time it was meant to be (logged in or logged out within session time):
+an operator logout and missing data do not count against it. Session time is as the engine evaluated it then, so a
+schedule changed since does not alter the past.
+
+Each step of the band is a whole number of the engine's exports, and its shares count every sample in it, so an
+outage shorter than the step still shows. A session without a monitoring plugin has no availability. Prometheus
+keeps returning a stopped engine's last value for up to its lookback (5 minutes by default), and the OpenTelemetry
+collector for its `metric_expiration`: data goes missing that much later than the engine.
+
 ## Plugins
 
 Every jar in `plugins/` (next to `staffix-admin.jar`; `-Dloader.path=...` names another directory) joins the

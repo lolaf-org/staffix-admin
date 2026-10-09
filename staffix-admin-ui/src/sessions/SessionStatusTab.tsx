@@ -7,6 +7,7 @@ import { STATUS_LABELS } from './status'
 import { StatusBadge } from './StatusBadge'
 import { formatCompIds } from './identity'
 import { RESET_MODES } from './resetModes'
+import { SessionAvailability } from './SessionAvailability'
 import { WriteButton } from './WriteButton'
 
 interface Props {
@@ -43,6 +44,7 @@ export function SessionStatusTab({ sessionRef, detail }: Props) {
           { label: 'Next outgoing seq num', children: detail.outgoingSeqNum },
         ]}
       />
+      <SessionAvailability key={summary.runningConfigId} configRef={{ ...sessionRef, sessionId: summary.runningConfigId }} />
       <div>
         <Divider titlePlacement="start" plain>
           Session control

@@ -89,13 +89,21 @@ class SimulatedMetricsSource implements MetricsSource {
     private static MetricSeries series(MetricQuery query, Map<String, String> labels) {
         MetricSeries.MetricSeriesBuilder series = MetricSeries.builder()
                 .labels(labels)
-                .rateWindow(query.getStatistic() == MetricStatistic.VALUE ? null
+                .rateWindow(query.getStatistic() == MetricStatistic.VALUE || query.getStatistic() == MetricStatistic.SHARE ? null
                         : Objects.requireNonNullElse(query.getRateWindow(), query.getStep()));
+        double value = query.getStatistic() == MetricStatistic.SHARE ? loggedInShare(query) : 1;
         long step = query.getStep().toSeconds();
         long start = query.getFrom().getEpochSecond() / step * step;
         for (long second = start; second <= query.getTo().getEpochSecond(); second += step) {
-            series.point(new MetricPoint(Instant.ofEpochSecond(second), 1));
+            series.point(new MetricPoint(Instant.ofEpochSecond(second), value));
         }
         return series.build();
+    }
+
+    /**
+     * Always logged in.
+     */
+    private static double loggedInShare(MetricQuery query) {
+        return Objects.equals(query.getValue(), 1.0) ? 1 : 0;
     }
 }

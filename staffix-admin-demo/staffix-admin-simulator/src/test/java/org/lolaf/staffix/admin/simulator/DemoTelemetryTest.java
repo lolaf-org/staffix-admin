@@ -22,35 +22,52 @@ class DemoTelemetryTest {
     private final List<SimulatedSession> sessions = SimulationScenario.engines().getFirst().runningConfigs();
 
     @Test
+    void sharesTheLogonStatusesOfEachStepWithAnOutageEveryFewHours() {
+        Instant to = FROM.plus(Duration.ofHours(6));
+        Duration step = Duration.ofMinutes(1);
+        List<List<DemoTelemetry.Series>> byStatus = List.of(0.0, 1.0, 2.0, 3.0).stream()
+                .map(status -> DemoTelemetry.metrics(sessions, "session.logon.status", "SHARE", null, status, BY_SESSION, Map.of(), FROM, to, step, null))
+                .toList();
+
+        List<DemoTelemetry.Point> loggedOut = byStatus.getFirst().getFirst().points();
+        for (int i = 0; i < loggedOut.size(); i++) {
+            int point = i;
+            assertThat(byStatus.stream().mapToDouble(series -> series.getFirst().points().get(point).value()).sum()).isEqualTo(1.0);
+        }
+        assertThat(loggedOut).anyMatch(point -> point.value() > 0);
+        assertThat(byStatus.get(3).getFirst().points()).anyMatch(point -> point.value() > 0);
+    }
+
+    @Test
     void reportsTheRateWindowAskedForElseTheStep() {
-        assertThat(DemoTelemetry.metrics(sessions, READ, "RATE", null, BY_MESSAGE, IN, FROM, TO, STEP, Duration.ofSeconds(20)))
+        assertThat(DemoTelemetry.metrics(sessions, READ, "RATE", null, null, BY_MESSAGE, IN, FROM, TO, STEP, Duration.ofSeconds(20)))
                 .isNotEmpty()
                 .extracting(DemoTelemetry.Series::rateWindow).containsOnly(20L);
-        assertThat(DemoTelemetry.metrics(sessions, READ, "RATE", null, BY_MESSAGE, IN, FROM, TO, STEP, null))
+        assertThat(DemoTelemetry.metrics(sessions, READ, "RATE", null, null, BY_MESSAGE, IN, FROM, TO, STEP, null))
                 .extracting(DemoTelemetry.Series::rateWindow).containsOnly(5L);
     }
 
     @Test
     void splitsByTheTagsAskedKeepingOnlyTheFilteredValues() {
-        assertThat(DemoTelemetry.metrics(sessions, READ, "QUANTILE", 0.99, BY_MESSAGE, IN, FROM, TO, STEP, null))
+        assertThat(DemoTelemetry.metrics(sessions, READ, "QUANTILE", 0.99, null, BY_MESSAGE, IN, FROM, TO, STEP, null))
                 .extracting(DemoTelemetry.Series::labels)
                 .containsExactly(Map.of("fix.msg.type", "0", "fix.msg.dir", "in"), Map.of("fix.msg.type", "8", "fix.msg.dir", "in"),
                         Map.of("fix.msg.type", "D", "fix.msg.dir", "in"));
-        assertThat(DemoTelemetry.metrics(sessions, "orders.pricing", "MEAN", null, List.of(), Map.of(), FROM, TO, STEP, null))
+        assertThat(DemoTelemetry.metrics(sessions, "orders.pricing", "MEAN", null, null, List.of(), Map.of(), FROM, TO, STEP, null))
                 .singleElement().satisfies(one -> assertThat(one.labels()).isEmpty());
     }
 
     @Test
     void reportsNoRateWindowForTheClockOffset() {
-        assertThat(DemoTelemetry.metrics(sessions, "session.clock.offset", "VALUE", null, BY_SESSION, Map.of(), FROM, TO, STEP, Duration.ofSeconds(20)))
+        assertThat(DemoTelemetry.metrics(sessions, "session.clock.offset", "VALUE", null, null, BY_SESSION, Map.of(), FROM, TO, STEP, Duration.ofSeconds(20)))
                 .isNotEmpty()
                 .extracting(DemoTelemetry.Series::rateWindow).containsOnlyNulls();
     }
 
     @Test
     void aWiderRateWindowSmoothsTheChart() {
-        double narrow = spread(DemoTelemetry.metrics(sessions, "session.rtt", "MEAN", null, BY_SESSION, Map.of(), FROM, TO, STEP, Duration.ofSeconds(5)));
-        double wide = spread(DemoTelemetry.metrics(sessions, "session.rtt", "MEAN", null, BY_SESSION, Map.of(), FROM, TO, STEP, Duration.ofMinutes(1)));
+        double narrow = spread(DemoTelemetry.metrics(sessions, "session.rtt", "MEAN", null, null, BY_SESSION, Map.of(), FROM, TO, STEP, Duration.ofSeconds(5)));
+        double wide = spread(DemoTelemetry.metrics(sessions, "session.rtt", "MEAN", null, null, BY_SESSION, Map.of(), FROM, TO, STEP, Duration.ofMinutes(1)));
 
         assertThat(wide).isLessThan(narrow / 2);
     }

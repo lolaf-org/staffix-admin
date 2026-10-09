@@ -56,3 +56,13 @@ function fractionOf(iso: string): string {
 export function separatorOf(line: string): string {
   return line.includes('\u0001') ? '\u0001' : '|'
 }
+
+export function formatDuration(millis: number): string {
+  const seconds = Math.round(millis / 1000)
+  if (seconds < 60) return `${seconds} s`
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60) return `${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 48) return minutes % 60 === 0 ? `${hours} h` : `${hours} h ${minutes % 60} min`
+  return `${Math.floor(hours / 24)} d ${hours % 24} h`
+}

@@ -98,7 +98,28 @@ public class PrometheusMetricsSource implements MetricsSource {
                     + " / sum by (" + by + ") (rate(" + meter + "_count{" + selector + "}[" + range + "]))");
             case VALUE -> queryRange(query, query.getGaugeUnit() == null ? 1 : query.getGaugeUnit().convert(1, TimeUnit.SECONDS),
                     tagsByLabel, null, "avg by (" + by + ") (" + meter + "{" + selector + "})");
+            case SHARE -> queryRange(query, 1, tagsByLabel, null, share(query, "max by (" + by + ") (" + meter + "{" + selector + "})"));
         };
+    }
+
+    /**
+     * Prometheus fills a subquery's points from the last sample within its lookback, so the resolution only has to be
+     * as fine as the samples: missing ones show once the series goes stale.
+     */
+    private static String share(MetricQuery query, String gauge) {
+        String held = "(" + gauge + " == bool " + number(Objects.requireNonNull(query.getValue(), "A share needs a value")) + ")";
+        Duration step = query.getStep();
+        Duration sampleInterval = query.getSampleInterval();
+        if (sampleInterval == null) {
+            return "avg_over_time(" + held + "[" + step.toSeconds() + "s:])";
+        }
+        Duration resolution = sampleInterval.compareTo(step) < 0 ? sampleInterval : step;
+        return "sum_over_time(" + held + "[" + step.toSeconds() + "s:" + resolution.toMillis() + "ms]) / "
+                + number((double) step.toMillis() / resolution.toMillis());
+    }
+
+    private static String number(double value) {
+        return value == Math.rint(value) ? Long.toString((long) value) : Double.toString(value);
     }
 
     @Override

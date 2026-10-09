@@ -298,6 +298,24 @@ export function useMetrics(scope: MetricScope, request: MetricRequest | undefine
   })
 }
 
+export type Availability = Schemas['Availability']
+
+/**
+ * `period` resolved once per fetch, so the shares cover the range returned with them.
+ */
+export function useAvailability(ref: SessionRef, period: number | FixedPeriod) {
+  const relative = typeof period === 'number'
+  return useQuery({
+    queryKey: ['availability', ref, period],
+    queryFn: async () => {
+      const range = relative ? lastMinutes(period) : period
+      return { range, availability: await call(api.GET('/api/availability', { params: { query: { ...ref, ...range } } })) }
+    },
+    refetchInterval: relative ? 60_000 : false,
+    placeholderData: (previous) => previous,
+  })
+}
+
 /**
  * The meters the scope's running sessions publish, as their engine describes them.
  */

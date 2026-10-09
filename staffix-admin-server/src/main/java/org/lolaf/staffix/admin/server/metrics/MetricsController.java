@@ -91,6 +91,10 @@ public class MetricsController {
                                       @RequestParam Instant from,
                                       @RequestParam Instant to,
                                       @RequestParam(required = false) @Nullable Duration rateWindow) {
+        if (statistic.equals(MetricStatistic.SHARE)) {
+            throw new ErrorResponseException(HttpStatus.BAD_REQUEST, ProblemDetail.forStatusAndDetail(
+                    HttpStatus.BAD_REQUEST, "A share is read through /api/availability"), null);
+        }
         MetricQuery.MetricQueryBuilder query = MetricQuery.builder()
                 .meter(meter)
                 .statistic(statistic)

@@ -38,6 +38,7 @@ public class ElasticsearchMetricsSource implements MetricsSource {
     private static final String COUNT = "count";
     private static final String SUM = "sum";
     private static final String VALUE = "value";
+    private static final String HELD = "held";
     private static final int MAX_SPLIT_VALUES = 1000;
 
     private final ElasticsearchClient client;
@@ -89,6 +90,17 @@ public class ElasticsearchMetricsSource implements MetricsSource {
                         buckets -> {
                             JsonNode average = buckets.getFirst().aggregations().path(VALUE).path(VALUE);
                             return average.isNumber() ? average.asDouble() / gaugeUnitsPerSecond : null;
+                        });
+            }
+            case SHARE -> {
+                Duration sampleInterval = query.getSampleInterval();
+                double samplesPerStep = sampleInterval == null ? 0 : Math.max(1, (double) step.toMillis() / sampleInterval.toMillis());
+                yield new Statistic(step, 1, null,
+                        Map.of(HELD, Map.of("filter", Map.of("term", Map.of(field, Objects.requireNonNull(query.getValue(), "A share needs a value"))))),
+                        buckets -> {
+                            Bucket bucket = buckets.getFirst();
+                            double samples = sampleInterval == null ? bucket.documents() : samplesPerStep;
+                            return samples == 0 ? null : Math.min(1, bucket.aggregations().path(HELD).path("doc_count").asLong() / samples);
                         });
             }
         });

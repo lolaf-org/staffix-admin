@@ -162,6 +162,33 @@ class ElasticsearchMetricsSourceTest {
     }
 
     @Test
+    void sharesEachStepAmongTheSamplesItShouldHold() {
+        response = "{\"aggregations\":{\"series\":{\"buckets\":"
+                + buckets(-10, 10, "{\"doc_count\":2,\"held\":{\"doc_count\":1}}", "{\"doc_count\":1,\"held\":{\"doc_count\":1}}") + "}}}";
+
+        List<MetricSeries> series = source(TimeUnit.MILLISECONDS).query(messages(MetricStatistic.SHARE, "session.logon.status", Duration.ofSeconds(10))
+                .toBuilder().clearSplitBy().clearTagFilters().value(1.0).sampleInterval(Duration.ofSeconds(5)).build());
+
+        assertThat(search.path("aggs").path("series").path("aggs").path("held").path("filter").toString())
+                .isEqualTo("{\"term\":{\"metrics.session.logon.status\":1.0}}");
+        assertThat(series).containsExactly(MetricSeries.builder()
+                .point(new MetricPoint(FROM, 0.5))
+                .point(new MetricPoint(FROM.plusSeconds(10), 0.5))
+                .build());
+    }
+
+    @Test
+    void sharesAmongTheSamplesFoundWithoutASampleInterval() {
+        response = "{\"aggregations\":{\"series\":{\"buckets\":"
+                + buckets(-10, 10, "{\"doc_count\":2,\"held\":{\"doc_count\":1}}", "{\"doc_count\":1,\"held\":{\"doc_count\":1}}") + "}}}";
+
+        List<MetricSeries> series = source(TimeUnit.MILLISECONDS).query(messages(MetricStatistic.SHARE, "session.logon.status", Duration.ofSeconds(10))
+                .toBuilder().clearSplitBy().clearTagFilters().value(1.0).build());
+
+        assertThat(series.getFirst().getPoints()).extracting(MetricPoint::getValue).containsExactly(0.5, 1.0);
+    }
+
+    @Test
     void sendsTheApiKey() {
         response = "{\"aggregations\":{\"series\":{\"buckets\":[]}}}";
 

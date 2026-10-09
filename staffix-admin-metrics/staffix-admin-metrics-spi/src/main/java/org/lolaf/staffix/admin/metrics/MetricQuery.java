@@ -55,6 +55,17 @@ public class MetricQuery {
      */
     @Nullable
     TimeUnit gaugeUnit;
+    /**
+     * For {@link MetricStatistic#SHARE}, the gauge value counted.
+     */
+    @Nullable
+    Double value;
+    /**
+     * For {@link MetricStatistic#SHARE}, how often the engines export the gauge, telling how many samples a full step
+     * holds; null when unknown, a share then being of the samples found, so missing ones go unnoticed.
+     */
+    @Nullable
+    Duration sampleInterval;
     Instant from;
     Instant to;
     Duration step;

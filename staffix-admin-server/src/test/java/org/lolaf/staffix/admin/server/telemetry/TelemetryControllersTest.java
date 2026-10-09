@@ -104,6 +104,12 @@ class TelemetryControllersTest {
     }
 
     @Test
+    void rejectsAShareWithoutItsValue() throws Exception {
+        mockMvc.perform(get("/api/metrics?engineId=nyc-uat&meter=session.logon.status&statistic=SHARE" + LAST_HOUR))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void rejectsAnInvertedTimeRange() throws Exception {
         mockMvc.perform(get("/api/metrics?engineId=nyc-uat&meter=session.rtt&statistic=MEAN&from=" + TO + "&to=" + TO.minusSeconds(60)))
                 .andExpect(status().isBadRequest());

@@ -160,6 +160,37 @@ class PrometheusMetricsSourceTest {
     }
 
     @Test
+    void readsTheShareOfEachStepAGaugeHeldAValueFromItsSamples() {
+        response = """
+                {"status":"success","data":{"resultType":"matrix","result":[
+                 {"metric":{"fix_sg":"beta","fix_sn":"trading"},"values":[[1790928000,"0.75"]]}]}}
+                """;
+
+        List<MetricSeries> series = source(TimeUnit.MILLISECONDS).query(perSession("session.logon.status", MetricStatistic.SHARE)
+                .toBuilder().value(1.0).step(Duration.ofMinutes(1)).sampleInterval(Duration.ofSeconds(15)).build());
+
+        assertThat(form.get("query")).isEqualTo("sum_over_time((max by (fix_sg, fix_sn) (session_logon_status{fix_eid=\"alpha\",fix_sg=\"beta\",fix_sn=\"trading\"})"
+                + " == bool 1)[60s:15000ms]) / 4");
+        assertThat(series.getFirst().getPoints()).extracting(MetricPoint::getValue).containsExactly(0.75);
+    }
+
+    @Test
+    void samplesAShareNoFinerThanItsStep() {
+        source(TimeUnit.MILLISECONDS).query(perSession("session.logon.status", MetricStatistic.SHARE)
+                .toBuilder().value(0.0).sampleInterval(Duration.ofSeconds(15)).build());
+
+        assertThat(form.get("query")).endsWith(" == bool 0)[5s:5000ms]) / 1");
+    }
+
+    @Test
+    void sharesAmongTheSamplesFoundWithoutASampleInterval() {
+        source(TimeUnit.MILLISECONDS).query(perSession("session.logon.status", MetricStatistic.SHARE).toBuilder().value(2.0).build());
+
+        assertThat(form.get("query")).startsWith("avg_over_time((max by (fix_sg, fix_sn) (session_logon_status{")
+                .endsWith(" == bool 2)[5s:])");
+    }
+
+    @Test
     void readsACustomTimersMeanNamingItsTagsAsPrometheusDoes() {
         response = """
                 {"status":"success","data":{"resultType":"matrix","result":[

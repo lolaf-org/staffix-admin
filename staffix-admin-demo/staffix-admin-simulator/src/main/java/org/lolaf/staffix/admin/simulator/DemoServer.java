@@ -57,6 +57,7 @@ final class DemoServer {
                 case "/demo/health" -> null;
                 case "/demo/metrics" -> DemoTelemetry.metrics(sessions(query), query.get("meter"), query.get("statistic"),
                         query.containsKey("quantile") ? Double.valueOf(query.get("quantile")) : null,
+                        query.containsKey("value") ? Double.valueOf(query.get("value")) : null,
                         List.copyOf(values(query.get("splitBy"))), filters(query.get("tagFilters")),
                         Instant.parse(query.get("from")), Instant.parse(query.get("to")), Duration.ofSeconds(Long.parseLong(query.get("step"))),
                         query.containsKey("rateWindow") ? Duration.ofSeconds(Long.parseLong(query.get("rateWindow"))) : null);

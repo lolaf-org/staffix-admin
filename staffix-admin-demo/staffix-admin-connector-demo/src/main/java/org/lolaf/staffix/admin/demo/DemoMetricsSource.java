@@ -36,6 +36,7 @@ final class DemoMetricsSource implements MetricsSource {
                 .map(filter -> filter.getKey() + "=" + filter.getValue())
                 .collect(Collectors.joining(",")));
         parameters.put("quantile", query.getQuantile());
+        parameters.put("value", query.getValue());
         parameters.put("from", query.getFrom());
         parameters.put("to", query.getTo());
         parameters.put("step", query.getStep().toSeconds());
