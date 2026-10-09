@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Alert, Checkbox, Flex, Input, Select, Table, Tag, Tooltip, Typography } from 'antd'
-import { ArrowDownOutlined, ArrowUpOutlined, InfoCircleOutlined } from '@ant-design/icons'
+import { Alert, Button, Checkbox, Flex, Input, Select, Table, Tag, Tooltip, Typography } from 'antd'
+import { ArrowDownOutlined, ArrowUpOutlined, DownloadOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import { isNotCollected, type Schemas } from '../api/client'
 import { NotCollectedNotice } from './NotCollectedNotice'
 import { useLogs, useMessageTypes, type DecodeTarget, type LogType } from '../api/queries'
+import { downloadCsv, logsCsv } from './csv'
 import { DecodedMessageModal } from './DecodedMessageModal'
 import { formatDateTime, logTimeDigits, logTimeWidth, separatorOf } from './format'
 import { LogTime } from './LogTime'
@@ -34,7 +35,8 @@ export function LogsPanel({ engineId, group, sessionId }: Props) {
   const [limit, setLimit] = useState(100)
   const [decoding, setDecoding] = useState<DecodeTarget>()
   const logs = useLogs({ engineId, group, sessionId, period, text, types, msgTypes, limit }, engineId !== '', live)
-  const timeDigits = logTimeDigits((logs.data?.entries ?? []).map((entry) => entry.timestamp))
+  const entries = logs.data?.entries ?? []
+  const timeDigits = logTimeDigits(entries.map((entry) => entry.timestamp))
 
   return (
     <Flex vertical gap={12}>
@@ -72,6 +74,15 @@ export function LogsPanel({ engineId, group, sessionId }: Props) {
           style={{ width: 120 }}
           aria-label="Maximum lines"
         />
+        <Tooltip title={entries.length > 0 ? `The ${entries.length} lines found, every page` : 'Nothing found to export'}>
+          <Button
+            icon={<DownloadOutlined />}
+            disabled={entries.length === 0}
+            onClick={() => downloadCsv(csvFileName(engineId, group, sessionId), logsCsv(engineId, entries))}
+          >
+            CSV
+          </Button>
+        </Tooltip>
       </Flex>
       {logs.isError && <Alert type={isNotCollected(logs.error) ? 'info' : 'error'} title={logs.error.message} />}
       {logs.isSuccess && <NotCollectedNotice what="logs" sessions={logs.data.notCollected} />}
@@ -145,4 +156,9 @@ export function LogsPanel({ engineId, group, sessionId }: Props) {
 
 function decodable(entry: Schemas['LogEntry']): boolean {
   return entry.type !== 'EVENT' && entry.group != null && entry.sessionId != null
+}
+
+function csvFileName(engineId: string, group: string | undefined, sessionId: string | undefined): string {
+  const scope = [engineId, group, sessionId].filter(Boolean).join('.')
+  return `logs-${scope}-${new Date().toISOString().replaceAll(':', '')}.csv`
 }
