@@ -184,9 +184,17 @@ class PrometheusMetricsSourceTest {
         List<MetricSeries> series = source(TimeUnit.MILLISECONDS).query(perSession("session.logon.status", MetricStatistic.SHARE)
                 .toBuilder().value(1.0).step(Duration.ofMinutes(1)).sampleInterval(Duration.ofSeconds(15)).build());
 
-        assertThat(form.get("query")).isEqualTo("sum_over_time((max by (fix_sg, fix_sn) (session_logon_status{fix_eid=\"alpha\",fix_sg=\"beta\",fix_sn=\"trading\"})"
+        assertThat(form.get("query")).isEqualTo("sum_over_time((max by (fix_sg, fix_sn) (last_over_time(session_logon_status{fix_eid=\"alpha\",fix_sg=\"beta\",fix_sn=\"trading\"}[30000ms]))"
                 + " == bool 1)[60s:15000ms]) / 4");
         assertThat(series.getFirst().getPoints()).extracting(MetricPoint::getValue).containsExactly(0.75);
+    }
+
+    @Test
+    void keepsAShareSampleNoLessThanTheMinimumRateWindow() {
+        source(TimeUnit.MILLISECONDS).query(perSession("session.logon.status", MetricStatistic.SHARE)
+                .toBuilder().value(1.0).step(Duration.ofMinutes(1)).sampleInterval(Duration.ofSeconds(1)).build());
+
+        assertThat(form.get("query")).contains("[20000ms])) == bool 1)");
     }
 
     @Test

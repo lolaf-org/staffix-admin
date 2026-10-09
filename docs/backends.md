@@ -21,9 +21,10 @@ Scrape faster than the engines export, e.g. every 2 s for a 5 s step: the collec
 export, so a scrape at the same pace misses exports and leaves too few samples for the narrowest windows, which then
 chart nothing. To see second by second, an engine must export every second.
 
-Prometheus keeps returning a stopped engine's last value for its lookback (5 minutes by default), so a session's
-[availability](sessions.md#availability) shows its last status that long before "no data". Without `send_timestamps`
-on the collector's `prometheus` exporter, the collector's `metric_expiration` adds to it.
+A session's [availability](sessions.md#availability) counts a status only from the last two exports (at least
+`minRateWindow`), so a stopped or crashed engine shows as no data within seconds, not after Prometheus' 5 minute
+lookback. This needs `send_timestamps` on the collector's `prometheus` exporter: without it, the collector re-exports
+the last value as new until its `metric_expiration`.
 
 ## Loki
 

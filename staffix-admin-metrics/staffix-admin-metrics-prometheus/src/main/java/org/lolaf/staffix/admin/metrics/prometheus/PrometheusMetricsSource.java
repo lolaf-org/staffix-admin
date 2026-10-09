@@ -113,21 +113,25 @@ public class PrometheusMetricsSource implements MetricsSource {
                     + " / sum by (" + by + ") (rate(" + meter + "_count{" + selector + "}[" + range + "]))");
             case VALUE -> queryRange(query, query.getGaugeUnit() == null ? 1 : query.getGaugeUnit().convert(1, TimeUnit.SECONDS),
                     tagsByLabel, null, "avg by (" + by + ") (" + meter + "{" + selector + "})");
-            case SHARE -> queryRange(query, 1, tagsByLabel, null, share(query, "max by (" + by + ") (" + meter + "{" + selector + "})"));
+            case SHARE -> queryRange(query, 1, tagsByLabel, null, share(query, meter + "{" + selector + "}", by));
         };
     }
 
     /**
-     * Prometheus fills a subquery's points from the last sample within its lookback, so the resolution only has to be
-     * as fine as the samples: missing ones show once the series goes stale.
+     * A subquery's point takes the last sample within reach, so the resolution only has to be as fine as the samples.
+     * A sample reaches two exports (at least {@code minRateWindow}, its delivery delay) rather than the 5 minute
+     * lookback, so a crashed engine, which sends no final status, shows as missing data at once.
      */
-    private static String share(MetricQuery query, String gauge) {
-        String held = "(" + gauge + " == bool " + number(Objects.requireNonNull(query.getValue(), "A share needs a value")) + ")";
+    private String share(MetricQuery query, String series, String by) {
+        String value = number(Objects.requireNonNull(query.getValue(), "A share needs a value"));
         Duration step = query.getStep();
         Duration sampleInterval = query.getSampleInterval();
         if (sampleInterval == null) {
-            return "avg_over_time(" + held + "[" + step.toSeconds() + "s:])";
+            return "avg_over_time((max by (" + by + ") (" + series + ") == bool " + value + ")[" + step.toSeconds() + "s:])";
         }
+        Duration twoExports = sampleInterval.multipliedBy(2);
+        Duration freshness = twoExports.compareTo(minRateWindow) > 0 ? twoExports : minRateWindow;
+        String held = "(max by (" + by + ") (last_over_time(" + series + "[" + freshness.toMillis() + "ms])) == bool " + value + ")";
         Duration resolution = sampleInterval.compareTo(step) < 0 ? sampleInterval : step;
         return "sum_over_time(" + held + "[" + step.toSeconds() + "s:" + resolution.toMillis() + "ms]) / "
                 + number((double) step.toMillis() / resolution.toMillis());
