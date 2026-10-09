@@ -1,0 +1,35 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4321
+
+processors:
+  batch:
+    timeout: 2s
+    send_batch_size: 512
+
+exporters:
+  # creates the otel database's tables: otel_logs, otel_traces, otel_metrics_<type>
+  clickhouse:
+    endpoint: tcp://clickhouse:9000
+    database: otel
+    username: otel
+    password: otel
+    create_schema: true
+    ttl: 72h
+
+service:
+  pipelines:
+    metrics:
+      receivers: [ otlp ]
+      processors: [ batch ]
+      exporters: [ clickhouse ]
+    logs:
+      receivers: [ otlp ]
+      processors: [ batch ]
+      exporters: [ clickhouse ]
+    traces:
+      receivers: [ otlp ]
+      processors: [ batch ]
+      exporters: [ clickhouse ]

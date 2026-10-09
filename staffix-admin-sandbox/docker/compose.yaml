@@ -100,7 +100,38 @@ services:
       elasticsearch:
         condition: service_healthy
 
+  # ClickHouse behind its own collector on 4321: run the engines with -DotlpUrl=http://localhost:4321
+  otel-collector-clickhouse:
+    image: otel/opentelemetry-collector-contrib:0.158.0
+    profiles: [ clickhouse ]
+    command: --config=/etc/otel/config.yaml
+    ports:
+      - "4321:4321"
+    volumes:
+      - ./conf/otel-collector-clickhouse.yaml:/etc/otel/config.yaml
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8
+    profiles: [ clickhouse ]
+    environment:
+      CLICKHOUSE_DB: otel
+      CLICKHOUSE_USER: otel
+      CLICKHOUSE_PASSWORD: otel
+    ports:
+      - "8123:8123"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test: [ "CMD-SHELL", "clickhouse-client --user otel --password otel --query 'SELECT 1'" ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
 volumes:
   console-data:
   console-es-data:
   elasticsearch-data:
+  clickhouse-data:

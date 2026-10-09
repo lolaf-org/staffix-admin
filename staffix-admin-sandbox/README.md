@@ -1,7 +1,8 @@
 # staffix-admin sandbox
 
 Three staffix engines trading with each other, announced to a locally running console, with their metrics in
-Prometheus and their FIX logs in Loki. Like the console, it builds against the staffix snapshot (see [Building](../docs/development.md#building)).
+Prometheus and their FIX logs in Loki (or Elasticsearch). Like the console, it builds against the
+staffix snapshot (see [Building](../docs/development.md#building)).
 
 ## Run
 
@@ -57,6 +58,20 @@ java -Dloader.path=$DIST/plugins -jar $DIST/staffix-admin.jar --staffix.admin.se
 
 Stop with `docker compose --profile kibana --profile console-es down`; add `-v` to also drop the indexed data and the
 connectors this console stored.
+
+### ClickHouse
+
+The `clickhouse` profile starts ClickHouse (HTTP on :8123, user and password `otel`, database `otel`) and a third
+OpenTelemetry collector on port 4321, whose `clickhouse` exporter creates the `otel_logs`, `otel_traces` and
+`otel_metrics_<type>` tables, to look at the data:
+
+```shell
+(cd staffix-admin-sandbox/docker && docker compose --profile clickhouse up -d)
+./mvnw exec:java -Psandbox -pl staffix-admin-sandbox -DotlpUrl=http://localhost:4321
+(cd staffix-admin-sandbox/docker && docker compose exec clickhouse clickhouse-client --user otel --password otel --database otel)
+```
+
+Stop with `docker compose --profile clickhouse down`; add `-v` to also drop the data.
 
 ## What runs
 
