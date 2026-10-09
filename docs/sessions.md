@@ -37,8 +37,10 @@ does not alter the past.
 
 Each step of the band is a whole number of the engine's exports, and its shares count every sample in it, so an
 outage shorter than the step still shows. A session without a monitoring plugin has no availability. An engine
-that shuts down reports its sessions logged out by an operator. Some backends keep returning a stopped or crashed
-engine's last status for a while before it shows as no data: see [Backends](backends.md).
+that shuts down reports its sessions logged out by an operator. The band ends at the last status the backend has
+stored: steps of the last 30 seconds without data are left out, as the backend may not have stored them yet, so a
+crashed engine shows as no data after 30 seconds. Some backends keep returning a stopped or crashed engine's last
+status for a while longer: see [Backends](backends.md).
 
 ## Settings tab
 

@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -48,12 +49,19 @@ public class AvailabilityController {
      * Below rounding errors of shares adding up to 1.
      */
     private static final double NO_DATA_MIN = 1e-9;
+    /**
+     * How long a backend may take to store an export: Elasticsearch, behind the collector's batching, takes up to about
+     * 17 s. A crashed engine shows as missing data this much later.
+     */
+    private static final Duration INGESTION_GRACE = Duration.ofSeconds(30);
 
     private final TelemetrySources telemetrySources;
+    private final Clock clock;
 
     /**
      * A session's statuses over the period, from the logon status gauge its engine exports. Steps are whole exports
-     * long, so each holds the same number of samples.
+     * long, so each holds the same number of samples. Recent steps missing data are left out until the backend had time
+     * to store their exports.
      */
     @GetMapping("/api/availability")
     public Availability getAvailability(@RequestParam String engineId,
@@ -92,6 +100,10 @@ public class AvailabilityController {
         for (Instant end = start.plus(step); !end.isAfter(range.getTo()); end = end.plus(step)) {
             Instant at = end;
             steps.add(new AvailabilityStep(end, shares(status -> sharesByStatus.get(status).getOrDefault(at, 0.0))));
+        }
+        Instant storedUntil = clock.instant().minus(INGESTION_GRACE);
+        while (!steps.isEmpty() && steps.getLast().getEnd().isAfter(storedUntil) && steps.getLast().getShares().getNoData() > 0) {
+            steps.removeLast();
         }
         StatusShares total = average(steps);
         double meantToBeLoggedIn = total.getLoggedIn() + total.getLoggedOutInsideSessionTime();
