@@ -19,7 +19,7 @@ export function SessionDrawer() {
     <Drawer
       open
       onClose={() => navigate({ pathname: '/', search: location.search })}
-      size={760}
+      size={950}
       title={session.data ? <StatusBadge status={session.data.summary.status} text={title} /> : title}
     >
       {session.isPending && <Skeleton active />}
