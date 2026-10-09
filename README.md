@@ -235,8 +235,10 @@ trace:
 
 The match is exact: `ORD-1` does not find `ORD-12`. Loki filters the lines itself; Elasticsearch finds the value as a
 phrase and the console keeps the exact matches. A message logged with SOH between fields matches like one logged with
-`|`. Loki has no index on the message content: a trace over a long period of busy engines reads all of their lines,
-so keep the period short where the logs are large.
+`|`. Loki indexes labels, not the message content: it finds a value by reading the selected sessions' lines, newest
+first, and stops once it has the limit's worth of matches. A value with few matches, such as an order id, makes it read
+the whole period, so a trace or a text search over days of sessions logging a lot costs Loki that much; the engines
+are not involved. Elasticsearch finds the value through its index whatever the period.
 
 ### Session availability
 

@@ -3,6 +3,8 @@ export const TIME_WINDOWS = [
   { value: 60, label: '1h' },
   { value: 360, label: '6h' },
   { value: 1440, label: '24h' },
+  { value: 2880, label: '2d' },
+  { value: 10080, label: '7d' },
 ] as const
 
 /**
