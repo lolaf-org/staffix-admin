@@ -36,9 +36,9 @@ missing data do not count against it. Session time is as the engine evaluated it
 does not alter the past.
 
 Each step of the band is a whole number of the engine's exports, and its shares count every sample in it, so an
-outage shorter than the step still shows. A session without a monitoring plugin has no availability. Prometheus
-keeps returning a stopped engine's last value for up to its lookback (5 minutes by default), and the OpenTelemetry
-collector for its `metric_expiration`: data goes missing that much later than the engine.
+outage shorter than the step still shows. A session without a monitoring plugin has no availability. An engine
+that shuts down reports its sessions logged out by an operator. Some backends keep returning a stopped or crashed
+engine's last status for a while before it shows as no data: see [Backends](backends.md).
 
 ## Settings tab
 

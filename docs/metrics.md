@@ -24,7 +24,7 @@ custom range of up to 31 days. A chart holds about 240 points, down to a point a
 
 A rate is averaged over a window, the step by default. A rate needs two samples in its window, so the window cannot
 go under twice the engine's export step, nor under the connector's `minRateWindow`; the chart says the window it used.
-See [Backends](backends.md#prometheus) for what sets those floors.
+See [Backends](backends.md) for what sets those floors.
 
 ## Around a logged message
 

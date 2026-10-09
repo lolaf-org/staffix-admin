@@ -21,6 +21,10 @@ Scrape faster than the engines export, e.g. every 2 s for a 5 s step: the collec
 export, so a scrape at the same pace misses exports and leaves too few samples for the narrowest windows, which then
 chart nothing. To see second by second, an engine must export every second.
 
+Prometheus keeps returning a stopped engine's last value for its lookback (5 minutes by default), so a session's
+[availability](sessions.md#availability) shows its last status that long before "no data". Without `send_timestamps`
+on the collector's `prometheus` exporter, the collector's `metric_expiration` adds to it.
+
 ## Loki
 
 Loki holds what staffix's OTLP messages logger sends: every message in and out, and session events. Loki keeps the
@@ -29,8 +33,10 @@ every stream of the time range. Promote `fix.eid`, `fix.sg` and `fix.sn` to inde
 `staffix-admin-sandbox/docker/conf/loki.yaml` does) and list them in the connector's `indexedLabels`, so a query reads
 only the streams of its engine, group or session.
 
-Loki indexes labels, not the message content: a text search reads the selected streams. See
-[what a search costs](logs-and-trace.md#what-a-search-costs).
+Loki indexes labels, not the message content: it finds a value by reading the selected sessions' lines, newest
+first, and stops once it has the limit's worth of matches. A value with few matches, such as an order id, makes it
+read the whole period, so a trace or a text search over days of sessions logging a lot costs Loki that much, and may
+hit its query limits.
 
 ## Elasticsearch
 
@@ -52,7 +58,8 @@ without a histogram (an `aggregate_metric_double`) has a rate and a mean but no 
 the engines' export step.
 
 A logs text filter matches whole words of the message, case insensitive (`body.text` is a text field), rather than
-any substring.
+any substring. A trace or a field value is found through the index as a phrase, whatever the period, and the console
+keeps the exact matches.
 
 ## ClickHouse
 
