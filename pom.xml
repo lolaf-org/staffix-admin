@@ -17,6 +17,20 @@
     <packaging>pom</packaging>
     <name>staffix-admin</name>
     <description>HTTP admin console for staffix FIX engines</description>
+    <url>https://github.com/lolaf-org/staffix-admin</url>
+    <inceptionYear>2026</inceptionYear>
+    <organization>
+        <name>Lolaf.org</name>
+        <url>https://www.lolaf.org</url>
+    </organization>
+
+    <licenses>
+        <license>
+            <name>The Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
 
     <modules>
         <module>staffix-admin-audit</module>
@@ -47,6 +61,7 @@
         <springdoc.version>3.1.1</springdoc.version>
         <springdoc-openapi-maven-plugin.version>1.5</springdoc-openapi-maven-plugin.version>
         <staffix.version>0.9.1-SNAPSHOT</staffix.version>
+        <license-maven-plugin.version>5.1.2</license-maven-plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -210,5 +225,55 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>com.mycila</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <version>${license-maven-plugin.version}</version>
+                <inherited>false</inherited>
+                <configuration>
+                    <aggregate>true</aggregate>
+                    <licenseSets>
+                        <licenseSet>
+                            <header>${project.basedir}/HEADER.txt</header>
+                            <excludes>
+                                <exclude>**/LICENSE.txt</exclude>
+                                <exclude>**/*.txt</exclude>
+                                <exclude>**/*.yaml</exclude>
+                                <exclude>**/*.yml</exclude>
+                                <exclude>**/*.sh</exclude>
+                                <exclude>**/mvnw</exclude>
+                                <exclude>**/.mvn/**</exclude>
+                                <exclude>**/pom.xml</exclude>
+                                <exclude>**/src/main/resources/**</exclude>
+                                <exclude>**/src/test/resources/**</exclude>
+                                <exclude>**/src/config/**</exclude>
+                                <exclude>staffix-admin-sandbox/console/**</exclude>
+                                <exclude>staffix-admin-sandbox/docker/conf/**</exclude>
+                                <exclude>**/*.html</exclude>
+                                <exclude>**/.dockerignore</exclude>
+                                <exclude>lombok.config</exclude>
+                                <exclude>staffix-admin-ui/node/**</exclude>
+                                <exclude>staffix-admin-ui/codegen/**</exclude>
+                                <exclude>staffix-admin-ui/src/api/schema.d.ts</exclude>
+                            </excludes>
+                        </licenseSet>
+                    </licenseSets>
+                    <mapping>
+                        <ts>SLASHSTAR_STYLE</ts>
+                        <tsx>SLASHSTAR_STYLE</tsx>
+                    </mapping>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>check-license-headers</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
     </build>
 </project>

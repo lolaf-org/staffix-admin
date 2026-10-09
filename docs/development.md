@@ -22,6 +22,9 @@ The console builds against the staffix snapshot (`0.9.1-SNAPSHOT`): install staf
 in the staffix repository), then `./mvnw install` here. The build downloads its own Node into `staffix-admin-ui/node/`;
 no system Node is needed. The `staffix-admin-sandbox` module builds only with `-Psandbox`.
 
+Every source file carries the Apache license header of `HEADER.txt`; the build fails without it, and
+`./mvnw license:format` adds it.
+
 ## API contract
 
 The Java controllers and DTOs are the source of truth. springdoc derives the OpenAPI spec from them, and the UI's
