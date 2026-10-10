@@ -21,6 +21,10 @@ import org.lolaf.staffix.api.admin.AdminApi;
 import org.lolaf.staffix.api.admin.FixAcceptorSessions;
 import org.lolaf.staffix.api.admin.FixInitiatorTargets;
 import org.lolaf.staffix.api.admin.FixSessionComponents;
+import org.lolaf.staffix.api.alerting.ProbeDefinition;
+import org.lolaf.staffix.api.alerting.ProbeState;
+import org.lolaf.staffix.api.alerting.ProbesListener;
+import org.lolaf.staffix.api.alerting.SessionProbeState;
 import org.lolaf.staffix.api.application.FixApplicationSessionSettingDescriptor;
 import org.lolaf.staffix.api.logging.FixMessagesLoggerSettings;
 import org.lolaf.staffix.api.monitoring.FixMeterDescriptor;
@@ -259,6 +263,31 @@ final class SimulatedEngine implements AdminApi {
     public synchronized List<FixMeterDescriptor> getFixSessionMeters(FixSessionId fixSessionId) {
         SimulatedSession session = running(fixSessionId);
         return monitoring.context(session, this).map(FixSessionsMonitoringContext::getMeterDescriptors).orElse(List.of());
+    }
+
+    @Override
+    public synchronized List<ProbeDefinition> getProbeDefinitions(FixSessionId fixSessionId) {
+        running(fixSessionId);
+        return List.of();
+    }
+
+    @Override
+    public synchronized List<ProbeState> getProbeStates(FixSessionId fixSessionId) {
+        running(fixSessionId);
+        return List.of();
+    }
+
+    @Override
+    public List<SessionProbeState> getActiveAlerts() {
+        return List.of();
+    }
+
+    @Override
+    public void addProbesListener(ProbesListener listener) {
+    }
+
+    @Override
+    public void removeProbesListener(ProbesListener listener) {
     }
 
     @Override

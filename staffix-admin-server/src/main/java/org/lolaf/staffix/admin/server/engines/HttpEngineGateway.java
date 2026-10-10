@@ -17,6 +17,9 @@ package org.lolaf.staffix.admin.server.engines;
 
 import org.jspecify.annotations.Nullable;
 import org.lolaf.staffix.admin.server.AdminProperties;
+import org.lolaf.staffix.admin.server.alerts.ActiveAlert;
+import org.lolaf.staffix.admin.server.alerts.AlertLevel;
+import org.lolaf.staffix.admin.server.alerts.SessionProbe;
 import org.lolaf.staffix.admin.server.dictionaries.DictionaryRef;
 import org.lolaf.staffix.admin.server.sessions.CompIds;
 import org.lolaf.staffix.admin.server.sessions.FixIdentity;
@@ -218,6 +221,79 @@ class HttpEngineGateway implements EngineGateway {
         return call(engineId, HttpMethod.GET, List.of("dictionaries", dictionaryId), null, byte[].class);
     }
 
+    @Override
+    public List<ActiveAlert> listAlerts(String engineId) {
+        return sessions(engineId).stream()
+                .flatMap(session -> session.alerts().stream().map(alert -> activeAlert(engineId, alert)))
+                .sorted(ActiveAlert.WORST_FIRST)
+                .toList();
+    }
+
+    @Override
+    public List<SessionProbe> getProbes(SessionRef session) {
+        EngineSession engineSession = session(session);
+        String probesVersion = engineSession.status().getProbesVersion();
+        if (probesVersion == null) {
+            return List.of();
+        }
+        List<ConnectorProbes.Probe> definitions = definitions(session, probesVersion);
+        Map<String, ConnectorProbes.State> states = new HashMap<>();
+        for (ConnectorProbes.State state : call(session.getEngineId(), HttpMethod.GET, sessionPath(session, "probes", "states"), null,
+                ConnectorProbes.State[].class)) {
+            states.put(state.getProbe(), state);
+        }
+        return definitions.stream().map(definition -> probe(definition, states.get(definition.getName()))).toList();
+    }
+
+    /**
+     * Read again only when the status reports another version: definitions change only when a probe is added or
+     * removed.
+     */
+    private List<ConnectorProbes.Probe> definitions(SessionRef session, String probesVersion) {
+        CachedStatus cached = statuses.get(session.getEngineId());
+        List<String> key = List.of(session.getGroup(), session.getSessionId());
+        synchronized (cached) {
+            CachedProbes probes = cached.probes.get(key);
+            if (probes != null && probes.version.equals(probesVersion)) {
+                return probes.definitions;
+            }
+        }
+        List<ConnectorProbes.Probe> definitions = List.of(call(session.getEngineId(), HttpMethod.GET, sessionPath(session, "probes"), null,
+                ConnectorProbes.Probe[].class));
+        synchronized (cached) {
+            cached.probes.put(key, new CachedProbes(probesVersion, definitions));
+        }
+        return definitions;
+    }
+
+    private static ActiveAlert activeAlert(String engineId, ConnectorAlerts.Alert alert) {
+        return ActiveAlert.builder()
+                .engineId(engineId)
+                .group(alert.getGroup())
+                .sessionId(alert.getName())
+                .configId(alert.getSelectedConfig())
+                .probe(alert.getProbe())
+                .level(AlertLevel.valueOf(alert.getLevel()))
+                .message(alert.getMessage())
+                .since(Instant.parse(alert.getSince()))
+                .build();
+    }
+
+    private static SessionProbe probe(ConnectorProbes.Probe definition, ConnectorProbes.@Nullable State state) {
+        SessionProbe.SessionProbeBuilder probe = SessionProbe.builder()
+                .name(definition.getName())
+                .description(definition.getDescription())
+                .evaluationInterval(Duration.parse(definition.getEvaluationInterval()))
+                .reminderInterval(definition.getReminderInterval() == null ? null : Duration.parse(definition.getReminderInterval()));
+        if (state != null) {
+            probe.level(state.getLevel() == null ? null : AlertLevel.valueOf(state.getLevel()))
+                    .message(state.getMessage())
+                    .since(state.getSince() == null ? null : Instant.parse(state.getSince()))
+                    .lastEvaluation(Instant.parse(state.getLastEvaluation()));
+        }
+        return probe.build();
+    }
+
     private List<EngineSession> sessions(String engineId) {
         RegisteredEngine engine = registry.get(engineId);
         CachedStatus cached = statuses.computeIfAbsent(engineId, id -> new CachedStatus());
@@ -231,7 +307,8 @@ class HttpEngineGateway implements EngineGateway {
                     if (cached.described == null || !cached.described.getVersion().equals(status.getSessionsVersion())) {
                         cached.described = call(engineId, HttpMethod.GET, List.of("sessions"), null, ConnectorSessions.class);
                     }
-                    cached.sessions = join(cached.described, status);
+                    readAlertsIfChanged(engineId, cached, status);
+                    cached.sessions = join(cached.described, status, cached.alerts);
                     cached.failure = null;
                 } catch (GatewayException e) {
                     cached.failure = e;
@@ -245,16 +322,34 @@ class HttpEngineGateway implements EngineGateway {
     }
 
     /**
+     * The alerts' own version is kept rather than the status's: it is at least as recent, so a change racing the two
+     * calls is not read twice.
+     */
+    private void readAlertsIfChanged(String engineId, CachedStatus cached, ConnectorStatus status) {
+        if (status.getAlertsVersion() == null) {
+            cached.alertsVersion = null;
+            cached.alerts = List.of();
+        } else if (!status.getAlertsVersion().equals(cached.alertsVersion)) {
+            ConnectorAlerts alerts = call(engineId, HttpMethod.GET, List.of("alerts"), null, ConnectorAlerts.class);
+            cached.alertsVersion = alerts.getAlertsVersion();
+            cached.alerts = alerts.getAlerts();
+        }
+    }
+
+    /**
      * A session that came after the description was read is left out until the next poll reads the new one.
      */
-    private static List<EngineSession> join(ConnectorSessions described, ConnectorStatus status) {
+    private static List<EngineSession> join(ConnectorSessions described, ConnectorStatus status, List<ConnectorAlerts.Alert> alerts) {
         Map<List<String>, ConnectorSessions.Session> descriptions = new HashMap<>();
         described.getSessions().forEach(session -> descriptions.put(List.of(session.getGroup(), session.getName()), session));
+        Map<List<String>, List<ConnectorAlerts.Alert>> alertsBySession = new HashMap<>();
+        alerts.forEach(alert -> alertsBySession.computeIfAbsent(List.of(alert.getGroup(), alert.getName()), key -> new ArrayList<>()).add(alert));
         List<EngineSession> joined = new ArrayList<>();
         for (ConnectorStatus.Session session : status.getSessions()) {
-            ConnectorSessions.Session description = descriptions.get(List.of(session.getGroup(), session.getName()));
+            List<String> key = List.of(session.getGroup(), session.getName());
+            ConnectorSessions.Session description = descriptions.get(key);
             if (description != null) {
-                joined.add(new EngineSession(description, session));
+                joined.add(new EngineSession(description, session, alertsBySession.getOrDefault(key, List.of())));
             }
         }
         return joined;
@@ -287,8 +382,10 @@ class HttpEngineGateway implements EngineGateway {
                 .orElseThrow(() -> GatewayException.unknownSession(session));
     }
 
-    private static List<String> sessionPath(SessionRef session, String operation) {
-        return List.of("sessions", session.getGroup(), session.getSessionId(), operation);
+    private static List<String> sessionPath(SessionRef session, String... operation) {
+        List<String> path = new ArrayList<>(List.of("sessions", session.getGroup(), session.getSessionId()));
+        path.addAll(List.of(operation));
+        return path;
     }
 
     private <T> T call(String engineId, HttpMethod method, List<String> path, @Nullable Object body, Class<T> responseType) {
@@ -350,6 +447,8 @@ class HttpEngineGateway implements EngineGateway {
                 .desiredState(SessionDesiredState.valueOf(status.getDesiredState()))
                 .messagesLoggerInstanceId(description.getMessagesLoggerInstanceId())
                 .monitoringInstanceId(description.getMonitoringInstanceId())
+                .alertLevel(session.alerts().stream().map(alert -> AlertLevel.valueOf(alert.getLevel())).max(Comparator.naturalOrder()).orElse(null))
+                .alertCount(session.alerts().size())
                 .build();
     }
 
@@ -367,7 +466,8 @@ class HttpEngineGateway implements EngineGateway {
                 .build();
     }
 
-    private record EngineSession(ConnectorSessions.Session description, ConnectorStatus.Session status) {
+    private record EngineSession(ConnectorSessions.Session description, ConnectorStatus.Session status,
+                                 List<ConnectorAlerts.Alert> alerts) {
 
         ConnectorSessions.Config selectedConfig() {
             return description.getConfigs().stream()
@@ -377,9 +477,13 @@ class HttpEngineGateway implements EngineGateway {
         }
     }
 
+    private record CachedProbes(String version, List<ConnectorProbes.Probe> definitions) {
+    }
+
     /**
      * Also holds a failed call, so the viewers waiting on an engine that does not answer do not each wait out the
-     * request timeout in turn. The description is kept until the status reports another version.
+     * request timeout in turn. The description, the alerts and each session's probes are kept until the status
+     * reports another version of them.
      */
     private static final class CachedStatus {
         @Nullable RegisteredEngine engine;
@@ -387,6 +491,9 @@ class HttpEngineGateway implements EngineGateway {
         @Nullable ConnectorSessions described;
         @Nullable List<EngineSession> sessions;
         @Nullable GatewayException failure;
+        @Nullable Long alertsVersion;
+        List<ConnectorAlerts.Alert> alerts = List.of();
+        final Map<List<String>, CachedProbes> probes = new HashMap<>();
 
         boolean isFresh(RegisteredEngine current, Instant now) {
             return engine != null && at != null && now.isBefore(at.plus(STATUS_FRESH))

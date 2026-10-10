@@ -16,6 +16,8 @@
 package org.lolaf.staffix.admin.server.simulator;
 
 import org.jspecify.annotations.Nullable;
+import org.lolaf.staffix.admin.server.alerts.ActiveAlert;
+import org.lolaf.staffix.admin.server.alerts.SessionProbe;
 import org.lolaf.staffix.admin.server.dictionaries.DictionaryRef;
 import org.lolaf.staffix.admin.server.engines.EngineGateway;
 import org.lolaf.staffix.admin.server.engines.GatewayException;
@@ -203,5 +205,15 @@ class SimulatedEngineGateway implements EngineGateway {
             throw GatewayException.unknownDictionary(engineId, dictionaryId);
         }
         return dictionary.xml();
+    }
+
+    @Override
+    public List<ActiveAlert> listAlerts(String engineId) {
+        return List.of();
+    }
+
+    @Override
+    public List<SessionProbe> getProbes(SessionRef session) {
+        return List.of();
     }
 }

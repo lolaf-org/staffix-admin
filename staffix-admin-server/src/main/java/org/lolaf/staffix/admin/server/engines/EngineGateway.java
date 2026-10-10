@@ -16,6 +16,8 @@
 package org.lolaf.staffix.admin.server.engines;
 
 import org.jspecify.annotations.Nullable;
+import org.lolaf.staffix.admin.server.alerts.ActiveAlert;
+import org.lolaf.staffix.admin.server.alerts.SessionProbe;
 import org.lolaf.staffix.admin.server.dictionaries.DictionaryRef;
 import org.lolaf.staffix.admin.server.sessions.ApplicationSetting;
 import org.lolaf.staffix.admin.server.sessions.ResetMode;
@@ -108,4 +110,14 @@ public interface EngineGateway {
     List<DictionaryRef> getDictionaries(SessionRef config);
 
     byte[] getDictionaryXml(String engineId, String dictionaryId);
+
+    /**
+     * The engine's ongoing alerts, the worst first then the oldest; read again only when the engine reports a change.
+     */
+    List<ActiveAlert> listAlerts(String engineId);
+
+    /**
+     * The session's probes in the order they were added, each with its live state.
+     */
+    List<SessionProbe> getProbes(SessionRef session);
 }

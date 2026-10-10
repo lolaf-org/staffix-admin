@@ -24,6 +24,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.lolaf.staffix.admin.server.AdminProperties;
 import org.lolaf.staffix.admin.server.SteppingClock;
+import org.lolaf.staffix.admin.server.alerts.AlertLevel;
+import org.lolaf.staffix.admin.server.alerts.SessionProbe;
 import org.lolaf.staffix.admin.server.dictionaries.DictionaryRef;
 import org.lolaf.staffix.admin.server.onboarding.EngineAnnouncement;
 import org.lolaf.staffix.admin.server.sessions.ApplicationSetting;
@@ -53,6 +55,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -86,16 +89,39 @@ class HttpEngineGatewayTest {
               "messagesLoggerInstanceId":"otlp","monitoringInstanceId":"otlp-metrics","addedLater":true}]}
             """;
     private static final String STATUS = """
-            {"instanceId":"alpha-engine","sessionsVersion":"%s","sessions":[
+            {"instanceId":"alpha-engine","sessionsVersion":"%s",%s"sessions":[
              {"group":"beta","name":"drop-copy","selectedConfig":"drop-copy",
               "desiredState":"LOGGED_OUT","status":"LOGGED_OUT_BY_OPERATOR","incomingSeqNum":1,"outgoingSeqNum":1},
              {"group":"alpha","name":"trading","selectedConfig":"trading-drp",
-              "desiredState":"LOGGED_IN","status":"LOGGED_IN","incomingSeqNum":12,"outgoingSeqNum":34},
+              "desiredState":"LOGGED_IN","status":"LOGGED_IN","incomingSeqNum":12,"outgoingSeqNum":34%s},
              {"group":"alpha","name":"added-since","selectedConfig":"added-since",
               "desiredState":"LOGGED_IN","status":"LOGGED_IN","incomingSeqNum":1,"outgoingSeqNum":1}]}
             """;
 
+    private static final String ALERTS = """
+            {"engineId":"alpha-engine","alertsVersion":%d,"alerts":[
+             {"group":"alpha","name":"trading","selectedConfig":"trading-drp","probe":"queue","level":"WARNING",
+              "message":"250 queued","since":"2026-10-10T10:00:00Z"},
+             {"group":"alpha","name":"trading","selectedConfig":"trading-drp","probe":"session-down","level":"CRITICAL",
+              "message":"down","since":"2026-10-10T10:05:00Z"},
+             {"group":"beta","name":"drop-copy","selectedConfig":"drop-copy","probe":"queue","level":"CRITICAL",
+              "message":"5000 queued","since":"2026-10-10T09:00:00Z"}]}
+            """;
+    private static final String PROBES = """
+            [{"name":"session-down","description":"Down inside session time","evaluationInterval":"PT1S"},
+             {"name":"order-flow","description":"Time since the last order","evaluationInterval":"PT5S","reminderInterval":"PT1M"}]
+            """;
+    private static final String PROBE_STATES = """
+            [{"probe":"session-down","level":"CRITICAL","message":"down","since":"2026-10-10T10:05:00Z",
+              "lastEvaluation":"2026-10-10T10:06:00Z"}]
+            """;
+
     private volatile String sessionsVersion = "v1";
+    /**
+     * Null serves the status of an engine older than alerting, without its versions.
+     */
+    private volatile Long alertsVersion;
+    private volatile String probesVersion;
     private final List<String> requests = new CopyOnWriteArrayList<>();
     private final Map<String, String> bodies = new ConcurrentHashMap<>();
     private final Map<String, Integer> statuses = new ConcurrentHashMap<>();
@@ -131,7 +157,12 @@ class HttpEngineGatewayTest {
         requests.add(request);
         bodies.put(request, new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
         byte[] body = switch (path) {
-            case "status" -> STATUS.formatted(sessionsVersion).getBytes(StandardCharsets.UTF_8);
+            case "status" -> STATUS.formatted(sessionsVersion,
+                    alertsVersion == null ? "" : "\"alertsVersion\":" + alertsVersion + ",",
+                    probesVersion == null ? "" : ",\"probesVersion\":\"" + probesVersion + "\"").getBytes(StandardCharsets.UTF_8);
+            case "alerts" -> ALERTS.formatted(alertsVersion).getBytes(StandardCharsets.UTF_8);
+            case "sessions/alpha/trading/probes" -> PROBES.getBytes(StandardCharsets.UTF_8);
+            case "sessions/alpha/trading/probes/states" -> PROBE_STATES.getBytes(StandardCharsets.UTF_8);
             case "sessions" -> SESSIONS.getBytes(StandardCharsets.UTF_8);
             case "dictionaries/default-FIX.4.4" -> "<fix/>".getBytes(StandardCharsets.UTF_8);
             case "session-settings-stores" -> "[{\"instanceId\":\"main\",\"persistent\":true}]".getBytes(StandardCharsets.UTF_8);
@@ -268,6 +299,68 @@ class HttpEngineGatewayTest {
         gateway.listGroups("alpha-engine");
 
         assertThat(requests).containsExactly("GET status", "GET sessions", "GET status", "GET sessions");
+    }
+
+    @Test
+    void anEngineOlderThanAlertingIsReadWithoutAlerts() {
+        SessionSummary trading = gateway.listGroups("alpha-engine").get(0).getSessions().get(0);
+
+        assertThat(trading.getAlertLevel()).isNull();
+        assertThat(trading.getAlertCount()).isZero();
+        assertThat(gateway.listAlerts("alpha-engine")).isEmpty();
+        assertThat(gateway.getProbes(trading())).isEmpty();
+        assertThat(requests).containsExactly("GET status", "GET sessions");
+    }
+
+    @Test
+    void alertsAreReadOnlyWhenTheirVersionMovesAndEachSessionCarriesItsOwn() {
+        alertsVersion = 5L;
+        SessionSummary trading = gateway.listGroups("alpha-engine").get(0).getSessions().get(0);
+
+        assertThat(trading.getAlertLevel()).isEqualTo(AlertLevel.CRITICAL);
+        assertThat(trading.getAlertCount()).isEqualTo(2);
+        clock.step(HttpEngineGateway.STATUS_FRESH);
+        gateway.listGroups("alpha-engine");
+        assertThat(requests).as("same alerts version").containsExactly("GET status", "GET sessions", "GET alerts", "GET status");
+
+        alertsVersion = 6L;
+        clock.step(HttpEngineGateway.STATUS_FRESH);
+        gateway.listGroups("alpha-engine");
+        assertThat(requests).endsWith("GET status", "GET alerts");
+    }
+
+    @Test
+    void anEnginesAlertsAreTheWorstFirstThenTheOldestNamedAfterTheSession() {
+        alertsVersion = 5L;
+
+        assertThat(gateway.listAlerts("alpha-engine"))
+                .extracting(alert -> alert.getGroup() + "." + alert.getSessionId() + "/" + alert.getConfigId() + " "
+                        + alert.getProbe() + " " + alert.getLevel())
+                .containsExactly("beta.drop-copy/drop-copy queue CRITICAL", "alpha.trading/trading-drp session-down CRITICAL",
+                        "alpha.trading/trading-drp queue WARNING");
+    }
+
+    @Test
+    void probeDefinitionsAreReadOnlyWhenTheirVersionMovesAndStatesOnEveryCall() {
+        probesVersion = "p1";
+
+        gateway.getProbes(trading());
+        List<SessionProbe> probes = gateway.getProbes(trading());
+
+        assertThat(requests).containsExactly("GET status", "GET sessions", "GET sessions/alpha/trading/probes",
+                "GET sessions/alpha/trading/probes/states", "GET sessions/alpha/trading/probes/states");
+        assertThat(probes).extracting(SessionProbe::getName).containsExactly("session-down", "order-flow");
+        assertThat(probes.get(0).getLevel()).isEqualTo(AlertLevel.CRITICAL);
+        assertThat(probes.get(0).getSince()).isEqualTo(Instant.parse("2026-10-10T10:05:00Z"));
+        assertThat(probes.get(0).getEvaluationInterval()).isEqualTo(Duration.ofSeconds(1));
+        assertThat(probes.get(1).getLevel()).as("not evaluated yet").isNull();
+        assertThat(probes.get(1).getLastEvaluation()).isNull();
+        assertThat(probes.get(1).getReminderInterval()).isEqualTo(Duration.ofMinutes(1));
+
+        probesVersion = "p2";
+        clock.step(HttpEngineGateway.STATUS_FRESH);
+        gateway.getProbes(trading());
+        assertThat(requests).filteredOn(request -> request.endsWith("/probes")).hasSize(2);
     }
 
     @Test

@@ -19,6 +19,7 @@ import lombok.Builder;
 import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.lolaf.staffix.admin.server.alerts.AlertLevel;
 
 import java.util.List;
 
@@ -61,4 +62,10 @@ public class SessionSummary {
      */
     @Nullable
     String monitoringInstanceId;
+    /**
+     * The worst level among the session's ongoing alerts, null when none is.
+     */
+    @Nullable
+    AlertLevel alertLevel;
+    int alertCount;
 }

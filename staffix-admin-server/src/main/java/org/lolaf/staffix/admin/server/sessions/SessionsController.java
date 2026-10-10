@@ -17,6 +17,7 @@ package org.lolaf.staffix.admin.server.sessions;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.lolaf.staffix.admin.server.alerts.SessionProbe;
 import org.lolaf.staffix.admin.server.audit.AuditLog;
 import org.lolaf.staffix.admin.server.engines.EngineGateway;
 import org.lolaf.staffix.admin.server.engines.GatewayException;
@@ -55,6 +56,14 @@ public class SessionsController {
     @GetMapping(SESSION)
     public SessionDetail getSession(@PathVariable String engineId, @PathVariable String group, @PathVariable String sessionId) {
         return gateway.getSession(SessionRef.of(engineId, group, sessionId));
+    }
+
+    /**
+     * The session's probes with their live state; the console fetches it only while the session's alerts are shown.
+     */
+    @GetMapping(SESSION + "/probes")
+    public List<SessionProbe> getProbes(@PathVariable String engineId, @PathVariable String group, @PathVariable String sessionId) {
+        return gateway.getProbes(SessionRef.of(engineId, group, sessionId));
     }
 
     /**

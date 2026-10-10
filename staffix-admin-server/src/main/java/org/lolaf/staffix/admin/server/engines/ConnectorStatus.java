@@ -19,6 +19,7 @@ import lombok.Builder;
 import lombok.Singular;
 import lombok.Value;
 import lombok.extern.jackson.Jacksonized;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -32,6 +33,11 @@ import java.util.List;
 class ConnectorStatus {
     String engineId;
     String sessionsVersion;
+    /**
+     * Moves with every alert raised, changed or cleared; null from an engine older than staffix's alerting.
+     */
+    @Nullable
+    Long alertsVersion;
     @Singular
     List<Session> sessions;
 
@@ -46,5 +52,7 @@ class ConnectorStatus {
         String status;
         long incomingSeqNum;
         long outgoingSeqNum;
+        @Nullable
+        String probesVersion;
     }
 }
