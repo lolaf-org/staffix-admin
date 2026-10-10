@@ -36,6 +36,7 @@ import org.lolaf.staffix.api.session.FixSessionSettings;
 import org.lolaf.staffix.api.session.plugins.FixSessionsPluginSettings;
 
 import java.net.InetSocketAddress;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -43,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -60,6 +62,9 @@ final class SimulatedEngine implements AdminApi {
     private final List<FixMessagesLoggerSettings> loggers;
     private final List<FixSessionsPluginSettings<?>> plugins;
     private final SimulatedMonitoring monitoring;
+    private final Map<SimulatedConnection, SimulatedProbes> probes = new LinkedHashMap<>();
+    private final List<ProbesListener> probesListeners = new CopyOnWriteArrayList<>();
+    private long ticks;
 
     SimulatedEngine(String engineId, List<SimulatedConnection> connections, List<FixMessagesLoggerSettings> loggers,
                     List<FixSessionsPluginSettings<?>> plugins) {
@@ -70,8 +75,30 @@ final class SimulatedEngine implements AdminApi {
         this.monitoring = new SimulatedMonitoring(engineId, plugins);
     }
 
-    synchronized void tick(Random random) {
+    /**
+     * Listeners are told after the engine's lock is released, as staffix tells them from its probes thread.
+     */
+    void tick(Random random) {
+        List<Map.Entry<FixSessionId, ProbeState>> transitions = tickSessions(random);
+        transitions.forEach(transition -> probesListeners.forEach(listener ->
+                listener.onAlertTransition(transition.getKey(), transition.getValue())));
+    }
+
+    private synchronized List<Map.Entry<FixSessionId, ProbeState>> tickSessions(Random random) {
         connections.forEach(connection -> connection.running().tick(random));
+        long tick = ticks++;
+        Instant now = Instant.now();
+        List<Map.Entry<FixSessionId, ProbeState>> transitions = new ArrayList<>();
+        for (SimulatedConnection connection : connections) {
+            SimulatedSession running = connection.running();
+            probes(connection).tick(tick, running.status(), now)
+                    .forEach(state -> transitions.add(Map.entry(running.fixSessionId(), state)));
+        }
+        return transitions;
+    }
+
+    private SimulatedProbes probes(SimulatedConnection connection) {
+        return probes.computeIfAbsent(connection, added -> new SimulatedProbes(probes.size()));
     }
 
     /**
@@ -267,27 +294,42 @@ final class SimulatedEngine implements AdminApi {
 
     @Override
     public synchronized List<ProbeDefinition> getProbeDefinitions(FixSessionId fixSessionId) {
-        running(fixSessionId);
-        return List.of();
+        return probes(connectionRunning(fixSessionId)).definitions();
     }
 
     @Override
     public synchronized List<ProbeState> getProbeStates(FixSessionId fixSessionId) {
-        running(fixSessionId);
-        return List.of();
+        return probes(connectionRunning(fixSessionId)).states();
     }
 
     @Override
-    public List<SessionProbeState> getActiveAlerts() {
-        return List.of();
+    public synchronized List<SessionProbeState> getActiveAlerts() {
+        List<SessionProbeState> active = new ArrayList<>();
+        for (SimulatedConnection connection : connections) {
+            for (ProbeState state : probes(connection).states()) {
+                if (state.getAlert().isPresent()) {
+                    active.add(new SessionProbeState(connection.running().fixSessionId(), state));
+                }
+            }
+        }
+        return active;
     }
 
     @Override
     public void addProbesListener(ProbesListener listener) {
+        probesListeners.add(listener);
     }
 
     @Override
     public void removeProbesListener(ProbesListener listener) {
+        probesListeners.remove(listener);
+    }
+
+    private SimulatedConnection connectionRunning(FixSessionId fixSessionId) {
+        return connections.stream()
+                .filter(connection -> connection.running().fixSessionId().equals(fixSessionId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("No initiator or acceptor manages session " + fixSessionId));
     }
 
     @Override
