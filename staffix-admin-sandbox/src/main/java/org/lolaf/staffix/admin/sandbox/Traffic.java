@@ -35,12 +35,16 @@ import org.lolaf.staffix.admin.sandbox.fix44.fields.Side;
 import org.lolaf.staffix.admin.sandbox.fix44.fields.Symbol;
 import org.lolaf.staffix.admin.sandbox.fix44.msg.MessageTypes;
 import org.lolaf.staffix.api.FixDictionaryId;
+import org.lolaf.staffix.api.alerting.Alert;
+import org.lolaf.staffix.api.alerting.Probe;
+import org.lolaf.staffix.api.alerting.ProbeEvaluator;
 import org.lolaf.staffix.api.application.FixApplication;
 import org.lolaf.staffix.api.codec.FixFieldsDecoderMapper;
 import org.lolaf.staffix.api.codec.FixMessageDecoder;
 import org.lolaf.staffix.api.fields.FieldsRegistry;
 import org.lolaf.staffix.api.monitoring.Gauge;
 import org.lolaf.staffix.api.monitoring.Timer;
+import org.lolaf.staffix.api.msg.DecodedFixMessage;
 import org.lolaf.staffix.api.msg.MessageType;
 import org.lolaf.staffix.api.msg.MessageTypeRegistry;
 import org.lolaf.staffix.api.session.FixSession;
@@ -51,6 +55,7 @@ import org.lolaf.staffix.api.version.FixRegularVersion;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -117,9 +122,13 @@ final class Traffic {
 
     /**
      * Asks for a quote on a random symbol every interval, and buys at the offer of one quote in {@value QUOTES_PER_ORDER}
-     * with a NewOrderSingle naming the quote.
+     * with a NewOrderSingle naming the quote. Goes quiet for {@link #PAUSE} of every {@link #PAUSE_CYCLE}, shifted per
+     * session, so the quoter's order-flow probe raises its alerts and clears them.
      */
     static final class Requester extends Periodic {
+
+        static final Duration PAUSE_CYCLE = Duration.ofMinutes(4);
+        static final Duration PAUSE = Duration.ofSeconds(70);
 
         private final AtomicLong requests = new AtomicLong();
         private final AtomicLong quotes = new AtomicLong();
@@ -149,6 +158,9 @@ final class Traffic {
 
         @Override
         void send(FixSession session) {
+            if (isPaused(session)) {
+                return;
+            }
             String quoteReqId = session.getFixSessionId().getGroup() + "-" + requests.incrementAndGet();
             quoteRequest.begin()
                     .setQuoteReqID(quoteReqId)
@@ -156,6 +168,12 @@ final class Traffic {
                     .setSymbol(SYMBOLS.get(ThreadLocalRandom.current().nextInt(SYMBOLS.size())));
             roundTrips.sent(quoteReqId);
             session.send(quoteRequest, null);
+        }
+
+        private static boolean isPaused(FixSession session) {
+            long cycle = PAUSE_CYCLE.toSeconds();
+            long shift = Math.floorMod(session.getFixSessionId().getQualifiedName().hashCode(), cycle);
+            return Math.floorMod(System.currentTimeMillis() / 1000 + shift, cycle) >= cycle - PAUSE.toSeconds();
         }
 
         private void quoted(FixSession session, QuoteDecoder quote) {
@@ -301,7 +319,10 @@ final class Traffic {
      */
     static final class Quoter implements FixApplication {
 
+        static final String ORDER_FLOW_PROBE = "order-flow";
+
         private final DropCopy dropCopy;
+        private final OrderFlow orderFlow = new OrderFlow(Duration.ofSeconds(20), Duration.ofSeconds(45));
 
         Quoter() {
             this(null);
@@ -325,7 +346,58 @@ final class Traffic {
         public List<FixMessageDecoder> setup(FixSessionSettings settings, FixSession session, Set<MessageType> encodedMessagesTypes) {
             encodedMessagesTypes.add(MessageTypes.Quote);
             encodedMessagesTypes.add(MessageTypes.ExecutionReport);
-            return List.of(new QuoteRequestDecoder(session), new OrderDecoder(session, dropCopy));
+            return List.of(new QuoteRequestDecoder(session), new OrderDecoder(session, dropCopy, orderFlow));
+        }
+
+        /**
+         * Added on logon and removed on logout, as an application watching its own flow would: a session nobody can
+         * send on is not short of orders, and the silence restarts from the logon.
+         */
+        @Override
+        public void onLogon(FixSession session, DecodedFixMessage logon) {
+            orderFlow.restart();
+            session.getProbes().remove(ORDER_FLOW_PROBE);
+            session.getProbes().add(Probe.builder()
+                    .name(ORDER_FLOW_PROBE)
+                    .description("Time since the last NewOrderSingle")
+                    .evaluator(orderFlow)
+                    .reminderInterval(Duration.ofMinutes(1))
+                    .build());
+        }
+
+        @Override
+        public void onLogout(FixSession session, String message, DecodedFixMessage logoutMessage) {
+            session.getProbes().remove(ORDER_FLOW_PROBE);
+        }
+
+        /**
+         * Evaluated on the engine's probes thread, hence the volatile; the alerts are built once, so an evaluation
+         * allocates nothing.
+         */
+        private static final class OrderFlow implements ProbeEvaluator {
+
+            private final long warningAfterNanos;
+            private final long majorAfterNanos;
+            private final Optional<Alert> warning;
+            private final Optional<Alert> major;
+            private volatile long lastOrderNanos = System.nanoTime();
+
+            OrderFlow(Duration warningAfter, Duration majorAfter) {
+                warningAfterNanos = warningAfter.toNanos();
+                majorAfterNanos = majorAfter.toNanos();
+                warning = Optional.of(Alert.warning("no order for more than " + warningAfter.toSeconds() + "s"));
+                major = Optional.of(Alert.major("no order for more than " + majorAfter.toSeconds() + "s"));
+            }
+
+            void restart() {
+                lastOrderNanos = System.nanoTime();
+            }
+
+            @Override
+            public Optional<Alert> evaluate() {
+                long silence = System.nanoTime() - lastOrderNanos;
+                return silence >= majorAfterNanos ? major : silence >= warningAfterNanos ? warning : Optional.empty();
+            }
         }
 
         @Setter
@@ -333,6 +405,7 @@ final class Traffic {
 
             private final ExecutionReportEncoder report;
             private final DropCopy dropCopy;
+            private final OrderFlow orderFlow;
             private final AtomicLong orders = new AtomicLong();
             private String clOrdId;
             private String symbol;
@@ -340,9 +413,10 @@ final class Traffic {
             private double orderQty;
             private double price;
 
-            OrderDecoder(FixSession session, DropCopy dropCopy) {
+            OrderDecoder(FixSession session, DropCopy dropCopy, OrderFlow orderFlow) {
                 report = session.newEncoder(ExecutionReportEncoder.class).asReusable();
                 this.dropCopy = dropCopy;
+                this.orderFlow = orderFlow;
             }
 
             @Override
@@ -361,6 +435,7 @@ final class Traffic {
 
             @Override
             public void onDecoded(FixSession session, boolean possDupFlag, boolean possResend) {
+                orderFlow.restart();
                 String orderId = session.getFixSessionId().getSenderCompID().getValue() + "-" + orders.incrementAndGet();
                 Fill fill = new Fill(clOrdId, orderId, symbol, side, orderQty, price);
                 session.send(fill.encode(report.begin(), session.getClock().now()), null);

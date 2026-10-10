@@ -18,6 +18,7 @@ package org.lolaf.staffix.admin.sandbox;
 import lombok.extern.slf4j.Slf4j;
 import org.lolaf.ringos.Deadline;
 import org.lolaf.staffix.admin.http.HttpAdminApiSettings;
+import org.lolaf.staffix.alerting.slf4j.Slf4jAlertsPublisherSettings;
 import org.lolaf.staffix.api.FixAcceptorBuilder;
 import org.lolaf.staffix.api.FixEngine;
 import org.lolaf.staffix.api.FixEngineBuilder;
@@ -130,6 +131,7 @@ final class SandboxEngine {
                                 .build())
                         .build())
                 .fixMessagesStore(MemoryMessageStoreSettings.builder().build())
+                .fixAlertsPublisher(Slf4jAlertsPublisherSettings.builder().build())
                 .fixMessagesLogger(OtlpMessagesLoggerSettings.builder()
                         .otlpEndpointUrl(settings.otlpUrl())
                         .resourceAttribute(FixMonitoringConstants.OTLP_SERVICE_NAME, "staffix-admin-sandbox")
