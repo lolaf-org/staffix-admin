@@ -18,9 +18,15 @@ import { PauseCircleOutlined } from '@ant-design/icons'
 import type { Schemas } from '../api/client'
 import { STATUS_COLORS, STATUS_LABELS } from './status'
 import { formatIdentity } from './identity'
+import { AlertBell } from '../alerts/AlertBell'
+import { ALERT_LEVEL_LABELS } from '../alerts/levels'
 
 interface Props {
   session: Schemas['SessionSummary']
+  /**
+   * The session's ongoing alerts for the tooltip; may lag the summary's count by a poll.
+   */
+  alerts: Schemas['ActiveAlert'][]
   selected: boolean
   onClick: () => void
 }
@@ -30,7 +36,7 @@ interface Props {
  */
 const TOOLTIP_MAX_WIDTH = 375
 
-export function SessionBox({ session, selected, onClick }: Props) {
+export function SessionBox({ session, alerts, selected, onClick }: Props) {
   const { token } = theme.useToken()
   const colors = {
     success: { background: token.colorSuccessBg, border: token.colorSuccess },
@@ -48,13 +54,18 @@ export function SessionBox({ session, selected, onClick }: Props) {
         <>
           <div>{formatIdentity(session.identity)}</div>
           <div>{STATUS_LABELS[session.status]}</div>
+          {alerts.map((alert) => (
+            <div key={alert.probe}>
+              {ALERT_LEVEL_LABELS[alert.level]}: {alert.probe}, {alert.message}
+            </div>
+          ))}
         </>
       }
     >
       <button
         type="button"
         onClick={onClick}
-        aria-label={`${session.group}.${session.id}, ${STATUS_LABELS[session.status]}`}
+        aria-label={`${session.group}.${session.id}, ${STATUS_LABELS[session.status]}${session.alertCount > 0 ? `, ${session.alertCount} alert${session.alertCount > 1 ? 's' : ''}` : ''}`}
         style={{
           width: 220,
           padding: '8px 10px',
@@ -76,9 +87,12 @@ export function SessionBox({ session, selected, onClick }: Props) {
             {session.id}
             {operatorLoggedOut && <PauseCircleOutlined style={{ marginLeft: 6 }} aria-label="Logged out by an operator" />}
           </Typography.Text>
-          <Typography.Text type="secondary" style={{ fontSize: 11 }}>
-            {session.type.toLowerCase()}
-          </Typography.Text>
+          <Flex align="center" gap={6} style={{ flexShrink: 0 }}>
+            {session.alertLevel && <AlertBell level={session.alertLevel} count={session.alertCount} tooltip={false} />}
+            <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+              {session.type.toLowerCase()}
+            </Typography.Text>
+          </Flex>
         </Flex>
         {session.configIds.length > 1 &&
           session.configIds.map((configId, index) => {

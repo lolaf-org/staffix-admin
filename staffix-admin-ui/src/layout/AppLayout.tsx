@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { Button, Flex, Layout, Segmented, Spin, Tabs, Tag, Typography, theme } from 'antd'
-import { ApiOutlined, AppstoreOutlined, AreaChartOutlined, DesktopOutlined, FileSearchOutlined, LogoutOutlined, NodeIndexOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
+import { Badge, Button, Flex, Layout, Segmented, Spin, Tabs, Tag, Typography, theme } from 'antd'
+import { ApiOutlined, AppstoreOutlined, BellOutlined, AreaChartOutlined, DesktopOutlined, FileSearchOutlined, LogoutOutlined, NodeIndexOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
 import { useQueryClient } from '@tanstack/react-query'
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router'
 import { isUnauthorized } from '../api/client'
-import { logout, useCurrentUser } from '../api/queries'
+import { logout, useAlerts, useCurrentUser } from '../api/queries'
 import { useThemeMode, type ThemeMode } from '../theme/ThemeMode'
 import staffixLogo from '../assets/staffix-logo.png'
 
@@ -26,6 +26,7 @@ const { Header, Content } = Layout
 
 const TABS = [
   { path: '/', label: 'Sessions', icon: <AppstoreOutlined /> },
+  { path: '/alerts', label: 'Alerts', icon: <BellOutlined /> },
   { path: '/metrics', label: 'Metrics', icon: <AreaChartOutlined /> },
   { path: '/logs', label: 'Logs', icon: <FileSearchOutlined /> },
   { path: '/trace', label: 'Trace', icon: <NodeIndexOutlined /> },
@@ -38,6 +39,7 @@ export function AppLayout() {
   const queryClient = useQueryClient()
   const me = useCurrentUser()
   const themeMode = useThemeMode()
+  const alerts = useAlerts()
   const { token } = theme.useToken()
 
   if (me.isPending) {
@@ -85,7 +87,11 @@ export function AppLayout() {
         <Tabs
           activeKey={TABS.find((tab) => tab.path !== '/' && location.pathname.startsWith(tab.path))?.path ?? '/'}
           onChange={(path) => navigate(path)}
-          items={TABS.map((tab) => ({ key: tab.path, icon: tab.icon, label: tab.label }))}
+          items={TABS.map((tab) => ({
+            key: tab.path,
+            icon: tab.icon,
+            label: tab.path === '/alerts' ? <AlertsTabLabel count={alerts.data?.alerts.length ?? 0} /> : tab.label,
+          }))}
           tabBarStyle={{ margin: 0, paddingInline: 20, background: token.colorBgContainer }}
         />
       </div>
@@ -93,5 +99,13 @@ export function AppLayout() {
         <Outlet />
       </Content>
     </Layout>
+  )
+}
+
+function AlertsTabLabel({ count }: { count: number }) {
+  return (
+    <Badge count={count} size="small" offset={[8, -2]}>
+      Alerts
+    </Badge>
   )
 }

@@ -16,6 +16,7 @@
 import { useSearchParams } from 'react-router'
 import type { Schemas } from '../api/client'
 import type { Status } from './status'
+import type { AlertLevel } from '../alerts/levels'
 import { formatIdentity } from './identity'
 
 /**
@@ -26,6 +27,7 @@ export function useSessionFilters() {
   const text = params.get('q') ?? ''
   const statuses = params.getAll('status') as Status[]
   const engines = params.getAll('engine')
+  const alertLevels = params.getAll('alert') as AlertLevel[]
 
   const update = (name: string, values: string[]) =>
     setParams(
@@ -44,15 +46,21 @@ export function useSessionFilters() {
 
   const matches = (session: Schemas['SessionSummary']) =>
     (statuses.length === 0 || statuses.includes(session.status)) &&
+    (alertLevels.length === 0 || (session.alertLevel != null && alertLevels.includes(session.alertLevel))) &&
     (text === '' || searchable(session).includes(text.toLowerCase()))
 
   return {
     text,
     statuses,
     engines,
+    alertLevels,
     setText: (value: string) => update('q', [value]),
     setStatuses: (values: Status[]) => update('status', values),
     setEngines: (values: string[]) => update('engine', values),
+    /**
+     * Matches a session by its worst ongoing level.
+     */
+    setAlertLevels: (values: AlertLevel[]) => update('alert', values),
     matches,
   }
 }

@@ -80,6 +80,40 @@ export function useSession(ref: SessionRef) {
   })
 }
 
+/**
+ * Every engine's ongoing alerts; the console reads an engine's again only when it reports a change.
+ */
+export function useAlerts() {
+  return useQuery({
+    queryKey: ['alerts'],
+    queryFn: () => call(api.GET('/api/alerts')),
+    refetchInterval: POLL_INTERVAL_MS,
+  })
+}
+
+/**
+ * Polled only while the engine has an alert, which is what its sessions' summaries tell.
+ */
+export function useEngineAlerts(engineId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['alerts', engineId],
+    queryFn: () => call(api.GET('/api/engines/{engineId}/alerts', enginePath(engineId))),
+    refetchInterval: POLL_INTERVAL_MS,
+    enabled,
+  })
+}
+
+/**
+ * Live states, read from the engine on every call: used only while the session's alerts are shown.
+ */
+export function useSessionProbes(ref: SessionRef) {
+  return useQuery({
+    queryKey: ['probes', ref.engineId, ref.group, ref.sessionId],
+    queryFn: () => call(api.GET('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/probes', sessionPath(ref))),
+    refetchInterval: POLL_INTERVAL_MS,
+  })
+}
+
 export function useSessionSettings(ref: SessionRef, runningConfigId: string) {
   return useQuery({
     queryKey: ['settings', ref.engineId, ref.group, ref.sessionId, runningConfigId],

@@ -22,6 +22,7 @@ const OverviewPage = lazy(() => import('./pages/OverviewPage').then((m) => ({ de
 const MetricsPage = lazy(() => import('./pages/MetricsPage').then((m) => ({ default: m.MetricsPage })))
 const LogsPage = lazy(() => import('./pages/LogsPage').then((m) => ({ default: m.LogsPage })))
 const TracePage = lazy(() => import('./pages/TracePage').then((m) => ({ default: m.TracePage })))
+const AlertsPage = lazy(() => import('./alerts/AlertsPage').then((m) => ({ default: m.AlertsPage })))
 const ConnectorsPage = lazy(() => import('./connectors/ConnectorsPage').then((m) => ({ default: m.ConnectorsPage })))
 const SessionDrawer = lazy(() => import('./sessions/SessionDrawer').then((m) => ({ default: m.SessionDrawer })))
 
@@ -36,6 +37,7 @@ export const router = createBrowserRouter([
         element: <OverviewPage />,
         children: [{ path: 'engines/:engineId/groups/:group/sessions/:sessionId', element: <SessionDrawer /> }],
       },
+      { path: 'alerts', element: <AlertsPage /> },
       { path: 'metrics', element: <MetricsPage /> },
       { path: 'logs', element: <LogsPage /> },
       { path: 'trace', element: <TracePage /> },
