@@ -67,6 +67,14 @@ class SimulatedEngineTest {
     }
 
     @Test
+    void refusesToClearAnAlertByHandAsStaffixRefusesAPolledCondition() {
+        FixSessionId trading = session("alpha", "trading").getFixSessionId();
+
+        assertThat(paris.clearAlert(trading, "session-down")).isFalse();
+        assertThatThrownBy(() -> paris.clearAlert(trading, "unknown")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void answersTheDictionaryOfEachSessionsApplication() {
         assertThat(paris.getManagedFixSessions()).isNotEmpty()
                 .allSatisfy(session -> assertThat(session.getApplication().getDictionaryId()).isEqualTo(FixDictionaryId.of(FixRegularVersion.VERSION_44)));

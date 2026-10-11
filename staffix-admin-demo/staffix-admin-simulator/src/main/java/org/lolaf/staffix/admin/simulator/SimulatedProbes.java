@@ -78,6 +78,18 @@ final class SimulatedProbes {
     }
 
     /**
+     * Refused, as staffix refuses a polled condition: every simulated alert would come back at the next tick.
+     *
+     * @throws IllegalArgumentException if the session has no such probe
+     */
+    boolean clear(String probeName) {
+        if (probes.stream().noneMatch(probe -> probe.definition.getName().equals(probeName))) {
+            throw new IllegalArgumentException("No probe named " + probeName);
+        }
+        return false;
+    }
+
+    /**
      * Returns the states whose level changed, raised or cleared, which is what staffix reports as a transition.
      */
     List<ProbeState> tick(long tick, FixSessionStatus status, Instant now) {

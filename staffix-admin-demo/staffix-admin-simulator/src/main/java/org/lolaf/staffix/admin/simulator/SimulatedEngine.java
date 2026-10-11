@@ -316,6 +316,11 @@ final class SimulatedEngine implements AdminApi {
     }
 
     @Override
+    public synchronized boolean clearAlert(FixSessionId fixSessionId, String probeName) {
+        return probes(connectionRunning(fixSessionId)).clear(probeName);
+    }
+
+    @Override
     public void addProbesListener(ProbesListener listener) {
         probesListeners.add(listener);
     }
