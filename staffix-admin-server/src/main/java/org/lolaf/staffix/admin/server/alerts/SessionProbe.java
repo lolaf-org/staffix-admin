@@ -19,6 +19,7 @@ import lombok.Builder;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
+import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 
@@ -37,6 +38,11 @@ public class SessionProbe {
      */
     @Nullable
     Duration reminderInterval;
+    /**
+     * What to do about the probe's alerts; null when it has none.
+     */
+    @Nullable
+    URI runbookUrl;
     @Nullable
     AlertLevel level;
     @Nullable

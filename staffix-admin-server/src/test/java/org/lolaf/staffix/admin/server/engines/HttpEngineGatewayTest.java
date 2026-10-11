@@ -24,6 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.lolaf.staffix.admin.server.AdminProperties;
 import org.lolaf.staffix.admin.server.SteppingClock;
+import org.lolaf.staffix.admin.server.alerts.ActiveAlert;
 import org.lolaf.staffix.admin.server.alerts.AlertLevel;
 import org.lolaf.staffix.admin.server.alerts.SessionProbe;
 import org.lolaf.staffix.admin.server.dictionaries.DictionaryRef;
@@ -62,6 +63,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class HttpEngineGatewayTest {
@@ -101,14 +103,15 @@ class HttpEngineGatewayTest {
     private static final String ALERTS = """
             {"engineId":"alpha-engine","alertsVersion":%d,"alerts":[
              {"group":"alpha","name":"trading","selectedConfig":"trading-drp","probe":"queue","level":"WARNING",
-              "message":"250 queued","since":"2026-10-10T10:00:00Z"},
+              "message":"250 queued","since":"2026-10-10T10:00:00Z","runbookUrl":"https://wiki.example.com/queue"},
              {"group":"alpha","name":"trading","selectedConfig":"trading-drp","probe":"session-down","level":"CRITICAL",
-              "message":"down","since":"2026-10-10T10:05:00Z"},
+              "message":"down","since":"2026-10-10T10:05:00Z","runbookUrl":"javascript:alert(1)"},
              {"group":"beta","name":"drop-copy","selectedConfig":"drop-copy","probe":"queue","level":"CRITICAL",
               "message":"5000 queued","since":"2026-10-10T09:00:00Z"}]}
             """;
     private static final String PROBES = """
-            [{"name":"session-down","description":"Down inside session time","evaluationInterval":"PT1S"},
+            [{"name":"session-down","description":"Down inside session time","evaluationInterval":"PT1S",
+              "runbookUrl":"https://wiki.example.com/session-down"},
              {"name":"order-flow","description":"Time since the last order","evaluationInterval":"PT5S","reminderInterval":"PT1M"}]
             """;
     private static final String PROBE_STATES = """
@@ -341,6 +344,15 @@ class HttpEngineGatewayTest {
     }
 
     @Test
+    void onlyAWebRunbookLinkIsKept() {
+        alertsVersion = 5L;
+
+        assertThat(gateway.listAlerts("alpha-engine")).extracting(ActiveAlert::getProbe, ActiveAlert::getRunbookUrl)
+                .containsExactly(tuple("queue", null), tuple("session-down", null),
+                        tuple("queue", URI.create("https://wiki.example.com/queue")));
+    }
+
+    @Test
     void probeDefinitionsAreReadOnlyWhenTheirVersionMovesAndStatesOnEveryCall() {
         probesVersion = "p1";
 
@@ -356,6 +368,8 @@ class HttpEngineGatewayTest {
         assertThat(probes.get(1).getLevel()).as("not evaluated yet").isNull();
         assertThat(probes.get(1).getLastEvaluation()).isNull();
         assertThat(probes.get(1).getReminderInterval()).isEqualTo(Duration.ofMinutes(1));
+        assertThat(probes).extracting(SessionProbe::getRunbookUrl)
+                .containsExactly(URI.create("https://wiki.example.com/session-down"), null);
 
         probesVersion = "p2";
         clock.step(HttpEngineGateway.STATUS_FRESH);

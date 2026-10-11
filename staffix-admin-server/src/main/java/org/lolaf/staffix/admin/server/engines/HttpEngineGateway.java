@@ -48,6 +48,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
@@ -281,7 +282,23 @@ class HttpEngineGateway implements EngineGateway {
                 .level(AlertLevel.valueOf(alert.getLevel()))
                 .message(alert.getMessage())
                 .since(Instant.parse(alert.getSince()))
+                .runbookUrl(runbookUrl(alert.getRunbookUrl()))
                 .build();
+    }
+
+    /**
+     * Only a web link is kept: the console renders it as one, and an engine is no authority on what a browser runs.
+     */
+    private static @Nullable URI runbookUrl(@Nullable String url) {
+        if (url == null) {
+            return null;
+        }
+        try {
+            URI uri = new URI(url);
+            return "http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()) ? uri : null;
+        } catch (URISyntaxException notAUri) {
+            return null;
+        }
     }
 
     private static SessionProbe probe(ConnectorProbes.Probe definition, ConnectorProbes.@Nullable State state) {
@@ -289,7 +306,8 @@ class HttpEngineGateway implements EngineGateway {
                 .name(definition.getName())
                 .description(definition.getDescription())
                 .evaluationInterval(Duration.parse(definition.getEvaluationInterval()))
-                .reminderInterval(definition.getReminderInterval() == null ? null : Duration.parse(definition.getReminderInterval()));
+                .reminderInterval(definition.getReminderInterval() == null ? null : Duration.parse(definition.getReminderInterval()))
+                .runbookUrl(runbookUrl(definition.getRunbookUrl()));
         if (state != null) {
             probe.level(state.getLevel() == null ? null : AlertLevel.valueOf(state.getLevel()))
                     .message(state.getMessage())

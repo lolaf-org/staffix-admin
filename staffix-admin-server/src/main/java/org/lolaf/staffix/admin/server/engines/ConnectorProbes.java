@@ -38,6 +38,8 @@ final class ConnectorProbes {
         String evaluationInterval;
         @Nullable
         String reminderInterval;
+        @Nullable
+        String runbookUrl;
     }
 
     @Value

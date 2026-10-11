@@ -22,6 +22,7 @@ import org.lolaf.staffix.api.alerting.ProbeDefinition;
 import org.lolaf.staffix.api.alerting.ProbeState;
 import org.lolaf.staffix.api.session.FixSessionStatus;
 
+import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -62,6 +63,7 @@ final class SimulatedProbes {
                     .description("Time since the last NewOrderSingle")
                     .evaluationInterval(Duration.ofSeconds(1))
                     .reminderInterval(Duration.ofMinutes(1))
+                    .runbookUrl(URI.create("https://wiki.example.com/runbooks/order-flow"))
                     .build()));
         }
         if (sessionIndex % 4 == 1) {
@@ -76,6 +78,8 @@ final class SimulatedProbes {
                     .name(LARGE_ORDER)
                     .description("NewOrderSingle above the quantity limit")
                     .evaluationInterval(Duration.ofSeconds(1))
+                    .label("team", "trading_desk")
+                    .runbookUrl(URI.create("https://wiki.example.com/runbooks/large-order"))
                     .build()));
         }
         this.offset = sessionIndex * 37;
@@ -83,6 +87,11 @@ final class SimulatedProbes {
 
     List<ProbeDefinition> definitions() {
         return probes.stream().map(probe -> probe.definition).toList();
+    }
+
+    @Nullable URI runbookUrl(String probeName) {
+        return probes.stream().filter(probe -> probe.definition.getName().equals(probeName)).findFirst()
+                .flatMap(probe -> probe.definition.getRunbookUrl()).orElse(null);
     }
 
     List<ProbeState> states() {

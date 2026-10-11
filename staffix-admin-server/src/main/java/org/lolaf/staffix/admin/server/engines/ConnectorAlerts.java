@@ -19,6 +19,7 @@ import lombok.Builder;
 import lombok.Singular;
 import lombok.Value;
 import lombok.extern.jackson.Jacksonized;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -45,5 +46,7 @@ class ConnectorAlerts {
         String level;
         String message;
         String since;
+        @Nullable
+        String runbookUrl;
     }
 }

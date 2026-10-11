@@ -20,6 +20,7 @@ import { parseDuration } from '../settings/duration'
 import { formatDateTime, formatDuration } from '../telemetry/format'
 import { AlertLevelTag } from './AlertLevelTag'
 import { ClearAlertButton } from './ClearAlertButton'
+import { RunbookLink } from './RunbookLink'
 import { ALERT_LEVELS } from './levels'
 
 type SessionProbe = Schemas['SessionProbe']
@@ -64,6 +65,7 @@ export function SessionAlertsTab({ sessionRef }: { sessionRef: SessionRef }) {
             <>
               <Typography.Text code>{probe.name}</Typography.Text>
               <div><Typography.Text type="secondary">{probe.description}</Typography.Text></div>
+              <RunbookLink url={probe.runbookUrl} />
             </>
           ),
         },

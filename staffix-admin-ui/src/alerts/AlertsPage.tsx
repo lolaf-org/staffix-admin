@@ -20,6 +20,7 @@ import { sessionRoute, useAlerts } from '../api/queries'
 import { formatDateTime, formatDuration } from '../telemetry/format'
 import { AlertLevelTag } from './AlertLevelTag'
 import { ClearAlertButton } from './ClearAlertButton'
+import { RunbookLink } from './RunbookLink'
 
 type ActiveAlert = Schemas['ActiveAlert']
 
@@ -68,7 +69,15 @@ export function AlertsPage() {
               </Typography.Text>
             ),
           },
-          { title: 'Probe', dataIndex: 'probe', render: (probe: string) => <Typography.Text code>{probe}</Typography.Text> },
+          {
+            title: 'Probe',
+            render: (_, alert) => (
+              <>
+                <Typography.Text code>{alert.probe}</Typography.Text>
+                <div><RunbookLink url={alert.runbookUrl} /></div>
+              </>
+            ),
+          },
           { title: 'Message', dataIndex: 'message' },
           {
             title: 'Since',

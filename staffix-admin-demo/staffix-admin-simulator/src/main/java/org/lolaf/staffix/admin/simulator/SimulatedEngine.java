@@ -308,7 +308,8 @@ final class SimulatedEngine implements AdminApi {
         for (SimulatedConnection connection : connections) {
             for (ProbeState state : probes(connection).states()) {
                 if (state.getAlert().isPresent()) {
-                    active.add(new SessionProbeState(connection.running().fixSessionId(), state));
+                    active.add(new SessionProbeState(connection.running().fixSessionId(), state,
+                            probes(connection).runbookUrl(state.getProbeName())));
                 }
             }
         }

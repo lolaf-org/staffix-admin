@@ -17,7 +17,9 @@ package org.lolaf.staffix.admin.server.alerts;
 
 import lombok.Builder;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 
+import java.net.URI;
 import java.time.Instant;
 import java.util.Comparator;
 
@@ -51,4 +53,9 @@ public class ActiveAlert {
      * When the alert was raised, kept across level changes.
      */
     Instant since;
+    /**
+     * The probe's runbook; null when it has none.
+     */
+    @Nullable
+    URI runbookUrl;
 }
