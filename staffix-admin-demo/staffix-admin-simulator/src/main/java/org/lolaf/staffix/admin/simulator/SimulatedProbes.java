@@ -30,13 +30,16 @@ import java.util.List;
 /**
  * The probes of one simulated session, evaluated on the simulator's one-second tick. Every session has staffix's
  * {@code session-down}; some also have a probe whose alert cycles on a fixed schedule, offset per session, so the
- * demo always has alerts being raised, changing level and clearing.
+ * demo always has alerts being raised, changing level and clearing. {@code large-order} stands for an alert raised
+ * from application code: the only one an operator can clear by hand, until its next cycle raises it again.
  */
 final class SimulatedProbes {
 
     static final Duration SESSION_DOWN_DELAY = Duration.ofSeconds(10);
     private static final int ORDER_FLOW_CYCLE = 120;
     private static final int QUEUE_CYCLE = 90;
+    private static final int LARGE_ORDER_CYCLE = 150;
+    private static final String LARGE_ORDER = "large-order";
 
     private final List<Probe> probes = new ArrayList<>();
     /**
@@ -44,6 +47,8 @@ final class SimulatedProbes {
      */
     private final int offset;
     private int downTicks;
+    private long lastTick;
+    private long largeOrderClearedCycle = -1;
 
     SimulatedProbes(int sessionIndex) {
         probes.add(new Probe(ProbeDefinition.builder()
@@ -66,6 +71,13 @@ final class SimulatedProbes {
                     .evaluationInterval(Duration.ofSeconds(10))
                     .build()));
         }
+        if (sessionIndex % 5 == 2) {
+            probes.add(new Probe(ProbeDefinition.builder()
+                    .name(LARGE_ORDER)
+                    .description("NewOrderSingle above the quantity limit")
+                    .evaluationInterval(Duration.ofSeconds(1))
+                    .build()));
+        }
         this.offset = sessionIndex * 37;
     }
 
@@ -78,27 +90,33 @@ final class SimulatedProbes {
     }
 
     /**
-     * Refused, as staffix refuses a polled condition: every simulated alert would come back at the next tick.
+     * Accepted only for {@code large-order} in alert; the others are refused, as staffix refuses a polled condition.
      *
      * @throws IllegalArgumentException if the session has no such probe
      */
     boolean clear(String probeName) {
-        if (probes.stream().noneMatch(probe -> probe.definition.getName().equals(probeName))) {
-            throw new IllegalArgumentException("No probe named " + probeName);
+        Probe probe = probes.stream().filter(candidate -> candidate.definition.getName().equals(probeName)).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("No probe named " + probeName));
+        if (!probeName.equals(LARGE_ORDER) || probe.alert == null) {
+            return false;
         }
-        return false;
+        largeOrderClearedCycle = (lastTick + offset) / LARGE_ORDER_CYCLE;
+        probe.clearRequested = true;
+        return true;
     }
 
     /**
      * Returns the states whose level changed, raised or cleared, which is what staffix reports as a transition.
      */
     List<ProbeState> tick(long tick, FixSessionStatus status, Instant now) {
+        lastTick = tick;
         downTicks = status == FixSessionStatus.LOGGED_OUT_INSIDE_SESSION_TIME ? downTicks + 1 : 0;
         List<ProbeState> transitions = new ArrayList<>();
         for (Probe probe : probes) {
             if (probe.evaluate(alert(probe.definition.getName(), tick), now)) {
-                transitions.add(probe.state());
+                transitions.add(probe.state(probe.clearRequested && probe.alert == null));
             }
+            probe.clearRequested = false;
         }
         return transitions;
     }
@@ -107,6 +125,7 @@ final class SimulatedProbes {
         return switch (probe) {
             case "session-down" -> downTicks > SESSION_DOWN_DELAY.toSeconds() ? Alert.critical("down for " + downTicks + "s") : null;
             case "order-flow" -> orderFlow((int) ((tick + offset) % ORDER_FLOW_CYCLE));
+            case LARGE_ORDER -> largeOrder(tick + offset);
             default -> queue((int) ((tick + offset) % QUEUE_CYCLE));
         };
     }
@@ -122,6 +141,15 @@ final class SimulatedProbes {
         return phase >= 60 && phase < 110 ? Alert.warning("no order for " + silence + "s") : null;
     }
 
+    /**
+     * Raised for a minute of each cycle, unless an operator cleared it during this one.
+     */
+    private @Nullable Alert largeOrder(long shiftedTick) {
+        long phase = shiftedTick % LARGE_ORDER_CYCLE;
+        boolean raised = phase >= 30 && phase < 90 && shiftedTick / LARGE_ORDER_CYCLE != largeOrderClearedCycle;
+        return raised ? Alert.major("order of 250000 above the limit of 10000") : null;
+    }
+
     private static @Nullable Alert queue(int phase) {
         return phase >= 50 && phase < 80 ? Alert.warning((250 + phase * 7) + " events queued, WARNING from 250") : null;
     }
@@ -132,6 +160,7 @@ final class SimulatedProbes {
         @Nullable Alert alert;
         @Nullable Instant since;
         @Nullable Instant lastEvaluation;
+        boolean clearRequested;
 
         Probe(ProbeDefinition definition) {
             this.definition = definition;
@@ -148,6 +177,10 @@ final class SimulatedProbes {
         }
 
         @Nullable ProbeState state() {
+            return state(false);
+        }
+
+        @Nullable ProbeState state(boolean clearedManually) {
             if (lastEvaluation == null) {
                 return null;
             }
@@ -156,6 +189,7 @@ final class SimulatedProbes {
                     .alert(alert)
                     .since(alert == null ? null : since)
                     .lastEvaluation(lastEvaluation)
+                    .clearedManually(clearedManually)
                     .build();
         }
     }
