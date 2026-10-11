@@ -1,13 +1,14 @@
 # staffix-admin sandbox
 
 Three staffix engines trading with each other, announced to a locally running console, with their metrics in
-Prometheus and their FIX logs in Loki (or Elasticsearch, or ClickHouse). Like the console, it builds against the
+Prometheus and their FIX logs in Loki (or Elasticsearch, or ClickHouse). Two of them store their messages in
+Postgres and post their alerts to Prometheus Alertmanager. Like the console, it builds against the
 staffix snapshot (see [Building](../docs/development.md#building)).
 
 ## Run
 
 ```shell
-# 1. Prometheus, Loki and the OpenTelemetry collector
+# 1. Prometheus, Loki and the OpenTelemetry collector, with Postgres and Alertmanager (started with any profile)
 (cd staffix-admin-sandbox/docker && docker compose --profile prometheus-loki up -d)
 
 # 2. The console, with the sandbox users (reader, writer, engine; password = name), reading the sandbox's
@@ -96,6 +97,15 @@ The applications publish their own meters through staffix's monitoring: the bank
 QuoteRequest until its Quote, tag `venue`) and reads `quotes.pending` from its requests in flight (a gauge read at each
 export); the venues time `quote.pricing` and set `quote.last.mid` on every quote (a gauge they set). All three engines share HTTP admin API port 8686. System properties `consoleUrl`,
 `consoleUsername`, `consolePassword`, `adminApiPort` and `otlpUrl` override the defaults.
+
+`venue-x` stores its messages in Postgres through staffix's JDBC store, and `venue-y` through the async store in
+front of the JDBC store; `alpha-bank` keeps them in memory. Each venue has its own schema (`venue_x`, `venue_y`) in
+the `staffix` database, recreated at each start from the DDL the build generates with staffix's DDL plugin. Both
+venues post their alerts to Alertmanager, labelled `env=sandbox` (its UI on http://localhost:9093, which notifies
+nobody); `alpha-bank` logs them. Stopping Postgres (`docker compose stop postgres`) raises `jdbc-store` on the venues'
+sessions: `venue-x`'s sessions then drop, while `venue-y`'s keep trading on the async store's queue and also raise
+`async-store-resource`. Once Postgres is back (`docker compose start postgres`), the alerts clear after 30 seconds.
+System properties `jdbcUrl`, `jdbcUsername`, `jdbcPassword` and `alertmanagerUrl` override the defaults.
 
 Both sides of each connection are separate engines: switching `alpha-bank`'s `venue-x.trading` to its backup turns
 it red, and logging a session out on one side shows the other side lose it.

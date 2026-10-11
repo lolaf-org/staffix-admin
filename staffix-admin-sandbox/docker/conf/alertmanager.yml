@@ -1,0 +1,9 @@
+# Only shown in Alertmanager's UI: the sandbox notifies nobody.
+route:
+  receiver: nobody
+  group_by: [ alertname, engine ]
+  group_wait: 5s
+  group_interval: 30s
+
+receivers:
+  - name: nobody

@@ -2,6 +2,25 @@ name: staffix-admin-sandbox
 
 services:
 
+  # venue-x and venue-y's message stores, whatever telemetry profile runs: no volume, the sandbox recreates its tables
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: staffix
+      POSTGRES_USER: staffix
+      POSTGRES_PASSWORD: staffix
+    ports:
+      - "5432:5432"
+
+  # where venue-x and venue-y post their alerts; its UI on http://localhost:9093
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    command: --config.file=/etc/alertmanager/alertmanager.yml
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./conf/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+
   otel-collector:
     image: otel/opentelemetry-collector:0.158.0
     profiles: [ prometheus-loki ]

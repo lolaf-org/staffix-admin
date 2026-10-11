@@ -24,6 +24,7 @@ import org.lolaf.staffix.api.FixEngine;
 import org.lolaf.staffix.api.FixEngineBuilder;
 import org.lolaf.staffix.api.FixInitiatorBuilder;
 import org.lolaf.staffix.api.FixInitiatorTarget;
+import org.lolaf.staffix.api.alerting.FixAlertsPublisherSettings;
 import org.lolaf.staffix.api.application.FixApplication;
 import org.lolaf.staffix.api.monitoring.FixMonitoringConstants;
 import org.lolaf.staffix.api.monitoring.FixSessionsMonitoringManager;
@@ -31,6 +32,7 @@ import org.lolaf.staffix.api.session.FixSession.FixSessionType;
 import org.lolaf.staffix.api.session.FixSessionId;
 import org.lolaf.staffix.api.session.FixSessionSettings;
 import org.lolaf.staffix.api.session.FixSessionSettings.SessionScheduleSettings;
+import org.lolaf.staffix.api.stores.FixMessagesStoreSettings;
 import org.lolaf.staffix.api.version.FixApplVerID;
 import org.lolaf.staffix.api.version.FixRegularVersion;
 import org.lolaf.staffix.application.factories.simple.SimpleApplicationFactorySettings;
@@ -52,7 +54,8 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * One sandbox engine: its acceptors and initiators, exporting metrics and FIX logs over OTLP and announcing itself
- * to the console through the HTTP admin API.
+ * to the console through the HTTP admin API. Its messages are kept in memory and its alerts logged, unless it is
+ * given another store or alerts publisher.
  */
 @Slf4j
 final class SandboxEngine {
@@ -63,6 +66,8 @@ final class SandboxEngine {
     private final SandboxSettings settings;
     private final Map<String, Acceptor> acceptors = new LinkedHashMap<>();
     private final List<Initiator> initiators = new ArrayList<>();
+    private FixMessagesStoreSettings messagesStore = MemoryMessageStoreSettings.builder().build();
+    private FixAlertsPublisherSettings alertsPublisher = Slf4jAlertsPublisherSettings.builder().build();
     private FixEngine engine;
 
     record Session(FixSessionId fixSessionId, FixApplication application, boolean windowClosed) {
@@ -117,6 +122,16 @@ final class SandboxEngine {
         return this;
     }
 
+    SandboxEngine messagesStore(FixMessagesStoreSettings store) {
+        messagesStore = store;
+        return this;
+    }
+
+    SandboxEngine alertsPublisher(FixAlertsPublisherSettings publisher) {
+        alertsPublisher = publisher;
+        return this;
+    }
+
     void start() {
         SimpleApplicationFactorySettings.SimpleApplicationFactorySettingsBuilder applications = SimpleApplicationFactorySettings.builder();
         FixEngineBuilder.FixEngineBuilderBuilder<?, ?> builder = FixEngineBuilder.builder()
@@ -130,8 +145,8 @@ final class SandboxEngine {
                                 .interval(Duration.ofSeconds(10))
                                 .build())
                         .build())
-                .fixMessagesStore(MemoryMessageStoreSettings.builder().build())
-                .fixAlertsPublisher(Slf4jAlertsPublisherSettings.builder().build())
+                .fixMessagesStore(messagesStore)
+                .fixAlertsPublisher(alertsPublisher)
                 .fixMessagesLogger(OtlpMessagesLoggerSettings.builder()
                         .otlpEndpointUrl(settings.otlpUrl())
                         .resourceAttribute(FixMonitoringConstants.OTLP_SERVICE_NAME, "staffix-admin-sandbox")

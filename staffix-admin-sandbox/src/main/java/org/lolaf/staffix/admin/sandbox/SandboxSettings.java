@@ -16,10 +16,12 @@
 package org.lolaf.staffix.admin.sandbox;
 
 /**
- * Where the sandbox engines send their telemetry and announce themselves; each is a system property of the same
- * name, with the defaults matching the docker stack and a console started locally with the development users.
+ * Where the sandbox engines send their telemetry, store their messages, post their alerts and announce themselves;
+ * each is a system property of the same name, with the defaults matching the docker stack and a console started
+ * locally with the development users.
  */
-record SandboxSettings(String consoleUrl, String consoleUsername, String consolePassword, int adminApiPort, String otlpUrl) {
+record SandboxSettings(String consoleUrl, String consoleUsername, String consolePassword, int adminApiPort, String otlpUrl,
+                       String jdbcUrl, String jdbcUsername, String jdbcPassword, String alertmanagerUrl) {
 
     static SandboxSettings fromSystemProperties() {
         return new SandboxSettings(
@@ -27,6 +29,10 @@ record SandboxSettings(String consoleUrl, String consoleUsername, String console
                 System.getProperty("consoleUsername", "engine"),
                 System.getProperty("consolePassword", "engine"),
                 Integer.getInteger("adminApiPort", 8686),
-                System.getProperty("otlpUrl", "http://localhost:4318"));
+                System.getProperty("otlpUrl", "http://localhost:4318"),
+                System.getProperty("jdbcUrl", "jdbc:postgresql://localhost:5432/staffix"),
+                System.getProperty("jdbcUsername", "staffix"),
+                System.getProperty("jdbcPassword", "staffix"),
+                System.getProperty("alertmanagerUrl", "http://localhost:9093"));
     }
 }
