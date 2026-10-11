@@ -44,9 +44,12 @@ export function useSessionFilters() {
       .join(' ')
       .toLowerCase()
 
-  const matches = (session: Schemas['SessionSummary']) =>
+  /**
+   * A session whose alerts are unknown never matches a level: its last known one may be gone, or worse.
+   */
+  const matches = (session: Schemas['SessionSummary'], alertsKnown = true) =>
     (statuses.length === 0 || statuses.includes(session.status)) &&
-    (alertLevels.length === 0 || (session.alertLevel != null && alertLevels.includes(session.alertLevel))) &&
+    (alertLevels.length === 0 || (alertsKnown && session.alertLevel != null && alertLevels.includes(session.alertLevel))) &&
     (text === '' || searchable(session).includes(text.toLowerCase()))
 
   return {

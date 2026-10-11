@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { Badge, Button, Flex, Layout, Segmented, Spin, Tabs, Tag, Typography, theme } from 'antd'
+import { Badge, Button, Flex, Layout, Segmented, Spin, Tabs, Tag, Tooltip, Typography, theme } from 'antd'
 import { ApiOutlined, AppstoreOutlined, BellOutlined, AreaChartOutlined, DesktopOutlined, FileSearchOutlined, LogoutOutlined, NodeIndexOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
 import { useQueryClient } from '@tanstack/react-query'
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router'
 import { isUnauthorized } from '../api/client'
 import { logout, useAlerts, useCurrentUser } from '../api/queries'
+import { useEnginesWithUnknownAlerts } from '../alerts/unknown'
 import { useThemeMode, type ThemeMode } from '../theme/ThemeMode'
 import staffixLogo from '../assets/staffix-logo.png'
 
@@ -40,6 +41,7 @@ export function AppLayout() {
   const me = useCurrentUser()
   const themeMode = useThemeMode()
   const alerts = useAlerts()
+  const unknownEngines = useEnginesWithUnknownAlerts()
   const { token } = theme.useToken()
 
   if (me.isPending) {
@@ -90,7 +92,7 @@ export function AppLayout() {
           items={TABS.map((tab) => ({
             key: tab.path,
             icon: tab.icon,
-            label: tab.path === '/alerts' ? <AlertsTabLabel count={alerts.data?.alerts.length ?? 0} /> : tab.label,
+            label: tab.path === '/alerts' ? <AlertsTabLabel count={alerts.data?.alerts.length ?? 0} unknown={unknownEngines.size > 0} /> : tab.label,
           }))}
           tabBarStyle={{ margin: 0, paddingInline: 20, background: token.colorBgContainer }}
         />
@@ -102,10 +104,23 @@ export function AppLayout() {
   )
 }
 
-function AlertsTabLabel({ count }: { count: number }) {
+/**
+ * The count leaves out the engines that do not answer, so a "?" says it may be short.
+ */
+function AlertsTabLabel({ count, unknown }: { count: number, unknown: boolean }) {
+  const { token } = theme.useToken()
   return (
-    <Badge count={count} size="small" offset={[8, -2]}>
-      Alerts
-    </Badge>
+    <Tooltip title={unknown ? 'Alerts unknown for an engine that does not answer' : undefined}>
+      <span>
+        <Badge count={count} size="small" offset={[8, -2]}>
+          Alerts
+        </Badge>
+        {unknown && (
+          <span aria-label="Alerts unknown for an engine" style={{ marginLeft: count > 0 ? 14 : 6 }}>
+            <Badge count="?" size="small" color={token.colorTextQuaternary} />
+          </span>
+        )}
+      </span>
+    </Tooltip>
   )
 }

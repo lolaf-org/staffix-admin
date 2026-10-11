@@ -29,6 +29,10 @@ interface Props {
   alerts: Schemas['ActiveAlert'][]
   selected: boolean
   onClick: () => void
+  /**
+   * The engine does not answer: dimmed, without its alert bell, its last known state only in the tooltip.
+   */
+  stale?: boolean
 }
 
 /**
@@ -36,7 +40,7 @@ interface Props {
  */
 const TOOLTIP_MAX_WIDTH = 375
 
-export function SessionBox({ session, alerts, selected, onClick }: Props) {
+export function SessionBox({ session, alerts, selected, onClick, stale = false }: Props) {
   const { token } = theme.useToken()
   const colors = {
     success: { background: token.colorSuccessBg, border: token.colorSuccess },
@@ -53,8 +57,10 @@ export function SessionBox({ session, alerts, selected, onClick }: Props) {
       title={
         <>
           <div>{formatIdentity(session.identity)}</div>
+          {stale && <div>Last known state: the engine does not answer</div>}
           <div>{STATUS_LABELS[session.status]}</div>
-          {alerts.map((alert) => (
+          {stale && session.alertLevel && <div>Last known worst alert: {ALERT_LEVEL_LABELS[session.alertLevel]}</div>}
+          {!stale && alerts.map((alert) => (
             <div key={alert.probe}>
               {ALERT_LEVEL_LABELS[alert.level]}: {alert.probe}, {alert.message}
             </div>
@@ -65,7 +71,9 @@ export function SessionBox({ session, alerts, selected, onClick }: Props) {
       <button
         type="button"
         onClick={onClick}
-        aria-label={`${session.group}.${session.id}, ${STATUS_LABELS[session.status]}${session.alertCount > 0 ? `, ${session.alertCount} alert${session.alertCount > 1 ? 's' : ''}` : ''}`}
+        aria-label={stale
+          ? `${session.group}.${session.id}, last known ${STATUS_LABELS[session.status]}, alerts unknown`
+          : `${session.group}.${session.id}, ${STATUS_LABELS[session.status]}${session.alertCount > 0 ? `, ${session.alertCount} alert${session.alertCount > 1 ? 's' : ''}` : ''}`}
         style={{
           width: 220,
           padding: '8px 10px',
@@ -75,8 +83,10 @@ export function SessionBox({ session, alerts, selected, onClick }: Props) {
           flexDirection: 'column',
           gap: 2,
           background: colors.background,
-          border: `1px solid ${colors.border}`,
-          borderLeft: `6px solid ${colors.border}`,
+          border: `1px ${stale ? 'dashed' : 'solid'} ${colors.border}`,
+          borderLeft: `6px ${stale ? 'dashed' : 'solid'} ${colors.border}`,
+          opacity: stale ? 0.55 : undefined,
+          filter: stale ? 'grayscale(0.7)' : undefined,
           borderRadius: token.borderRadius,
           outline: selected ? `2px solid ${token.colorPrimary}` : undefined,
           outlineOffset: 2,
@@ -88,7 +98,7 @@ export function SessionBox({ session, alerts, selected, onClick }: Props) {
             {operatorLoggedOut && <PauseCircleOutlined style={{ marginLeft: 6 }} aria-label="Logged out by an operator" />}
           </Typography.Text>
           <Flex align="center" gap={6} style={{ flexShrink: 0 }}>
-            {session.alertLevel && <AlertBell level={session.alertLevel} count={session.alertCount} tooltip={false} />}
+            {!stale && session.alertLevel && <AlertBell level={session.alertLevel} count={session.alertCount} tooltip={false} />}
             <Typography.Text type="secondary" style={{ fontSize: 11 }}>
               {session.type.toLowerCase()}
             </Typography.Text>

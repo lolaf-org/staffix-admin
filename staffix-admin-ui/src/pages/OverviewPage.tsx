@@ -25,7 +25,8 @@ import { StatusBadge } from '../sessions/StatusBadge'
 import { SessionBox } from '../sessions/SessionBox'
 import { useSessionFilters } from '../sessions/filters'
 import { WriteButton } from '../sessions/WriteButton'
-import { AlertBell } from '../alerts/AlertBell'
+import { AlertBell, UnknownAlertsPill } from '../alerts/AlertBell'
+import { useEnginesWithUnknownAlerts } from '../alerts/unknown'
 import { ALERT_LEVEL_LABELS, ALERT_LEVELS, worstLevel, type AlertLevel } from '../alerts/levels'
 
 export function OverviewPage() {
@@ -88,9 +89,10 @@ function EngineCard({ engine }: { engine: Schemas['Engine'] }) {
   const groups = useGroups(engine.engineId)
   const filters = useSessionFilters()
   const [adding, setAdding] = useState(false)
+  const alertsUnknown = useEnginesWithUnknownAlerts().has(engine.engineId) || groups.isError
 
   const shown = (groups.data ?? [])
-    .map((group) => ({ ...group, sessions: group.sessions.filter(filters.matches) }))
+    .map((group) => ({ ...group, sessions: group.sessions.filter((session) => filters.matches(session, !alertsUnknown)) }))
     .filter((group) => group.sessions.length > 0)
   const counts = STATUSES.map((status) => ({
     status,
@@ -127,7 +129,8 @@ function EngineCard({ engine }: { engine: Schemas['Engine'] }) {
           {counts.map(({ status, count }) => (
             <StatusBadge key={status} status={status} text={count} title={STATUS_LABELS[status]} />
           ))}
-          {alertCounts.map(({ level, count }) => (
+          {alertsUnknown && <UnknownAlertsPill />}
+          {!alertsUnknown && alertCounts.map(({ level, count }) => (
             <AlertBell
               key={level}
               level={level}
@@ -148,7 +151,7 @@ function EngineCard({ engine }: { engine: Schemas['Engine'] }) {
       {groups.isSuccess && shown.length === 0 && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No matching session" />}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 480px), 1fr))', gap: 12 }}>
         {shown.map((group) => (
-          <GroupBox key={group.group} engineId={engine.engineId} group={group} alertsBySession={alertsBySession} />
+          <GroupBox key={group.group} engineId={engine.engineId} group={group} alertsBySession={alertsBySession} stale={alertsUnknown} />
         ))}
       </div>
     </Card>
@@ -159,9 +162,13 @@ interface GroupBoxProps {
   engineId: string
   group: Schemas['SessionGroup']
   alertsBySession: Map<string, Schemas['ActiveAlert'][]>
+  /**
+   * The engine does not answer: its sessions are shown as last known.
+   */
+  stale: boolean
 }
 
-function GroupBox({ engineId, group, alertsBySession }: GroupBoxProps) {
+function GroupBox({ engineId, group, alertsBySession, stale }: GroupBoxProps) {
   const { token } = theme.useToken()
   const navigate = useNavigate()
   const location = useLocation()
@@ -186,7 +193,7 @@ function GroupBox({ engineId, group, alertsBySession }: GroupBoxProps) {
         <Typography.Text strong style={{ fontSize: 15 }}>
           {group.group}
         </Typography.Text>
-        {groupLevel && <AlertBell level={groupLevel} count={groupAlertCount} tooltip={`${groupAlertCount} alert${groupAlertCount > 1 ? 's' : ''} in this group`} />}
+        {!stale && groupLevel && <AlertBell level={groupLevel} count={groupAlertCount} tooltip={`${groupAlertCount} alert${groupAlertCount > 1 ? 's' : ''} in this group`} />}
       </Flex>
       <Flex wrap gap={8} align="flex-start">
         {group.sessions.map((session) => {
@@ -196,6 +203,7 @@ function GroupBox({ engineId, group, alertsBySession }: GroupBoxProps) {
               key={session.id}
               session={session}
               alerts={alertsBySession.get(`${group.group}.${session.id}`) ?? []}
+              stale={stale}
               selected={selected.engineId === engineId && selected.group === group.group && selected.sessionId === session.id}
               onClick={() => navigate({ pathname: sessionRoute(ref), search: location.search })}
             />

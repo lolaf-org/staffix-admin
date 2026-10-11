@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import { Tooltip, theme } from 'antd'
-import { BellFilled } from '@ant-design/icons'
+import { BellFilled, QuestionOutlined } from '@ant-design/icons'
 import type { ReactNode } from 'react'
 import { ALERT_LEVEL_LABELS, alertLevelColor, type AlertLevel } from './levels'
 
@@ -59,4 +59,36 @@ export function AlertBell({ level, count, tooltip, onClick }: Props) {
     </span>
   )
   return tooltip === false ? pill : <Tooltip title={tooltip ?? label}>{pill}</Tooltip>
+}
+
+/**
+ * In place of the bells while an engine does not answer, so a quiet card is never mistaken for one without alerts.
+ */
+export function UnknownAlertsPill() {
+  const { token } = theme.useToken()
+  return (
+    <Tooltip title="Alerts unknown: the engine does not answer; its sessions show their last known state">
+      <span
+        role="img"
+        aria-label="Alerts unknown"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          padding: '1px 7px',
+          borderRadius: 10,
+          background: token.colorTextQuaternary,
+          color: '#fff',
+          fontSize: 13,
+          fontWeight: 600,
+          lineHeight: '18px',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        <BellFilled style={{ fontSize: 14 }} />
+        <QuestionOutlined style={{ fontSize: 12 }} />
+        alerts unknown
+      </span>
+    </Tooltip>
+  )
 }
