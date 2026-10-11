@@ -19,6 +19,7 @@ import type { Schemas } from '../api/client'
 import { sessionRoute, useAlerts } from '../api/queries'
 import { formatDateTime, formatDuration } from '../telemetry/format'
 import { AlertLevelTag } from './AlertLevelTag'
+import { ClearAlertButton } from './ClearAlertButton'
 
 type ActiveAlert = Schemas['ActiveAlert']
 
@@ -77,6 +78,12 @@ export function AlertsPage() {
                 {formatDateTime(Date.parse(since))}
                 <Typography.Text type="secondary"> for {formatDuration(now - Date.parse(since))}</Typography.Text>
               </Typography.Text>
+            ),
+          },
+          {
+            width: 80,
+            render: (_, alert) => (
+              <ClearAlertButton sessionRef={{ engineId: alert.engineId, group: alert.group, sessionId: alert.sessionId }} probe={alert.probe} />
             ),
           },
         ]}

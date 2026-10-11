@@ -120,4 +120,12 @@ public interface EngineGateway {
      * The session's probes in the order they were added, each with its live state.
      */
     List<SessionProbe> getProbes(SessionRef session);
+
+    /**
+     * Asks the probe's evaluator to end its ongoing alert, which then clears at the engine's next evaluation tick.
+     *
+     * @throws GatewayException a conflict when the probe is not in alert or its evaluator refuses, as a polled
+     *                          condition does
+     */
+    void clearAlert(SessionRef session, String probe);
 }

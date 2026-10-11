@@ -67,6 +67,19 @@ public class SessionsController {
     }
 
     /**
+     * Audited whether the engine accepts it or not: a refusal is answered 409, as a probe whose condition is polled
+     * cannot be cleared by hand.
+     */
+    @PreAuthorize(WRITER)
+    @PostMapping(SESSION + "/probes/{probe}/clear")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void clearAlert(@PathVariable String engineId, @PathVariable String group, @PathVariable String sessionId,
+                           @PathVariable String probe) {
+        SessionRef session = SessionRef.of(engineId, group, sessionId);
+        auditLog.record(session, "clear alert " + probe, () -> gateway.clearAlert(session, probe));
+    }
+
+    /**
      * A document of the engine's session settings schema; secret values masked.
      */
     @GetMapping(SESSION + "/settings")

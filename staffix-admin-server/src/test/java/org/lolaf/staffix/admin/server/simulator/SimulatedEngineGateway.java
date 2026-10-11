@@ -40,6 +40,8 @@ import java.util.stream.Collectors;
 
 class SimulatedEngineGateway implements EngineGateway {
 
+    private static final String CLEARABLE_PROBE = "large-order";
+
     private static final String MONITORING_PLUGIN_TYPE = "org.lolaf.staffix.api.monitoring.FixSessionsMonitoringManager";
 
     private final Map<String, SimulatedEngine> engines;
@@ -215,5 +217,20 @@ class SimulatedEngineGateway implements EngineGateway {
     @Override
     public List<SessionProbe> getProbes(SessionRef session) {
         return List.of();
+    }
+
+    /**
+     * Accepts {@link #CLEARABLE_PROBE}, refuses {@code session-down} as staffix refuses a polled condition, and knows
+     * no other probe.
+     */
+    @Override
+    public void clearAlert(SessionRef session, String probe) {
+        engine(session.getEngineId()).getSession(session);
+        if (probe.equals("session-down")) {
+            throw GatewayException.rejected("Probe session-down is not in alert, or its alert cannot be cleared by hand");
+        }
+        if (!probe.equals(CLEARABLE_PROBE)) {
+            throw GatewayException.notFound("No probe named " + probe);
+        }
     }
 }

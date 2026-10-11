@@ -16,18 +16,23 @@
 package org.lolaf.staffix.admin.server.sessions;
 
 import org.junit.jupiter.api.Test;
+import org.lolaf.staffix.admin.audit.AuditOutcome;
+import org.lolaf.staffix.admin.audit.AuditSink;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.startsWith;
 import static org.hamcrest.Matchers.hasItem;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -46,6 +51,9 @@ class SessionsControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @MockitoSpyBean
+    private AuditSink auditSink;
 
     @Test
     void listsTheSimulatedEngines() throws Exception {
@@ -74,6 +82,26 @@ class SessionsControllerTest {
 
         mockMvc.perform(post(ACME_TRADING + "/logon").with(csrf())).andExpect(status().isNoContent());
         mockMvc.perform(get(ACME_TRADING)).andExpect(jsonPath("$.summary.status").value("LOGGED_IN"));
+    }
+
+    @Test
+    void clearsAnAlertByHandAndAuditsTheAttemptWhetherAcceptedOrNot() throws Exception {
+        mockMvc.perform(post(ACME_TRADING + "/probes/large-order/clear").with(csrf())).andExpect(status().isNoContent());
+        mockMvc.perform(post(ACME_TRADING + "/probes/session-down/clear").with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value(containsString("cannot be cleared by hand")));
+        mockMvc.perform(post(ACME_TRADING + "/probes/unknown/clear").with(csrf())).andExpect(status().isNotFound());
+
+        verify(auditSink).record(argThat(entry -> entry.getOperation().equals("clear alert large-order")
+                && entry.getOutcome() == AuditOutcome.OK && "acme".equals(entry.getGroup())));
+        verify(auditSink).record(argThat(entry -> entry.getOperation().equals("clear alert session-down")
+                && entry.getOutcome() == AuditOutcome.FAILED));
+    }
+
+    @Test
+    @WithMockUser(roles = "READER")
+    void aReaderCannotClearAnAlert() throws Exception {
+        mockMvc.perform(post(ACME_TRADING + "/probes/large-order/clear").with(csrf())).andExpect(status().isForbidden());
     }
 
     @Test

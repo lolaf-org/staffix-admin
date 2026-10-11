@@ -203,6 +203,27 @@ export function useLogout(ref: SessionRef) {
   return useEngineMutation(ref.engineId, () => call(api.POST(`${SESSION}/logout`, sessionPath(ref))), 'Logout requested')
 }
 
+/**
+ * The engine clears the alert at its next evaluation tick, so the refreshed lists may show it until the next poll.
+ */
+export function useClearAlert(ref: SessionRef) {
+  const queryClient = useQueryClient()
+  const { message } = App.useApp()
+  return useMutation({
+    mutationFn: (probe: string) =>
+      call(api.POST(`${SESSION}/probes/{probe}/clear`, { params: { path: { ...ref, probe } } })),
+    onSuccess: (_, probe) => {
+      message.success(`Clear of ${probe} requested`)
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['alerts'] }),
+        queryClient.invalidateQueries({ queryKey: ['probes', ref.engineId, ref.group, ref.sessionId] }),
+        queryClient.invalidateQueries({ queryKey: ['groups', ref.engineId] }),
+      ])
+    },
+    onError: (error) => message.error(error.message),
+  })
+}
+
 export function useResetSession(ref: SessionRef) {
   return useEngineMutation(ref.engineId, (body: Schemas['ResetRequest']) =>
     call(api.POST(`${SESSION}/reset`, { ...sessionPath(ref), body })), 'Reset requested')

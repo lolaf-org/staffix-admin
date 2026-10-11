@@ -19,6 +19,7 @@ import { useSessionProbes, type SessionRef } from '../api/queries'
 import { parseDuration } from '../settings/duration'
 import { formatDateTime, formatDuration } from '../telemetry/format'
 import { AlertLevelTag } from './AlertLevelTag'
+import { ClearAlertButton } from './ClearAlertButton'
 import { ALERT_LEVELS } from './levels'
 
 type SessionProbe = Schemas['SessionProbe']
@@ -85,6 +86,10 @@ export function SessionAlertsTab({ sessionRef }: { sessionRef: SessionRef }) {
               {probe.lastEvaluation && <div>last {formatDateTime(Date.parse(probe.lastEvaluation))}</div>}
             </Typography.Text>
           ),
+        },
+        {
+          width: 80,
+          render: (_, probe) => probe.level && <ClearAlertButton sessionRef={sessionRef} probe={probe.name} />,
         },
       ]}
     />

@@ -176,6 +176,11 @@ class HttpEngineGateway implements EngineGateway {
     }
 
     @Override
+    public void clearAlert(SessionRef session, String probe) {
+        operate(session.getEngineId(), HttpMethod.POST, sessionPath(session, "probes", probe, "clear"), null);
+    }
+
+    @Override
     public void reset(SessionRef session, ResetMode mode) {
         operate(session.getEngineId(), HttpMethod.POST, sessionPath(session, "reset"), Map.of("mode", mode.name()));
     }
