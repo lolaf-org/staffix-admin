@@ -102,9 +102,13 @@ export); the venues time `quote.pricing` and set `quote.last.mid` on every quote
 front of the JDBC store; `alpha-bank` keeps them in memory. Each venue has its own schema (`venue_x`, `venue_y`) in
 the `staffix` database, recreated at each start from the DDL the build generates with staffix's DDL plugin. Both
 venues post their alerts to Alertmanager, labelled `env=sandbox` (its UI on http://localhost:9093, which notifies
-nobody); `alpha-bank` logs them. Stopping Postgres (`docker compose stop postgres`) raises `jdbc-store` on the venues'
-sessions: `venue-x`'s sessions then drop, while `venue-y`'s keep trading on the async store's queue and also raise
-`async-store-resource`. Once Postgres is back (`docker compose start postgres`), the alerts clear after 30 seconds.
+nobody); `alpha-bank` logs them. Stopping Postgres (`docker compose stop postgres`) raises `messages-store` on
+`venue-x`'s sessions, a warning that turns major once the store's check finds the database down: their sent messages
+are no longer stored, but each sequence number update still waits for the pool's 2 second timeout, so a busy session
+can drop and log on again. `venue-y`'s sessions keep trading on the async store's queue and raise
+`async-store-resource` instead. Once Postgres is back (`docker compose start postgres`), the alerts clear after 30
+seconds. Stopping the OpenTelemetry collector (`docker compose stop otel-collector`) raises `messages-logger` on
+every session the same way, cleared 30 seconds after it is started again.
 System properties `jdbcUrl`, `jdbcUsername`, `jdbcPassword` and `alertmanagerUrl` override the defaults.
 
 Both sides of each connection are separate engines: switching `alpha-bank`'s `venue-x.trading` to its backup turns
