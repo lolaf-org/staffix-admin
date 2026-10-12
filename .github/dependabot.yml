@@ -35,6 +35,9 @@ updates:
       - dependency-name: "*"
         update-types:
           - version-update:semver-major
+      # 3.10 stages resolver files into the Central bundle, which the Portal rejects
+      - dependency-name: "org.apache.maven:apache-maven"
+        versions: [">= 3.10.0"]
 
   - package-ecosystem: npm
     directories:

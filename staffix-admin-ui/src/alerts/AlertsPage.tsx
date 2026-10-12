@@ -17,8 +17,8 @@ import { Alert, Empty, Flex, Skeleton, Table, Typography } from 'antd'
 import { useNavigate } from 'react-router'
 import type { Schemas } from '../api/client'
 import { sessionRoute, useAlerts } from '../api/queries'
-import { formatDateTime, formatDuration } from '../telemetry/format'
 import { AlertLevelTag } from './AlertLevelTag'
+import { AlertSince } from './AlertSince'
 import { ClearAlertButton } from './ClearAlertButton'
 import { RunbookLink } from './RunbookLink'
 
@@ -82,12 +82,7 @@ export function AlertsPage() {
           {
             title: 'Since',
             dataIndex: 'since',
-            render: (since: string) => (
-              <Typography.Text style={{ whiteSpace: 'nowrap' }}>
-                {formatDateTime(Date.parse(since))}
-                <Typography.Text type="secondary"> for {formatDuration(now - Date.parse(since))}</Typography.Text>
-              </Typography.Text>
-            ),
+            render: (since: string) => <AlertSince since={since} now={now} />,
           },
           {
             width: 80,

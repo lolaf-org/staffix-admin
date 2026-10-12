@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { Alert, Skeleton, Table, Typography } from 'antd'
+import { Alert, Skeleton, Table, Tooltip, Typography } from 'antd'
 import type { Schemas } from '../api/client'
 import { useSessionProbes, type SessionRef } from '../api/queries'
 import { parseDuration } from '../settings/duration'
-import { formatDateTime, formatDuration } from '../telemetry/format'
+import { formatDateTime } from '../telemetry/format'
 import { AlertLevelTag } from './AlertLevelTag'
+import { AlertSince } from './AlertSince'
 import { ClearAlertButton } from './ClearAlertButton'
 import { RunbookLink } from './RunbookLink'
 import { ALERT_LEVELS } from './levels'
@@ -62,31 +63,28 @@ export function SessionAlertsTab({ sessionRef }: { sessionRef: SessionRef }) {
         {
           title: 'Probe',
           render: (_, probe) => (
-            <>
-              <Typography.Text code>{probe.name}</Typography.Text>
-              <div><Typography.Text type="secondary">{probe.description}</Typography.Text></div>
-              <RunbookLink url={probe.runbookUrl} />
-            </>
+            <div style={{ whiteSpace: 'nowrap' }}>
+              <Tooltip title={probe.description}>
+                <Typography.Text code>{probe.name}</Typography.Text>
+              </Tooltip>
+              <div><RunbookLink url={probe.runbookUrl} /></div>
+            </div>
           ),
         },
         { title: 'Message', dataIndex: 'message' },
         {
           title: 'Since',
-          render: (_, probe) => probe.since && (
-            <Typography.Text style={{ whiteSpace: 'nowrap' }}>
-              {formatDateTime(Date.parse(probe.since))}
-              <Typography.Text type="secondary"> for {formatDuration(now - Date.parse(probe.since))}</Typography.Text>
-            </Typography.Text>
-          ),
+          render: (_, probe) => probe.since && <AlertSince since={probe.since} now={now} />,
         },
         {
           title: 'Evaluated',
           render: (_, probe) => (
-            <Typography.Text type="secondary" style={{ whiteSpace: 'nowrap' }}>
-              every {interval(probe.evaluationInterval)}
-              {probe.reminderInterval && <>, reminded every {interval(probe.reminderInterval)}</>}
-              {probe.lastEvaluation && <div>last {formatDateTime(Date.parse(probe.lastEvaluation))}</div>}
-            </Typography.Text>
+            <Tooltip title={probe.lastEvaluation ? `Last evaluated ${formatDateTime(Date.parse(probe.lastEvaluation))}` : 'Not evaluated yet'}>
+              <Typography.Text type="secondary" style={{ whiteSpace: 'nowrap' }}>
+                every {interval(probe.evaluationInterval)}
+                {probe.reminderInterval && <>, reminded every {interval(probe.reminderInterval)}</>}
+              </Typography.Text>
+            </Tooltip>
           ),
         },
         {
