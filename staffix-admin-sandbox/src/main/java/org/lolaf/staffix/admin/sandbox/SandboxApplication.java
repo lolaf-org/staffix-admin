@@ -43,7 +43,8 @@ import java.util.stream.Stream;
 
 /**
  * Three engines trading with each other: a bank initiating to two venues, which quote it, fill the orders it places on
- * some quotes, publish news to it and copy venue-x's fills on a drop copy. venue-x stores its messages in Postgres,
+ * some quotes, publish news to it and copy venue-x's fills on a drop copy. venue-x stores its messages and its
+ * gateway's sessions in Postgres,
  * venue-y through an async store in front of Postgres, and both post their alerts to Alertmanager. Between them every session state the console shows appears: logged in, a backup that cannot
  * connect, a session outside its window, and one whose counterparty never connects.
  */
@@ -83,6 +84,7 @@ public final class SandboxApplication {
         SandboxEngine venueX = new SandboxEngine("venue-x", settings)
                 .messagesStore(jdbcStore(venueXDatabase))
                 .alertsPublisher(alertmanager(settings))
+                .acceptorsSessionsIn(venueXDatabase.dataSource())
                 .acceptor("venue-x-gateway", VENUE_X_PORT,
                         Session.of("alpha-bank", "trading", "VENX", "ALPHA", new Quoter(venueXDropCopy)))
                 .initiator("alpha-bank-drop-copy",

@@ -32,6 +32,8 @@ import org.lolaf.staffix.api.session.FixSession.FixSessionType;
 import org.lolaf.staffix.api.session.FixSessionId;
 import org.lolaf.staffix.api.session.FixSessionSettings;
 import org.lolaf.staffix.api.session.FixSessionSettings.SessionScheduleSettings;
+import org.lolaf.staffix.api.session.FixSessionsSettingsStore;
+import org.lolaf.staffix.api.session.FixSessionsSettingsStoreSettings;
 import org.lolaf.staffix.api.stores.FixMessagesStoreSettings;
 import org.lolaf.staffix.api.version.FixApplVerID;
 import org.lolaf.staffix.api.version.FixRegularVersion;
@@ -39,7 +41,10 @@ import org.lolaf.staffix.application.factories.simple.SimpleApplicationFactorySe
 import org.lolaf.staffix.monitoring.micrometer.otlp.OtlpMicrometerMonitoringManagerSettings;
 import org.lolaf.staffix.stores.loggers.otlp.OtlpMessagesLoggerSettings;
 import org.lolaf.staffix.stores.messages.memory.MemoryMessageStoreSettings;
+import org.lolaf.staffix.stores.sessions.jdbc.JdbcSessionsSettingsStoreSettings;
 import org.lolaf.staffix.stores.sessions.memory.MemorySessionsSettingsStoreSettings;
+
+import javax.sql.DataSource;
 
 import java.net.InetSocketAddress;
 import java.time.DayOfWeek;
@@ -54,8 +59,8 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * One sandbox engine: its acceptors and initiators, exporting metrics and FIX logs over OTLP and announcing itself
- * to the console through the HTTP admin API. Its messages are kept in memory and its alerts logged, unless it is
- * given another store or alerts publisher.
+ * to the console through the HTTP admin API. Its messages and its sessions' settings are kept in memory and its
+ * alerts logged, unless it is given another store or alerts publisher.
  */
 @Slf4j
 final class SandboxEngine {
@@ -68,6 +73,7 @@ final class SandboxEngine {
     private final List<Initiator> initiators = new ArrayList<>();
     private FixMessagesStoreSettings messagesStore = MemoryMessageStoreSettings.builder().build();
     private FixAlertsPublisherSettings alertsPublisher = Slf4jAlertsPublisherSettings.builder().build();
+    private DataSource acceptorsSessionsDatabase;
     private FixEngine engine;
 
     record Session(FixSessionId fixSessionId, FixApplication application, boolean windowClosed) {
@@ -132,6 +138,15 @@ final class SandboxEngine {
         return this;
     }
 
+    /**
+     * Keeps the acceptors' sessions in the database's {@code fix_sessions_settings} table instead of in memory, seeded
+     * with the sessions declared here only while the engine has none there yet.
+     */
+    SandboxEngine acceptorsSessionsIn(DataSource database) {
+        acceptorsSessionsDatabase = database;
+        return this;
+    }
+
     void start() {
         SimpleApplicationFactorySettings.SimpleApplicationFactorySettingsBuilder applications = SimpleApplicationFactorySettings.builder();
         FixEngineBuilder.FixEngineBuilderBuilder<?, ?> builder = FixEngineBuilder.builder()
@@ -166,13 +181,17 @@ final class SandboxEngine {
                         .clockOffsetEnabled(true)
                         .build());
         acceptors.forEach((instanceId, acceptor) -> {
-            MemorySessionsSettingsStoreSettings.MemorySessionsSettingsStoreSettingsBuilder store =
-                    MemorySessionsSettingsStoreSettings.builder().instanceId(instanceId);
+            List<FixSessionSettings> sessions = new ArrayList<>();
             acceptor.sessions().forEach(session -> {
                 applications.application(session.fixSessionId().getQualifiedName(), session.application());
-                store.fixSessionSetting(settings(session, FixSessionType.ACCEPTOR));
+                sessions.add(settings(session, FixSessionType.ACCEPTOR));
             });
-            builder.fixSessionsSettingsStore(store.build());
+            builder.fixSessionsSettingsStore(acceptorsSessionsDatabase == null
+                    ? MemorySessionsSettingsStoreSettings.builder().instanceId(instanceId).fixSessionSettings(sessions).build()
+                    : seeded(JdbcSessionsSettingsStoreSettings.builder()
+                    .instanceId(instanceId)
+                    .dataSource(acceptorsSessionsDatabase)
+                    .build(), sessions));
         });
         MemorySessionsSettingsStoreSettings.MemorySessionsSettingsStoreSettingsBuilder initiatorsStore =
                 MemorySessionsSettingsStoreSettings.builder().instanceId("initiators");
@@ -198,6 +217,26 @@ final class SandboxEngine {
             engine.newInitiator(fixInitiator.build()).start();
         });
         log.info("Engine {} started", engineId);
+    }
+
+    /**
+     * Seeds through the store itself, so the rows are exactly what it writes, and the engine then reads them back at
+     * start as it would in production.
+     */
+    private FixSessionsSettingsStoreSettings seeded(FixSessionsSettingsStoreSettings storeSettings,
+                                                    List<FixSessionSettings> sessions) {
+        FixSessionsSettingsStore store = storeSettings.instance();
+        store.bind(engineId);
+        store.start();
+        try {
+            if (store.getSettings().isEmpty()) {
+                sessions.forEach(store::add);
+                log.info("Seeded {} sessions of engine {} in the database", sessions.size(), engineId);
+            }
+        } finally {
+            store.stop(Deadline.of(Duration.ofSeconds(1)));
+        }
+        return storeSettings;
     }
 
     void stop() {

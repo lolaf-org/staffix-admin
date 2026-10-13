@@ -25,13 +25,22 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
- * One engine's schema in the sandbox's Postgres, which its JDBC store writes to. The tables are dropped and created
- * again at start from the DDL the build generated, so they always match the store; the sessions reset their sequence
- * numbers on logon, so nothing worth keeping is lost.
+ * One engine's schema in the sandbox's Postgres, which its JDBC stores write to. The messages tables are dropped and
+ * created again at start from the DDL the build generated, so they always match the store; the sessions reset their
+ * sequence numbers on logon, so nothing worth keeping is lost. The sessions settings table is kept, so a session edited
+ * from the console survives a restart.
  */
 final class SandboxDatabase implements AutoCloseable {
+
+    /**
+     * Postgres's {@code duplicate_table}: the sessions settings table is already there from an earlier run.
+     */
+    private static final String DUPLICATE_TABLE = "42P07";
 
     private final HikariDataSource dataSource;
 
@@ -45,32 +54,46 @@ final class SandboxDatabase implements AutoCloseable {
         // short, so a stopped database fails the store's calls, and raises its alert, within seconds
         config.setConnectionTimeout(2000);
         dataSource = new HikariDataSource(config);
-        recreateTables(schema);
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement()) {
+            statement.execute("create schema if not exists " + schema);
+            statement.execute("set search_path to " + schema);
+            for (String sql : ddl("postgres.sql")) {
+                statement.execute(sql);
+            }
+            createSessionsSettingsTable(statement);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Could not create the " + schema + " tables in " + dataSource.getJdbcUrl()
+                    + ": is the sandbox's Postgres up?", e);
+        }
     }
 
     HikariDataSource dataSource() {
         return dataSource;
     }
 
-    private void recreateTables(String schema) {
-        try (InputStream ddl = SandboxDatabase.class.getResourceAsStream("/ddl/postgres.sql");
-             Connection connection = dataSource.getConnection();
-             Statement statement = connection.createStatement()) {
+    private static void createSessionsSettingsTable(Statement statement) throws SQLException {
+        try {
+            for (String sql : ddl("sessions-postgres.sql")) {
+                statement.execute(sql);
+            }
+        } catch (SQLException e) {
+            if (!DUPLICATE_TABLE.equals(e.getSQLState())) {
+                throw e;
+            }
+        }
+    }
+
+    private static List<String> ddl(String file) {
+        try (InputStream ddl = SandboxDatabase.class.getResourceAsStream("/ddl/" + file)) {
             if (ddl == null) {
-                throw new IllegalStateException("No ddl/postgres.sql: build the sandbox first");
+                throw new IllegalStateException("No ddl/" + file + ": build the sandbox first");
             }
-            statement.execute("create schema if not exists " + schema);
-            statement.execute("set search_path to " + schema);
-            for (String sql : new String(ddl.readAllBytes(), StandardCharsets.UTF_8).split(";")) {
-                if (!sql.isBlank()) {
-                    statement.execute(sql);
-                }
-            }
+            return Arrays.stream(new String(ddl.readAllBytes(), StandardCharsets.UTF_8).split(";"))
+                    .filter(sql -> !sql.isBlank())
+                    .collect(Collectors.toList());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
-        } catch (SQLException e) {
-            throw new IllegalStateException("Could not create the " + schema + " tables in " + dataSource.getJdbcUrl()
-                    + ": is the sandbox's Postgres up?", e);
         }
     }
 

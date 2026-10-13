@@ -75,6 +75,11 @@
         </dependency>
         <dependency>
             <groupId>org.lolaf.staffix</groupId>
+            <artifactId>staffix-sessions-settings-store-jdbc-impl</artifactId>
+            <version>${staffix.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.lolaf.staffix</groupId>
             <artifactId>staffix-application-factory-simple</artifactId>
             <version>${staffix.version}</version>
         </dependency>
@@ -140,19 +145,34 @@
             </plugin>
             <plugin>
                 <groupId>org.lolaf.staffix</groupId>
-                <artifactId>staffix-messages-store-jdbc-ddl-generator-maven-plugin</artifactId>
+                <artifactId>staffix-jdbc-ddl-generator-maven-plugin</artifactId>
                 <version>${staffix.version}</version>
                 <executions>
                     <execution>
+                        <id>messages</id>
                         <goals>
                             <goal>generate-ddl</goal>
                         </goals>
+                        <configuration>
+                            <schema>MESSAGES</schema>
+                            <outputFileName>postgres.sql</outputFileName>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>sessions-settings</id>
+                        <goals>
+                            <goal>generate-ddl</goal>
+                        </goals>
+                        <configuration>
+                            <schema>SESSIONS_SETTINGS</schema>
+                            <outputFileName>sessions-postgres.sql</outputFileName>
+                            <createDropStatements>false</createDropStatements>
+                        </configuration>
                     </execution>
                 </executions>
                 <configuration>
                     <dialect>org.hibernate.dialect.PostgreSQLDialect</dialect>
                     <outputDirectory>${project.build.outputDirectory}/ddl</outputDirectory>
-                    <outputFileName>postgres.sql</outputFileName>
                 </configuration>
             </plugin>
             <plugin>

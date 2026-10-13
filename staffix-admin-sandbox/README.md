@@ -111,5 +111,18 @@ seconds. Stopping the OpenTelemetry collector (`docker compose stop otel-collect
 every session the same way, cleared 30 seconds after it is started again.
 System properties `jdbcUrl`, `jdbcUsername`, `jdbcPassword` and `alertmanagerUrl` override the defaults.
 
+`venue-x-gateway`'s sessions live in Postgres too, in `venue_x.fix_sessions_settings` through staffix's JDBC session
+settings store: one row per session, its settings as JSON. Unlike the messages tables, that table is kept across runs,
+so sessions added, edited or removed from the console survive a restart. The first start seeds it with the gateway's
+sessions, through the store itself; later starts read whatever the table holds, and seed it again only once it is
+empty. Edit a row by hand and reload the store from the console to see the change reach the engine:
+
+```shell
+(cd staffix-admin-sandbox/docker && docker compose exec postgres psql -U staffix -c \
+  "select qualified_name, session_type, version, updated_at from venue_x.fix_sessions_settings")
+# back to the seeded sessions at the next start
+(cd staffix-admin-sandbox/docker && docker compose exec postgres psql -U staffix -c "drop table venue_x.fix_sessions_settings")
+```
+
 Both sides of each connection are separate engines: switching `alpha-bank`'s `venue-x.trading` to its backup turns
 it red, and logging a session out on one side shows the other side lose it.
