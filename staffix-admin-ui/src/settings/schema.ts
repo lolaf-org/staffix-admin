@@ -26,6 +26,7 @@ export interface JsonSchema {
   enum?: string[]
   description?: string
   default?: unknown
+  const?: JsonValue
   properties?: Record<string, JsonSchema>
   required?: string[]
   items?: JsonSchema
@@ -117,6 +118,21 @@ export function setAt(value: JsonObject, path: string[], next: JsonValue | undef
   const child = value[key!]
   copy[key!] = setAt(child && typeof child === 'object' && !Array.isArray(child) ? child : {}, rest, next)
   return copy
+}
+
+/**
+ * The fields a document may set: one the schema fixes with `const`, such as its schema version, is not a choice.
+ */
+export function editableProperties(node: JsonSchema): [string, JsonSchema][] {
+  return Object.entries(node.properties ?? {}).filter(([, child]) => child.const === undefined)
+}
+
+/**
+ * `value` with the top-level fields the schema fixes, which the form does not show, set as the engine requires.
+ */
+export function withConstants(root: JsonSchema, value: JsonObject): JsonObject {
+  const fixed = Object.entries(root.properties ?? {}).flatMap(([name, node]) => (node.const === undefined ? [] : [[name, node.const]]))
+  return { ...value, ...Object.fromEntries(fixed) }
 }
 
 /**

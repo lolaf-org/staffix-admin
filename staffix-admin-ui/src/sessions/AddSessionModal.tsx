@@ -27,7 +27,7 @@ import {
 } from '../api/queries'
 import { ApplicationSettingsEditor } from '../settings/ApplicationSettingsEditor'
 import { SchemaForm } from '../settings/SchemaForm'
-import { problems, SECRET_MASK, type JsonObject, type JsonSchema } from '../settings/schema'
+import { problems, SECRET_MASK, withConstants, type JsonObject, type JsonSchema } from '../settings/schema'
 import { sessionComponentOverrides } from './sessionComponentFields'
 
 const NEW_ACCEPTOR: JsonObject = { fixSessionType: 'ACCEPTOR', fixSessionId: {} }
@@ -83,10 +83,11 @@ export function AddSessionModal({ engineId, open, onClose, groups }: Props) {
   }
 
   const save = () => {
-    const found = problems(schema.data as JsonSchema, draft)
+    const settings = withConstants(schema.data as JsonSchema, draft)
+    const found = problems(schema.data as JsonSchema, settings)
     setInvalid(found)
     if (found.length === 0 && store) {
-      add.mutate({ store, settings: draft }, { onSuccess: onClose })
+      add.mutate({ store, settings }, { onSuccess: onClose })
     }
   }
 

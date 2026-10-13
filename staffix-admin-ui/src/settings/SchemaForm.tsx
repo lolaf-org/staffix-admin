@@ -17,7 +17,7 @@ import { Button, Card, Col, Collapse, Flex, Form, Input, InputNumber, Row, Selec
 import { DeleteOutlined, PlusOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import type { ReactNode } from 'react'
 import { DURATION_UNITS, type DurationUnit, formatDuration, parseDuration } from './duration'
-import { getAt, humanize, kindOf, resolve, setAt, type JsonObject, type JsonSchema, type JsonValue } from './schema'
+import { editableProperties, getAt, humanize, kindOf, resolve, setAt, type JsonObject, type JsonSchema, type JsonValue } from './schema'
 
 /**
  * Replaces the editor of one top-level field, for a field the schema cannot say enough about (secrets, read-only
@@ -42,7 +42,7 @@ interface Props {
  * left unset, which is what the engine then applies.
  */
 export function SchemaForm({ schema, value, onChange, disabled, overrides = {}, readOnly = [] }: Props) {
-  const properties = Object.entries(schema.properties ?? {})
+  const properties = editableProperties(schema)
   const sections = properties.filter(([, node]) => kindOf(resolve(node, schema)) === 'object' || kindOf(resolve(node, schema)) === 'objectList')
   const general = properties.filter(([name]) => !sections.some(([section]) => section === name))
   const set = (path: string[], next: JsonValue | undefined) => onChange(setAt(value, path, next))
@@ -248,7 +248,7 @@ function NestedObject({ path, node, root, value, onChange }: EditorProps) {
   const object = (value && typeof value === 'object' && !Array.isArray(value) ? value : {}) as JsonObject
   return (
     <Row gutter={16}>
-      {Object.entries(node.properties ?? {}).map(([name, child]) => {
+      {editableProperties(node).map(([name, child]) => {
         const resolved = resolve(child, root)
         return (
           <Col key={name} xs={24} md={12}>

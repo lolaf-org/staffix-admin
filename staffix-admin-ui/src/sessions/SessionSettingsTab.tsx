@@ -28,7 +28,7 @@ import {
 } from '../api/queries'
 import { ApplicationSettingsEditor } from '../settings/ApplicationSettingsEditor'
 import { SchemaForm } from '../settings/SchemaForm'
-import { problems, type JsonObject, type JsonSchema } from '../settings/schema'
+import { problems, withConstants, type JsonObject, type JsonSchema } from '../settings/schema'
 import { sessionComponentOverrides } from './sessionComponentFields'
 
 interface Props {
@@ -60,10 +60,11 @@ export function SessionSettingsTab({ sessionRef, detail }: Props) {
   const error = update.error
 
   const save = () => {
-    const found = problems(schema.data as JsonSchema, current)
+    const document = withConstants(schema.data as JsonSchema, current)
+    const found = problems(schema.data as JsonSchema, document)
     setInvalid(found)
     if (found.length === 0) {
-      update.mutate(current, { onSuccess: () => setDraft(undefined) })
+      update.mutate(document, { onSuccess: () => setDraft(undefined) })
     }
   }
 
