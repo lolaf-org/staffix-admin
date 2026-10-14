@@ -7,6 +7,7 @@ unpacked under `staffix-admin-dist/target/staffix-admin/`).
 
 | Path | Content |
 |---|---|
+| `bin/staffix-admin.sh` | Starts the console from the distribution's root, with `JAVA_OPTS` and the `java` of `JAVA_HOME` when set |
 | `staffix-admin.jar` | The console, with the UI inside |
 | `plugins/` | The YAML store, the audit log, and the Prometheus, Loki, Elasticsearch and ClickHouse connectors: see [Plugins](plugins.md) |
 | `config/` | `application.yml`, `jaas.conf` and `users.properties`, read from the directory the console starts in |
@@ -18,7 +19,7 @@ user, then start the console:
 cd staffix-admin-dist/target/staffix-admin/staffix-admin
 java -Dloader.main=org.lolaf.staffix.admin.server.security.jaas.PasswordHasher -jar staffix-admin.jar 'secret'
 # add a user with that hash to config/users.properties, e.g. alice = {bcrypt}..., WRITER
-java -jar staffix-admin.jar
+bin/staffix-admin.sh
 ```
 
 Open http://localhost:8080. Every setting is listed in [Configuration](configuration.md); to log in against your own

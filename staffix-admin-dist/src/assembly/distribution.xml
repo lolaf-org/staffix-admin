@@ -56,5 +56,10 @@
             <directory>src/config</directory>
             <outputDirectory>config</outputDirectory>
         </fileSet>
+        <fileSet>
+            <directory>src/bin</directory>
+            <outputDirectory>bin</outputDirectory>
+            <fileMode>0755</fileMode>
+        </fileSet>
     </fileSets>
 </assembly>

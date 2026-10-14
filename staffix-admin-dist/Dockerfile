@@ -22,4 +22,4 @@ USER staffix
 WORKDIR /opt/staffix-admin
 EXPOSE 8080
 VOLUME /data
-ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar staffix-admin.jar --staffix.admin.data-dir=/data"]
+ENTRYPOINT ["bin/staffix-admin.sh", "--staffix.admin.data-dir=/data"]
