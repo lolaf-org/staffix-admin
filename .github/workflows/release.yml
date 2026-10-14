@@ -46,3 +46,73 @@ jobs:
       tag: ${{ inputs.tag }}
       timeout-minutes: 120
     secrets: inherit
+
+  # The shared workflow ends at the GitHub Release; what an operator downloads is the archive and the image
+  distribution:
+    needs: release
+    if: ${{ !inputs.dryRun }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Derive the version
+        id: version
+        env:
+          RELEASE_VERSION: ${{ inputs.releaseVersion }}
+          PERFORM_ONLY: ${{ inputs.performOnly }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          if [ "$PERFORM_ONLY" = "true" ]; then
+            version="${TAG#v}"
+          else
+            version="$RELEASE_VERSION"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.version.outputs.tag }}
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: 21
+          cache: maven
+
+      - name: Build the distribution
+        run: ./mvnw -B -T1C install -DskipTests -pl staffix-admin-dist -am
+
+      - name: Attach the archives to the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release upload "$TAG" --clobber \
+            "staffix-admin-dist/target/staffix-admin-$VERSION.zip" \
+            "staffix-admin-dist/target/staffix-admin-$VERSION.tar.gz"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The source label links the package to this repository on GHCR
+      - name: Build and push the image
+        uses: docker/build-push-action@v7
+        with:
+          context: staffix-admin-dist
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/staffix-admin:${{ steps.version.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/staffix-admin:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}

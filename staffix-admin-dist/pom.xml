@@ -69,18 +69,39 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
                 <configuration>
-                    <finalName>staffix-admin</finalName>
                     <appendAssemblyId>false</appendAssemblyId>
                     <descriptors>
                         <descriptor>src/assembly/distribution.xml</descriptor>
                     </descriptors>
                 </configuration>
                 <executions>
+                    <!-- The unpacked directory keeps a fixed name for the Dockerfile and the docs; the archives are versioned -->
                     <execution>
+                        <id>directory</id>
                         <phase>package</phase>
                         <goals>
                             <goal>single</goal>
                         </goals>
+                        <configuration>
+                            <finalName>staffix-admin</finalName>
+                            <formats>
+                                <format>dir</format>
+                            </formats>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>archives</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <finalName>staffix-admin-${project.version}</finalName>
+                            <formats>
+                                <format>zip</format>
+                                <format>tar.gz</format>
+                            </formats>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
