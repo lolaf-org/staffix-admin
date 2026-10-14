@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>staffix-admin-metrics-spi</artifactId>
+    <name>Staffix Admin Metrics SPI</name>
     <description>SPI for the metrics backends (Prometheus, ...) queried by the admin console</description>
 
     <dependencies>

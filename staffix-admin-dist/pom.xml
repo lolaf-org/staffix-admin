@@ -12,6 +12,7 @@
 
     <artifactId>staffix-admin-dist</artifactId>
     <packaging>pom</packaging>
+    <name>Staffix Admin Distribution</name>
     <description>The console ready to run: its jar, the bundled plugins and an example configuration</description>
 
     <dependencies>

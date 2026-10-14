@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>staffix-admin-audit-spi</artifactId>
+    <name>Staffix Admin Audit SPI</name>
     <description>SPI for where the admin console records who changed what</description>
 
     <dependencies>

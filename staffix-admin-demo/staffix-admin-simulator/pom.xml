@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>staffix-admin-simulator</artifactId>
+    <name>Staffix Admin Simulator</name>
     <description>Simulated staffix engines served through staffix's HTTP admin API connector, with demo metrics and logs</description>
 
     <dependencies>

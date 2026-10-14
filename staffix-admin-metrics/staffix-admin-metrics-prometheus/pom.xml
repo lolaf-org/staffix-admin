@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>staffix-admin-metrics-prometheus</artifactId>
+    <name>Staffix Admin Prometheus Metrics</name>
     <description>Metrics source reading staffix's micrometer meters from Prometheus</description>
 
     <!-- provided: what staffix-admin.jar gives every plugin in plugins/ -->

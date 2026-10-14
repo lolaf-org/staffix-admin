@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>staffix-admin-metrics-clickhouse</artifactId>
+    <name>Staffix Admin ClickHouse Metrics</name>
     <description>Metrics source reading staffix's micrometer meters from ClickHouse</description>
 
     <!-- provided: what staffix-admin.jar gives every plugin in plugins/ -->

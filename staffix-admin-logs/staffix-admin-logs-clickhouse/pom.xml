@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>staffix-admin-logs-clickhouse</artifactId>
+    <name>Staffix Admin ClickHouse Logs</name>
     <description>Logs source reading staffix's FIX message logs from ClickHouse</description>
 
     <!-- provided: what staffix-admin.jar gives every plugin in plugins/ -->

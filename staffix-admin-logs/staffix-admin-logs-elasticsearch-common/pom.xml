@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>staffix-admin-logs-elasticsearch-common</artifactId>
+    <name>Staffix Admin Elasticsearch Common</name>
     <description>The Elasticsearch client and query clauses the Elasticsearch logs and metrics sources share</description>
 
     <!-- provided: what staffix-admin.jar gives every plugin in plugins/ -->

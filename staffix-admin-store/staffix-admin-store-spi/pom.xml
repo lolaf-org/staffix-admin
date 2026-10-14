@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>staffix-admin-store-spi</artifactId>
+    <name>Staffix Admin Store SPI</name>
     <description>SPI for where the admin console keeps its connectors and the engines linked to them</description>
 
     <dependencies>

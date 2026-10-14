@@ -12,6 +12,7 @@
 
     <artifactId>staffix-admin-logs</artifactId>
     <packaging>pom</packaging>
+    <name>Staffix Admin Logs (Parent)</name>
     <description>FIX logs backends: the SPI and its connectors</description>
 
     <modules>

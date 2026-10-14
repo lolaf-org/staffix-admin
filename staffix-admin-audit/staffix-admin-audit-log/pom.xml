@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>staffix-admin-audit-log</artifactId>
+    <name>Staffix Admin Audit Log</name>
     <description>Plugin writing the console's audit entries as lines of the staffix.admin.audit logger</description>
 
     <!-- provided: what staffix-admin.jar gives every plugin in plugins/ -->

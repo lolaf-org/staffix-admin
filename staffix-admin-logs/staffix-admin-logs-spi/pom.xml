@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>staffix-admin-logs-spi</artifactId>
+    <name>Staffix Admin Logs SPI</name>
     <description>SPI for the logs backends (Loki, ...) queried by the admin console</description>
 
     <dependencies>

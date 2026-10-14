@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>staffix-admin-sandbox</artifactId>
+    <name>Staffix Admin Sandbox</name>
     <description>Staffix engines trading with each other, announced to the console, exporting metrics and logs over OTLP</description>
 
     <dependencies>

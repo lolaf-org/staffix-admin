@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>staffix-admin-store-yaml</artifactId>
+    <name>Staffix Admin YAML Store</name>
     <description>Plugin storing the console's connectors in a YAML file of its data directory</description>
 
     <!-- provided: what staffix-admin.jar gives every plugin in plugins/ -->

@@ -12,6 +12,7 @@
 
     <artifactId>staffix-admin-demo</artifactId>
     <packaging>pom</packaging>
+    <name>Staffix Admin Demo (Parent)</name>
     <description>Everything to demo the console without real engines: the simulator, its connector and the demo distribution</description>
 
     <modules>

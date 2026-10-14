@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>staffix-admin-app</artifactId>
+    <name>Staffix Admin Application</name>
     <description>Executable jar: the server with the UI inside</description>
 
     <dependencies>

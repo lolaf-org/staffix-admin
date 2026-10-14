@@ -12,6 +12,7 @@
 
     <artifactId>staffix-admin-audit</artifactId>
     <packaging>pom</packaging>
+    <name>Staffix Admin Audit (Parent)</name>
     <description>Where the console records who changed what: the SPI and its implementations</description>
 
     <modules>

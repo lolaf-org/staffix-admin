@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>staffix-admin-logs-loki</artifactId>
+    <name>Staffix Admin Loki Logs</name>
     <description>Logs source reading staffix's FIX message logs from Loki</description>
 
     <!-- provided: what staffix-admin.jar gives every plugin in plugins/ -->

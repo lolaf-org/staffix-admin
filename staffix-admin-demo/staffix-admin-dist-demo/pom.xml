@@ -12,6 +12,7 @@
 
     <artifactId>staffix-admin-dist-demo</artifactId>
     <packaging>pom</packaging>
+    <name>Staffix Admin Demo Distribution</name>
     <description>The console distribution with the demo connector, demo users and connectors to the simulator; its Docker image</description>
 
     <dependencies>

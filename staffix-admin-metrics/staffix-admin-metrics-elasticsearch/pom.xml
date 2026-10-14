@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>staffix-admin-metrics-elasticsearch</artifactId>
+    <name>Staffix Admin Elasticsearch Metrics</name>
     <description>Metrics source reading staffix's micrometer meters from Elasticsearch</description>
 
     <!-- provided: what staffix-admin.jar gives every plugin in plugins/ -->

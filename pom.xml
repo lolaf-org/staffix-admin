@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd"
+         child.project.url.inherit.append.path="false">
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
@@ -15,7 +16,7 @@
     <artifactId>staffix-admin-parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
-    <name>staffix-admin</name>
+    <name>Staffix Admin</name>
     <description>HTTP admin console for staffix FIX engines</description>
     <url>https://github.com/lolaf-org/staffix-admin</url>
     <inceptionYear>2026</inceptionYear>
@@ -31,6 +32,29 @@
             <distribution>repo</distribution>
         </license>
     </licenses>
+
+    <developers>
+        <developer>
+            <id>cmunger</id>
+            <name>Cedric Munger</name>
+            <url>https://github.com/cmunger</url>
+            <organization>Lolaf.org</organization>
+            <organizationUrl>https://www.lolaf.org</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm child.scm.connection.inherit.append.path="false" child.scm.developerConnection.inherit.append.path="false" child.scm.url.inherit.append.path="false">
+        <connection>scm:git:https://github.com/lolaf-org/staffix-admin.git</connection>
+        <!-- HTTPS rather than ssh: the credential that pushes a release is a token. -->
+        <developerConnection>scm:git:https://github.com/lolaf-org/staffix-admin.git</developerConnection>
+        <url>https://github.com/lolaf-org/staffix-admin</url>
+        <tag>HEAD</tag>
+    </scm>
+
+    <issueManagement>
+        <system>GitHub Issues</system>
+        <url>https://github.com/lolaf-org/staffix-admin/issues</url>
+    </issueManagement>
 
     <modules>
         <module>staffix-admin-audit</module>

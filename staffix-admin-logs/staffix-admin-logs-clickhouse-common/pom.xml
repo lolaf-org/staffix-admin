@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>staffix-admin-logs-clickhouse-common</artifactId>
+    <name>Staffix Admin ClickHouse Common</name>
     <description>The ClickHouse client and SQL clauses the ClickHouse logs and metrics sources share</description>
 
     <!-- provided: what staffix-admin.jar gives every plugin in plugins/ -->

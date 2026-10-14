@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>staffix-admin-connector-demo</artifactId>
+    <name>Staffix Admin Demo Connector</name>
     <description>Metrics and logs of the staffix-admin simulator, for demos</description>
 
     <!-- provided: what staffix-admin.jar gives every plugin in plugins/ -->

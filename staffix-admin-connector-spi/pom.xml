@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>staffix-admin-connector-spi</artifactId>
+    <name>Staffix Admin Connector SPI</name>
     <description>SPI for the settings of the admin console connectors: descriptions, secrets</description>
 
     <dependencies>

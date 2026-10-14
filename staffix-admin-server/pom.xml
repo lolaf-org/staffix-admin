@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>staffix-admin-server</artifactId>
+    <name>Staffix Admin Server</name>
     <description>Spring Boot backend: REST API for the UI, engine proxy. Publishes its OpenAPI spec for the UI build</description>
 
     <properties>
