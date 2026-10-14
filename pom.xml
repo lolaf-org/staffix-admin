@@ -80,6 +80,8 @@
         <!-- Spring Boot's 4.35.1 is older than the gencode of staffix's opentelemetry-proto, which then fails to load -->
         <protobuf-java.version>4.36.2</protobuf-java.version>
         <license-maven-plugin.version>5.1.2</license-maven-plugin.version>
+        <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
+        <central-publishing-maven-plugin.version>0.11.0</central-publishing-maven-plugin.version>
         <maven-release-plugin.version>3.3.1</maven-release-plugin.version>
         <!-- Appended to what maven-release-plugin passes to its forked builds -->
         <release.extraArguments />
@@ -386,4 +388,71 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>${maven-gpg-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <!-- keyname comes from the CI secret -->
+                            <bestPractices>true</bestPractices>
+                            <gpgArguments>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>${central-publishing-maven-plugin.version}</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <!-- Upload and validate, then wait for a human: a published version can never
+                                 be replaced or reused. -->
+                            <autoPublish>false</autoPublish>
+                            <waitUntil>validated</waitUntil>
+                            <!-- Only the SPIs and their parent POMs go to Central -->
+                            <excludeArtifacts>
+                                <excludeArtifact>staffix-admin-server</excludeArtifact>
+                                <excludeArtifact>staffix-admin-ui</excludeArtifact>
+                                <excludeArtifact>staffix-admin-app</excludeArtifact>
+                                <excludeArtifact>staffix-admin-dist</excludeArtifact>
+                                <excludeArtifact>staffix-admin-audit-log</excludeArtifact>
+                                <excludeArtifact>staffix-admin-store-yaml</excludeArtifact>
+                                <excludeArtifact>staffix-admin-metrics-prometheus</excludeArtifact>
+                                <excludeArtifact>staffix-admin-metrics-elasticsearch</excludeArtifact>
+                                <excludeArtifact>staffix-admin-metrics-clickhouse</excludeArtifact>
+                                <excludeArtifact>staffix-admin-logs-loki</excludeArtifact>
+                                <excludeArtifact>staffix-admin-logs-elasticsearch</excludeArtifact>
+                                <excludeArtifact>staffix-admin-logs-elasticsearch-common</excludeArtifact>
+                                <excludeArtifact>staffix-admin-logs-clickhouse</excludeArtifact>
+                                <excludeArtifact>staffix-admin-logs-clickhouse-common</excludeArtifact>
+                                <excludeArtifact>staffix-admin-demo</excludeArtifact>
+                                <excludeArtifact>staffix-admin-connector-demo</excludeArtifact>
+                                <excludeArtifact>staffix-admin-simulator</excludeArtifact>
+                                <excludeArtifact>staffix-admin-dist-demo</excludeArtifact>
+                                <excludeArtifact>staffix-admin-sandbox</excludeArtifact>
+                            </excludeArtifacts>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
