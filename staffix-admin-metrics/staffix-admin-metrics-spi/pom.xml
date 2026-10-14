@@ -14,6 +14,12 @@
     <name>Staffix Admin Metrics SPI</name>
     <description>SPI for the metrics backends (Prometheus, ...) queried by the admin console</description>
 
+    <properties>
+        <delombok.skip>false</delombok.skip>
+        <maven.javadoc.skip>false</maven.javadoc.skip>
+        <maven.source.skip>false</maven.source.skip>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.jspecify</groupId>

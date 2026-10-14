@@ -88,6 +88,11 @@
         <!-- Spring Boot's 4.35.1 is older than the gencode of staffix's opentelemetry-proto, which then fails to load -->
         <protobuf-java.version>4.36.2</protobuf-java.version>
         <license-maven-plugin.version>5.1.2</license-maven-plugin.version>
+        <lombok-maven-plugin.version>1.18.20.0</lombok-maven-plugin.version>
+        <!-- Only the SPIs go to Central, and each turns these back on -->
+        <delombok.skip>true</delombok.skip>
+        <maven.javadoc.skip>true</maven.javadoc.skip>
+        <maven.source.skip>true</maven.source.skip>
     </properties>
 
     <dependencyManagement>
@@ -245,6 +250,36 @@
                     </configuration>
                 </plugin>
                 <plugin>
+                    <groupId>org.projectlombok</groupId>
+                    <artifactId>lombok-maven-plugin</artifactId>
+                    <version>${lombok-maven-plugin.version}</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </dependency>
+                    </dependencies>
+                    <configuration>
+                        <skip>${delombok.skip}</skip>
+                        <addOutputDirectory>false</addOutputDirectory>
+                        <sourceDirectory>${project.basedir}/src/main/java</sourceDirectory>
+                        <outputDirectory>${project.build.directory}/delombok</outputDirectory>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <configuration>
+                        <doclint>all,-missing</doclint>
+                        <failOnError>true</failOnError>
+                        <detectJavaApiLink>false</detectJavaApiLink>
+                        <detectOfflineLinks>false</detectOfflineLinks>
+                        <quiet>true</quiet>
+                        <sourcepath>${project.build.directory}/delombok</sourcepath>
+                    </configuration>
+                </plugin>
+                <plugin>
                     <groupId>com.github.eirslett</groupId>
                     <artifactId>frontend-maven-plugin</artifactId>
                     <version>${frontend-maven-plugin.version}</version>
@@ -252,6 +287,45 @@
             </plugins>
         </pluginManagement>
         <plugins>
+            <plugin>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>delombok-for-javadoc</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>delombok</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>javadoc-jar</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>source-jar</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>com.mycila</groupId>
                 <artifactId>license-maven-plugin</artifactId>

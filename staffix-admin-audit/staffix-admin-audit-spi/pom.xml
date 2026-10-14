@@ -14,6 +14,12 @@
     <name>Staffix Admin Audit SPI</name>
     <description>SPI for where the admin console records who changed what</description>
 
+    <properties>
+        <delombok.skip>false</delombok.skip>
+        <maven.javadoc.skip>false</maven.javadoc.skip>
+        <maven.source.skip>false</maven.source.skip>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.jspecify</groupId>
