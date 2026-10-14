@@ -2,8 +2,8 @@
 
 ## The distribution
 
-`./mvnw install` builds the distribution as `staffix-admin-dist/target/staffix-admin-<version>.zip` (and
-`.tar.gz`, and unpacked under `staffix-admin-dist/target/staffix-admin/`).
+`./mvnw install` builds the distribution as `staffix-admin-dist/target/staffix-admin-<version>.tar.gz`, and unpacked
+under `staffix-admin-dist/target/staffix-admin/`.
 
 | Path | Content |
 |---|---|

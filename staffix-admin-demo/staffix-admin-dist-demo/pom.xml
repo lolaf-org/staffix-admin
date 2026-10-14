@@ -20,7 +20,7 @@
             <groupId>org.lolaf.staffix.admin</groupId>
             <artifactId>staffix-admin-dist</artifactId>
             <version>${project.version}</version>
-            <type>zip</type>
+            <type>tar.gz</type>
         </dependency>
         <dependency>
             <groupId>org.lolaf.staffix.admin</groupId>

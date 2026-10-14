@@ -46,7 +46,7 @@ or later with its HTTP admin API.
 - **Logins and audit**: operators log in through JAAS, as `READER` (views) or `WRITER` (also changes); every change,
   and every refused one, is written to an audit log.
 - **Light, dark and system themes.**
-- **A distribution and a Docker image.** `staffix-admin-0.9.0.zip` and `.tar.gz` on the GitHub Release, started with
+- **A distribution and a Docker image.** `staffix-admin-0.9.0.tar.gz` on the GitHub Release, started with
   `bin/staffix-admin.sh`, and `ghcr.io/lolaf-org/staffix-admin:0.9.0`. Both ship an `admin` user (`WRITER`) and an
   `engine` user (`ENGINE`) whose password is their name: change them before anyone else can reach the console.
 - **Plugins.** Connectors, credential reference schemes, the audit sink and the configuration store are jars dropped

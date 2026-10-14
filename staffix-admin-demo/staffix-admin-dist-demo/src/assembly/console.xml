@@ -28,7 +28,7 @@
     <dependencySets>
         <dependencySet>
             <includes>
-                <include>org.lolaf.staffix.admin:staffix-admin-dist:zip</include>
+                <include>org.lolaf.staffix.admin:staffix-admin-dist:tar.gz</include>
             </includes>
             <unpack>true</unpack>
             <unpackOptions>

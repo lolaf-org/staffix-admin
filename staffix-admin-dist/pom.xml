@@ -98,7 +98,6 @@
                         <configuration>
                             <finalName>staffix-admin-${project.version}</finalName>
                             <formats>
-                                <format>zip</format>
                                 <format>tar.gz</format>
                             </formats>
                         </configuration>
