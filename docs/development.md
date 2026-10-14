@@ -21,6 +21,15 @@
 `./mvnw install` builds everything. The build downloads its own Node into `staffix-admin-ui/node/`;
 no system Node is needed.
 
+The distribution lands in `staffix-admin-dist/target/`: `staffix-admin-<version>.tar.gz`, and unpacked under
+`staffix-admin/staffix-admin/`. `run-admin.sh` starts it from the repository root, so `data/` stays there. The image
+builds from it:
+
+```shell
+./mvnw install
+docker build -t staffix-admin staffix-admin-dist
+```
+
 Every source file carries the Apache license header of `HEADER.txt`; the build fails without it, and
 `./mvnw license:format` adds it.
 

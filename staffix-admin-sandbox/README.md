@@ -2,8 +2,8 @@
 
 Three staffix engines trading with each other, announced to a locally running console, with their metrics in
 Prometheus and their FIX logs in Loki (or Elasticsearch, or ClickHouse). Two of them store their messages in
-Postgres and post their alerts to Prometheus Alertmanager. Like the console, it builds against the
-staffix snapshot (see [Building](../docs/development.md#building)).
+Postgres and post their alerts to Prometheus Alertmanager. It builds with the console (see
+[Building](../docs/development.md#building)).
 
 ## Run
 

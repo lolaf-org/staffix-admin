@@ -38,7 +38,26 @@ engine at a glance, control and configure them, and read their metrics and FIX l
 
 ## Quick start
 
-The demo runs the console against three simulated engines with generated metrics and logs, nothing else to install:
+Run a release with Docker, then open http://localhost:8080 and log in as `admin` (password `admin`):
+
+```shell
+docker run -p 8080:8080 -v staffix-admin-data:/data ghcr.io/lolaf-org/staffix-admin:0.9.0
+```
+
+Or, with Java 21, from the archive of the [latest release](https://github.com/lolaf-org/staffix-admin/releases/latest):
+
+```shell
+curl -LO https://github.com/lolaf-org/staffix-admin/releases/download/v0.9.0/staffix-admin-0.9.0.tar.gz
+tar xzf staffix-admin-0.9.0.tar.gz
+staffix-admin/bin/staffix-admin.sh
+```
+
+Change the `admin` and `engine` passwords before anyone else can reach it, then connect your engines: see
+[Installation](docs/installation.md).
+
+### Demo
+
+The demo runs the console against three simulated engines with generated metrics and logs; it builds from source:
 
 ```shell
 git clone https://github.com/lolaf-org/staffix-admin.git
@@ -49,10 +68,8 @@ docker compose up
 ```
 
 Open http://localhost:8080 and log in as `reader` or `writer` (password = name). Without Docker, see the
-[demo's README](staffix-admin-demo/README.md).
-
-To run it for your own engines, see [Installation](docs/installation.md); to try it with real engines, Prometheus,
-Loki, Elasticsearch or ClickHouse, the [sandbox](staffix-admin-sandbox/README.md).
+[demo's README](staffix-admin-demo/README.md). To try the console with real engines, Prometheus, Loki, Elasticsearch
+or ClickHouse, see the [sandbox](staffix-admin-sandbox/README.md).
 
 ## Documentation
 
