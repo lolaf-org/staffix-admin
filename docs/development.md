@@ -18,8 +18,7 @@
 
 ## Building
 
-The console builds against the staffix snapshot (`0.9.1-SNAPSHOT`): install staffix locally first (`./mvnw install`
-in the staffix repository), then `./mvnw install` here. The build downloads its own Node into `staffix-admin-ui/node/`;
+`./mvnw install` builds everything. The build downloads its own Node into `staffix-admin-ui/node/`;
 no system Node is needed. The `staffix-admin-sandbox` module builds only with `-Psandbox`.
 
 Every source file carries the Apache license header of `HEADER.txt`; the build fails without it, and

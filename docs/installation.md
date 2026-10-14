@@ -3,8 +3,7 @@
 ## The distribution
 
 `./mvnw install` builds the distribution as `staffix-admin-dist/target/staffix-admin.zip` (and `.tar.gz`, and
-unpacked under `staffix-admin-dist/target/staffix-admin/`). The console builds against the staffix snapshot
-(`0.9.1-SNAPSHOT`): install staffix locally first (`./mvnw install` in the staffix repository).
+unpacked under `staffix-admin-dist/target/staffix-admin/`).
 
 | Path | Content |
 |---|---|
