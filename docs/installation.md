@@ -12,13 +12,14 @@ unpacked under `staffix-admin-dist/target/staffix-admin/`).
 | `plugins/` | The YAML store, the audit log, and the Prometheus, Loki, Elasticsearch and ClickHouse connectors: see [Plugins](plugins.md) |
 | `config/` | `application.yml`, `jaas.conf` and `users.properties`, read from the directory the console starts in |
 
-`users.properties` defines no user until you add one, so a fresh install lets nobody in. Hash a password, add the
-user, then start the console:
+`users.properties` ships two users whose password is their name: `admin` (`WRITER`) for the UI, and `engine`
+(`ENGINE`) for engines to announce themselves; a `reader` (`READER`) is there commented out. Change both passwords
+before anyone else can reach the console: hash a password, replace the user's, then start the console:
 
 ```shell
 cd staffix-admin-dist/target/staffix-admin/staffix-admin
 java -Dloader.main=org.lolaf.staffix.admin.server.security.jaas.PasswordHasher -jar staffix-admin.jar 'secret'
-# add a user with that hash to config/users.properties, e.g. alice = {bcrypt}..., WRITER
+# replace admin's password in config/users.properties with that hash: admin = {bcrypt}..., WRITER
 bin/staffix-admin.sh
 ```
 
@@ -50,9 +51,9 @@ docker run -p 8080:8080 \
     staffix-admin
 ```
 
-- `config/` holds the image's copy of the distribution's: as shipped it lets nobody in. Mount your own in its place,
-  starting from `staffix-admin-dist/src/config/`: `application.yml`, `jaas.conf` and your users or JAAS module. Hash
-  a password with the image itself:
+- `config/` holds the image's copy of the distribution's, with the `admin` and `engine` users whose password is their
+  name. Mount your own in its place, starting from `staffix-admin-dist/src/config/`: `application.yml`, `jaas.conf`
+  and your users or JAAS module. Hash a password with the image itself:
   `docker run --rm --entrypoint sh staffix-admin -c "java -Dloader.main=org.lolaf.staffix.admin.server.security.jaas.PasswordHasher -jar staffix-admin.jar 'secret'"`.
 - `/data` is the data directory: `console.yaml` lives there, so keep it on a volume.
 - `JAVA_OPTS` passes JVM options; any setting can also come from the environment
