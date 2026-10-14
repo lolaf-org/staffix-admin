@@ -1,5 +1,8 @@
 # staffix-admin
 
+[![build](https://github.com/lolaf-org/staffix-admin/actions/workflows/build.yml/badge.svg)](https://github.com/lolaf-org/staffix-admin/actions/workflows/build.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE.txt)
+
 A web admin console for [staffix](https://github.com/lolaf-org/staffix) FIX engines: see every session of every
 engine at a glance, control and configure them, and read their metrics and FIX logs, from one place.
 
