@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       releaseVersion:
-        description: 'Version to release, without a leading v (e.g. 0.1.0). Ignored when performOnly.'
+        description: 'Version to release, without a leading v (e.g. 0.9.0). Ignored when performOnly.'
         required: false
         type: string
       developmentVersion:
-        description: 'Version to leave main on afterwards (e.g. 0.2.0-SNAPSHOT). Ignored when performOnly.'
+        description: 'Version to leave main on afterwards (e.g. 0.9.1-SNAPSHOT). Ignored when performOnly.'
         required: false
         type: string
       dryRun:
@@ -24,7 +24,7 @@ on:
         default: false
         type: boolean
       tag:
-        description: 'Tag to deploy when performOnly (e.g. v0.1.0)'
+        description: 'Tag to deploy when performOnly (e.g. v0.9.0)'
         required: false
         type: string
 
