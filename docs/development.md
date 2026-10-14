@@ -14,12 +14,12 @@
 | `staffix-admin-connector-spi` | What a backend plugin declares about its settings: descriptions, secrets, secret references |
 | `staffix-admin-dist` | The distribution: the console's jar, its plugins and an example configuration; a Docker image |
 | `staffix-admin-demo` | Simulated engines and the distribution reading their telemetry: see its [README](../staffix-admin-demo/README.md) |
-| `staffix-admin-sandbox` | Real staffix engines trading with each other, with Prometheus, Loki, Elasticsearch or ClickHouse (profile `sandbox`): see its [README](../staffix-admin-sandbox/README.md) |
+| `staffix-admin-sandbox` | Real staffix engines trading with each other, with Prometheus, Loki, Elasticsearch or ClickHouse: see its [README](../staffix-admin-sandbox/README.md) |
 
 ## Building
 
 `./mvnw install` builds everything. The build downloads its own Node into `staffix-admin-ui/node/`;
-no system Node is needed. The `staffix-admin-sandbox` module builds only with `-Psandbox`.
+no system Node is needed.
 
 Every source file carries the Apache license header of `HEADER.txt`; the build fails without it, and
 `./mvnw license:format` adds it.

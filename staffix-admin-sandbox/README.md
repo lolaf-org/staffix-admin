@@ -21,8 +21,7 @@ DIST=staffix-admin-dist/target/staffix-admin/staffix-admin
 java -Dloader.path=$DIST/plugins -jar $DIST/staffix-admin.jar --staffix.admin.security.jaas-config=file:staffix-admin-sandbox/console/jaas.conf
 
 # 3. The engines
-./mvnw install -Psandbox -pl staffix-admin-sandbox
-./mvnw exec:java -Psandbox -pl staffix-admin-sandbox
+./mvnw exec:java -pl staffix-admin-sandbox
 ```
 
 Open http://localhost:8080 and log in as `writer`. Stop with
@@ -42,7 +41,7 @@ map as histograms). Point the engines at it instead of the default collector:
 
 ```shell
 (cd staffix-admin-sandbox/docker && docker compose --profile kibana up -d)
-./mvnw exec:java -Psandbox -pl staffix-admin-sandbox -DotlpUrl=http://localhost:4320
+./mvnw exec:java -pl staffix-admin-sandbox -DotlpUrl=http://localhost:4320
 ```
 
 In Kibana, Discover the `logs-*` or `metrics-*` data views. The `console-es` profile runs the console with the
@@ -69,7 +68,7 @@ OpenTelemetry collector on port 4321, whose `clickhouse` exporter creates the `o
 
 ```shell
 (cd staffix-admin-sandbox/docker && docker compose --profile clickhouse up -d)
-./mvnw exec:java -Psandbox -pl staffix-admin-sandbox -DotlpUrl=http://localhost:4321
+./mvnw exec:java -pl staffix-admin-sandbox -DotlpUrl=http://localhost:4321
 (cd staffix-admin-sandbox/docker && docker compose --profile console-clickhouse up -d)
 # or from the working copy (data/console.yaml replaced: keep a copy if you edited it)
 mkdir -p data && cp staffix-admin-sandbox/console-clickhouse.yaml data/console.yaml

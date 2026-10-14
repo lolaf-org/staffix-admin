@@ -67,16 +67,8 @@
         <module>staffix-admin-app</module>
         <module>staffix-admin-dist</module>
         <module>staffix-admin-demo</module>
+        <module>staffix-admin-sandbox</module>
     </modules>
-
-    <profiles>
-        <profile>
-            <id>sandbox</id>
-            <modules>
-                <module>staffix-admin-sandbox</module>
-            </modules>
-        </profile>
-    </profiles>
 
     <properties>
         <java.version>21</java.version>
@@ -88,6 +80,9 @@
         <!-- Spring Boot's 4.35.1 is older than the gencode of staffix's opentelemetry-proto, which then fails to load -->
         <protobuf-java.version>4.36.2</protobuf-java.version>
         <license-maven-plugin.version>5.1.2</license-maven-plugin.version>
+        <maven-release-plugin.version>3.3.1</maven-release-plugin.version>
+        <!-- Appended to what maven-release-plugin passes to its forked builds -->
+        <release.extraArguments />
         <lombok-maven-plugin.version>1.18.20.0</lombok-maven-plugin.version>
         <!-- Only the SPIs go to Central, and each turns these back on -->
         <delombok.skip>true</delombok.skip>
@@ -277,6 +272,21 @@
                         <detectOfflineLinks>false</detectOfflineLinks>
                         <quiet>true</quiet>
                         <sourcepath>${project.build.directory}/delombok</sourcepath>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-release-plugin</artifactId>
+                    <version>${maven-release-plugin.version}</version>
+                    <configuration>
+                        <tagNameFormat>v@{project.version}</tagNameFormat>
+                        <autoVersionSubmodules>true</autoVersionSubmodules>
+                        <releaseProfiles>release</releaseProfiles>
+                        <useReleaseProfile>false</useReleaseProfile>
+                        <arguments>-T1C ${release.extraArguments}</arguments>
+                        <scmReleaseCommitComment>release @{releaseLabel}</scmReleaseCommitComment>
+                        <scmDevelopmentCommitComment>resume development after @{releaseLabel}
+                        </scmDevelopmentCommitComment>
                     </configuration>
                 </plugin>
                 <plugin>
