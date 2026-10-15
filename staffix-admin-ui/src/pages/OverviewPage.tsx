@@ -130,15 +130,19 @@ function EngineCard({ engine }: { engine: Schemas['Engine'] }) {
             <StatusBadge key={status} status={status} text={count} title={STATUS_LABELS[status]} />
           ))}
           {alertsUnknown && <UnknownAlertsPill />}
-          {!alertsUnknown && alertCounts.map(({ level, count }) => (
-            <AlertBell
-              key={level}
-              level={level}
-              count={count}
-              tooltip={`${count} session${count > 1 ? 's' : ''} in alert, worst ${ALERT_LEVEL_LABELS[level].toLowerCase()}: click to show only them`}
-              onClick={() => filters.setAlertLevels([level])}
-            />
-          ))}
+          {!alertsUnknown && alertCounts.map(({ level, count }) => {
+            const filtering = filters.alertLevels.length === 1 && filters.alertLevels[0] === level
+            return (
+              <AlertBell
+                key={level}
+                level={level}
+                count={count}
+                active={filtering}
+                tooltip={`${count} session${count > 1 ? 's' : ''} in alert, worst ${ALERT_LEVEL_LABELS[level].toLowerCase()}: ${filtering ? 'click to show all sessions' : 'click to show only them'}`}
+                onClick={() => filters.setAlertLevels(filtering ? [] : [level])}
+              />
+            )
+          })}
           <WriteButton size="small" icon={<PlusOutlined />} onConfirm={() => setAdding(true)}>
             Acceptor session
           </WriteButton>

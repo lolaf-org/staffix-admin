@@ -26,20 +26,27 @@ interface Props {
    */
   tooltip?: ReactNode | false
   onClick?: () => void
+  /**
+   * True while the filter this bell sets is on, so the operator sees what clicking it again undoes.
+   */
+  active?: boolean
 }
 
 /**
  * A filled pill rather than a bare icon, so it stands out on a coloured session box; the count shows from two.
  */
-export function AlertBell({ level, count, tooltip, onClick }: Props) {
+export function AlertBell({ level, count, tooltip, onClick, active = false }: Props) {
   const { token } = theme.useToken()
   const label = `${count} alert${count > 1 ? 's' : ''}, worst ${ALERT_LEVEL_LABELS[level].toLowerCase()}`
   const pill = (
     <span
       role={onClick ? 'button' : 'img'}
       aria-label={label}
+      aria-pressed={onClick ? active : undefined}
       onClick={onClick}
       style={{
+        outline: active ? `2px solid ${token.colorText}` : undefined,
+        outlineOffset: 1,
         display: 'inline-flex',
         alignItems: 'center',
         gap: 4,
