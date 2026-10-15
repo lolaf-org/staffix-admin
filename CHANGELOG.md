@@ -14,7 +14,7 @@ between releases. A section is written when the version it belongs to is being c
 carries the right number and date the first time and the workflow's check has exactly one heading it
 could mean.
 
-## [0.9.0] - 2026-10-14
+## [0.9.0] - 2026-10-15
 
 First public release. The staffix admin console is a web console for [staffix](https://github.com/lolaf-org/staffix)
 FIX engines: every session of every engine at a glance, controlled and configured from one place, with their metrics
