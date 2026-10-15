@@ -32,7 +32,7 @@ import { EnginePanel } from './EnginePanel'
 import { assignmentOptions, type Role, ROLE_LABELS, roleKey, roleOf } from './draft'
 
 /**
- * Edits a draft of the connectors part of the console configuration, saved in one go so its version guards against a concurrent change.
+ * Edits a draft of the connectors part of the console configuration, saved in one go so its revision guards against a concurrent change.
  */
 export function ConnectorsPage() {
   const stored = useConnectors()

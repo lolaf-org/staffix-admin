@@ -36,6 +36,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -363,10 +365,10 @@ class ConnectorsTest {
 
         @Override
         public synchronized ConsoleConfig save(ConsoleConfig config) {
-            if (config.getVersion() != stored.getVersion()) {
-                throw new StaleConsoleConfigException(config.getVersion(), stored.getVersion());
+            if (!Objects.equals(config.getRevision(), stored.getRevision())) {
+                throw new StaleConsoleConfigException();
             }
-            stored = config.toBuilder().version(config.getVersion() + 1).build();
+            stored = config.toBuilder().revision(UUID.randomUUID().toString()).build();
             return stored;
         }
     }

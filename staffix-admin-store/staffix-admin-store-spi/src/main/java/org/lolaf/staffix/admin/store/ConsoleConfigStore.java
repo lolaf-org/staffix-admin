@@ -29,7 +29,7 @@ public interface ConsoleConfigStore {
     ConsoleConfig load();
 
     /**
-     * Stores {@code config} if its version is still the stored one, and returns it with the next version.
+     * Stores {@code config} if its revision is still the stored one, and returns it with its new revision.
      *
      * @throws StaleConsoleConfigException if the store changed since {@code config} was loaded
      * @throws ConsoleConfigStoreException if the store cannot be written

@@ -44,11 +44,6 @@ class ConsoleSchema {
         schema.put("$schema", SchemaNodes.DRAFT);
         schema.put("title", "staffix-admin console.yaml");
         schema.setAll(NODES.object("The console's connectors and trace settings, also edited from its Connectors tab."));
-        ObjectNode version = NODES.typed("integer");
-        version.put("minimum", 0);
-        version.put("description", "Raised by the console on every save. Raise it by hand too, or the next save from the "
-                + "console overwrites the edit.");
-        NODES.exactProperty(schema, "version", version);
         ObjectNode connectors = NODES.typed("array");
         connectors.put("description", "The backends telemetry is read from.");
         connectors.set("items", connector(kinds));

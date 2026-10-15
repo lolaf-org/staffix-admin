@@ -65,28 +65,28 @@ class ConnectorsControllerTest {
                 () -> Base64.getEncoder().encodeToString("alpha-master-key-of-32-bytes-abc".getBytes(StandardCharsets.UTF_8)));
     }
 
-    private long version() throws Exception {
+    private String revisionAsJson() throws Exception {
         String body = mockMvc.perform(get("/api/connectors")).andReturn().getResponse().getContentAsString();
-        return jsonMapper.readTree(body).path("version").asLong();
+        return jsonMapper.readTree(body).path("revision").toString();
     }
 
-    private static String config(long version, String tenant) {
+    private static String config(String revision, String tenant) {
         return """
-                {"version":%d,"connectors":[{"id":"alpha-loki","name":"Alpha Loki","kind":"loki",
+                {"revision":%s,"connectors":[{"id":"alpha-loki","name":"Alpha Loki","kind":"loki",
                  "settings":{"url":"http://127.0.0.1:1","tenant":"%s"}}],
                  "defaults":{"logs":"alpha-loki"},"engines":{"paris-prod":{"loggers":{"clients-otlp":"none"}}}}
-                """.formatted(version, tenant);
+                """.formatted(revision, tenant);
     }
 
     @Test
     void savesASecretEncryptedAndNeverShowsIt() throws Exception {
-        mockMvc.perform(put("/api/connectors").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(config(version(), "alpha-tenant")))
+        mockMvc.perform(put("/api/connectors").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(config(revisionAsJson(), "alpha-tenant")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.connectors[0].settings.tenant").value("set"))
                 .andExpect(jsonPath("$.engines.paris-prod.loggers.clients-otlp").value("none"));
         String stored = (String) store.load().getConnectors().getFirst().getSettings().get("tenant");
 
-        mockMvc.perform(put("/api/connectors").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(config(version(), "set")))
+        mockMvc.perform(put("/api/connectors").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(config(revisionAsJson(), "set")))
                 .andExpect(status().isOk());
 
         assertThat(stored).startsWith("enc:v1:");
@@ -95,21 +95,21 @@ class ConnectorsControllerTest {
     }
 
     @Test
-    void refusesASaveBasedOnAnOlderVersion() throws Exception {
-        long version = version();
-        mockMvc.perform(put("/api/connectors").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(config(version, "${env:HOME}")))
+    void refusesASaveBasedOnAnOlderRevision() throws Exception {
+        String revision = revisionAsJson();
+        mockMvc.perform(put("/api/connectors").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(config(revision, "${env:HOME}")))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(put("/api/connectors").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(config(version, "${env:HOME}")))
+        mockMvc.perform(put("/api/connectors").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(config(revision, "${env:HOME}")))
                 .andExpect(status().isConflict());
     }
 
     @Test
     void listsEveryProblemOfAnInvalidSave() throws Exception {
         String invalid = """
-                {"version":%d,"connectors":[{"id":"alpha","name":"Alpha","kind":"elastic","settings":{}}],
+                {"revision":%s,"connectors":[{"id":"alpha","name":"Alpha","kind":"elastic","settings":{}}],
                  "defaults":{"metrics":"missing"},"engines":{}}
-                """.formatted(version());
+                """.formatted(revisionAsJson());
 
         mockMvc.perform(put("/api/connectors").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(invalid))
                 .andExpect(status().isBadRequest())
@@ -120,9 +120,9 @@ class ConnectorsControllerTest {
     @Test
     void refusesALabelTheConsoleDoesNotQueryOn() throws Exception {
         String config = """
-                {"version":%d,"connectors":[{"id":"alpha-loki","name":"Alpha Loki","kind":"loki",
+                {"revision":%s,"connectors":[{"id":"alpha-loki","name":"Alpha Loki","kind":"loki",
                  "settings":{"url":"http://127.0.0.1:1","indexedLabels":["fix_eid","service_name"]}}],"defaults":{},"engines":{}}
-                """.formatted(version());
+                """.formatted(revisionAsJson());
 
         mockMvc.perform(put("/api/connectors").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(config))
                 .andExpect(status().isBadRequest())
@@ -134,7 +134,7 @@ class ConnectorsControllerTest {
     @WithMockUser(roles = "READER")
     void letsAReaderViewButNotSave() throws Exception {
         mockMvc.perform(get("/api/connectors")).andExpect(status().isOk());
-        mockMvc.perform(put("/api/connectors").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(config(0, "x")))
+        mockMvc.perform(put("/api/connectors").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(config("null", "x")))
                 .andExpect(status().isForbidden());
     }
 

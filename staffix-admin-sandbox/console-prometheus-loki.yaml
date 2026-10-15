@@ -1,4 +1,3 @@
-version: 0
 connectors:
   - id: sandbox-prometheus
     name: Sandbox Prometheus

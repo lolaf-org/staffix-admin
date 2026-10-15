@@ -29,10 +29,12 @@ public class ConsoleConfig {
     public static final ConsoleConfig EMPTY = ConsoleConfig.builder().build();
 
     /**
-     * Raised by one on every save; a save based on another version than the stored one is refused, so two admins
-     * editing at once cannot silently overwrite each other.
+     * Identifies the stored content, set by the store on load and save; null before the first save. A save based on
+     * another revision than the stored one is refused, so two admins, or an admin and a hand edit, cannot silently
+     * overwrite each other.
      */
-    long version;
+    @Nullable
+    String revision;
     @Singular
     List<Connector> connectors;
     /**

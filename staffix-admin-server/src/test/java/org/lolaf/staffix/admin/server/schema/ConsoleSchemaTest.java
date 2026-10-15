@@ -36,7 +36,6 @@ class ConsoleSchemaTest {
     @Test
     void acceptsWhatTheConsoleReads() {
         assertThat(VALIDATOR.errors("""
-                version: 3
                 connectors:
                   - id: alpha-prometheus
                     name: Alpha Prometheus

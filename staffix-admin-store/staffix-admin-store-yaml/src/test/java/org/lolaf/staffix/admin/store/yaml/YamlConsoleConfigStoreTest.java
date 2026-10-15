@@ -75,10 +75,10 @@ class YamlConsoleConfigStoreTest {
 
         ConsoleConfig saved = store.save(CONFIG);
 
-        assertThat(saved).isEqualTo(CONFIG.toBuilder().version(1).build());
+        assertThat(saved).isEqualTo(CONFIG.toBuilder().revision(saved.getRevision()).build());
+        assertThat(saved.getRevision()).isNotNull();
         assertThat(store.load()).isEqualTo(saved);
         assertThat(Files.readString(dataDir.resolve("admin").resolve(YamlConsoleConfigStore.FILE_NAME))).isEqualTo("""
-                version: 1
                 connectors:
                   - id: alpha-prometheus
                     name: Alpha Prometheus
@@ -120,7 +120,7 @@ class YamlConsoleConfigStoreTest {
         ConsoleConfig saved = store.save(CONFIG);
 
         assertThat(Files.readAllLines(dataDir.resolve("data").resolve(YamlConsoleConfigStore.FILE_NAME)))
-                .startsWith("# yaml-language-server: $schema=../config/console.schema.json", "version: 1");
+                .startsWith("# yaml-language-server: $schema=../config/console.schema.json", "connectors:");
         assertThat(store.load()).isEqualTo(saved);
     }
 
@@ -128,7 +128,7 @@ class YamlConsoleConfigStoreTest {
     void writesNoSchemaLineWithoutTheSchema() throws IOException {
         new YamlConsoleConfigStore(dataDir, dataDir.resolve("absent.schema.json")).save(CONFIG);
 
-        assertThat(Files.readAllLines(dataDir.resolve(YamlConsoleConfigStore.FILE_NAME))).first().isEqualTo("version: 1");
+        assertThat(Files.readAllLines(dataDir.resolve(YamlConsoleConfigStore.FILE_NAME))).first().isEqualTo("connectors:");
     }
 
     @Test
@@ -140,17 +140,28 @@ class YamlConsoleConfigStoreTest {
     }
 
     @Test
-    void refusesASaveBasedOnAnOlderVersion() {
+    void refusesASaveBasedOnAnOlderRevision() {
         YamlConsoleConfigStore store = new YamlConsoleConfigStore(dataDir);
         ConsoleConfig loadedByBoth = store.load();
         store.save(loadedByBoth.toBuilder().connector(CONFIG.getConnectors().getFirst()).build());
 
         assertThatThrownBy(() -> store.save(loadedByBoth.toBuilder().connector(CONFIG.getConnectors().getLast()).build()))
-                .isInstanceOfSatisfying(StaleConsoleConfigException.class, e -> {
-                    assertThat(e.getExpectedVersion()).isZero();
-                    assertThat(e.getStoredVersion()).isEqualTo(1);
-                });
+                .isInstanceOf(StaleConsoleConfigException.class);
         assertThat(store.load().getConnectors()).containsExactly(CONFIG.getConnectors().getFirst());
+    }
+
+    @Test
+    void refusesASaveBasedOnTheContentBeforeAHandEdit() throws IOException {
+        YamlConsoleConfigStore store = new YamlConsoleConfigStore(dataDir);
+        ConsoleConfig loadedBeforeTheEdit = store.save(CONFIG);
+        Path file = dataDir.resolve(YamlConsoleConfigStore.FILE_NAME);
+        Files.writeString(file, Files.readString(file).replace("Alpha Loki", "Beta Loki"));
+
+        assertThatThrownBy(() -> store.save(loadedBeforeTheEdit.toBuilder().clearConnectors().build()))
+                .isInstanceOf(StaleConsoleConfigException.class);
+        ConsoleConfig edited = store.load();
+        assertThat(edited.getConnectors()).extracting(Connector::getName).containsExactly("Alpha Prometheus", "Beta Loki");
+        assertThat(store.save(edited.toBuilder().clearConnectors().build()).getConnectors()).isEmpty();
     }
 
     @Test
@@ -168,7 +179,7 @@ class YamlConsoleConfigStoreTest {
 
         ConsoleConfig config = new YamlConsoleConfigStore(dataDir).load();
 
-        assertThat(config.getVersion()).isZero();
+        assertThat(config.getRevision()).isNotNull();
         assertThat(config.getConnectors()).extracting(Connector::getId).containsExactly("alpha-loki");
         assertThat(config.getDefaults()).isEqualTo(EngineConnectors.builder().logs("alpha-loki").build());
         assertThat(config.getEngines()).isEmpty();
@@ -187,7 +198,6 @@ class YamlConsoleConfigStoreTest {
 
         assertThat(store.load()).isEqualTo(saved);
         assertThat(Files.readString(dataDir.resolve(YamlConsoleConfigStore.FILE_NAME))).isEqualTo("""
-                version: 1
                 defaults: {}
                 trace:
                   linkingTags: []

@@ -15,7 +15,9 @@
  */
 package org.lolaf.staffix.admin.store.yaml;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import org.jspecify.annotations.Nullable;
 import org.lolaf.staffix.admin.store.Connector;
 import org.lolaf.staffix.admin.store.ConsoleConfig;
 import org.lolaf.staffix.admin.store.ConsoleConfigStore;
@@ -36,20 +38,26 @@ import tools.jackson.dataformat.yaml.YAMLWriteFeature;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.Objects;
 
 /**
  * Keeps the console configuration in {@code console.yaml} under the data directory, so it can be read, diffed and
- * edited by hand. A hand edit that leaves the version unchanged is overwritten by the next save from the UI, and
- * comments do not survive one: each save writes back the line pointing an editor at the distribution's schema.
+ * edited by hand. A save from the UI based on content changed since, by hand or from another console, is refused.
+ * Comments do not survive a save, which writes back the line pointing an editor at the distribution's schema.
  */
 class YamlConsoleConfigStore implements ConsoleConfigStore {
 
     static final String FILE_NAME = "console.yaml";
     static final Path SCHEMA = Path.of("config", "console.schema.json");
+    private static final HexFormat HEX = HexFormat.of();
 
     private final Path file;
     private final Path schema;
@@ -89,11 +97,12 @@ class YamlConsoleConfigStore implements ConsoleConfigStore {
 
     @Override
     public ConsoleConfig load() {
-        if (!Files.exists(file)) {
+        byte[] content = read();
+        if (content == null) {
             return ConsoleConfig.EMPTY;
         }
         try {
-            return mapper.readValue(file, ConsoleConfig.class);
+            return mapper.readValue(content, ConsoleConfig.class).toBuilder().revision(revision(content)).build();
         } catch (JacksonException e) {
             throw new ConsoleConfigStoreException("Cannot read the console configuration from " + file + ": " + e.getOriginalMessage(), e);
         }
@@ -101,29 +110,47 @@ class YamlConsoleConfigStore implements ConsoleConfigStore {
 
     @Override
     public synchronized ConsoleConfig save(ConsoleConfig config) {
-        long storedVersion = load().getVersion();
-        if (config.getVersion() != storedVersion) {
-            throw new StaleConsoleConfigException(config.getVersion(), storedVersion);
+        byte[] stored = read();
+        if (!Objects.equals(config.getRevision(), stored == null ? null : revision(stored))) {
+            throw new StaleConsoleConfigException();
         }
-        ConsoleConfig saved = config.toBuilder().version(storedVersion + 1).build();
         try {
+            byte[] content = serialize(config);
             Files.createDirectories(file.getParent());
             Path temp = Files.createTempFile(file.getParent(), FILE_NAME, ".tmp");
             try {
-                try (Writer out = Files.newBufferedWriter(temp)) {
-                    if (Files.isRegularFile(schema)) {
-                        out.write(schemaComment);
-                    }
-                    mapper.writeValue(out, saved);
-                }
+                Files.write(temp, content);
                 Files.move(temp, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             } finally {
                 Files.deleteIfExists(temp);
             }
+            return config.toBuilder().revision(revision(content)).build();
         } catch (IOException | JacksonException e) {
             throw new ConsoleConfigStoreException("Cannot write the console configuration to " + file, e);
         }
-        return saved;
+    }
+
+    private byte @Nullable [] read() {
+        try {
+            return Files.readAllBytes(file);
+        } catch (NoSuchFileException e) {
+            return null;
+        } catch (IOException e) {
+            throw new ConsoleConfigStoreException("Cannot read the console configuration from " + file, e);
+        }
+    }
+
+    private byte[] serialize(ConsoleConfig config) {
+        String yaml = mapper.writeValueAsString(config);
+        return (Files.isRegularFile(schema) ? schemaComment + yaml : yaml).getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static String revision(byte[] content) {
+        try {
+            return HEX.formatHex(MessageDigest.getInstance("SHA-256").digest(content));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("Every JVM provides SHA-256", e);
+        }
     }
 
     private static String schemaLocation(Path file, Path schema) {
@@ -136,6 +163,7 @@ class YamlConsoleConfigStore implements ConsoleConfigStore {
     }
 
     @JsonDeserialize(builder = ConsoleConfig.ConsoleConfigBuilder.class)
+    @JsonIgnoreProperties("revision")
     private interface ConsoleConfigMixIn {
     }
 
