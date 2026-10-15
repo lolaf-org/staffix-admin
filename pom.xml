@@ -11,7 +11,7 @@
 
     <groupId>org.lolaf.staffix.admin</groupId>
     <artifactId>staffix-admin-parent</artifactId>
-    <version>0.9.0</version>
+    <version>0.9.1-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Staffix Admin</name>
     <description>HTTP admin console for staffix FIX engines</description>
@@ -45,7 +45,7 @@
         <!-- HTTPS rather than ssh: the credential that pushes a release is a token. -->
         <developerConnection>scm:git:https://github.com/lolaf-org/staffix-admin.git</developerConnection>
         <url>https://github.com/lolaf-org/staffix-admin</url>
-        <tag>v0.9.0</tag>
+        <tag>HEAD</tag>
     </scm>
 
     <issueManagement>
