@@ -5,6 +5,18 @@ in, from the command line (`--staffix.admin.data-dir=...`) or from the environme
 admins change at runtime, connectors and trace settings, lives in `console.yaml` instead: see
 [Connectors](connectors.md).
 
+## Editing the YAML files
+
+`config/` ships the JSON schemas of both files, `application.schema.json` and `console.schema.json`. With an editor
+using the YAML language server, such as VS Code's YAML extension, they complete the settings, show each one's
+description and default, and flag a misspelled name or a malformed value. `application.yml` names its schema on its
+first line; the console writes the same line at the top of `console.yaml` on every save, as long as
+`config/console.schema.json` exists in the directory it starts in. Otherwise, map a schema to its file in the
+editor's settings.
+
+Only `staffix.admin` is checked in `application.yml`: Spring Boot's own settings are left alone. In `console.yaml`, a
+connector of a kind no bundled plugin provides, such as one of your own, is accepted with its settings unchecked.
+
 ## Console
 
 | Setting | Default | |

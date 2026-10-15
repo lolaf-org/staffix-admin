@@ -34,7 +34,9 @@ import tools.jackson.databind.annotation.JsonPOJOBuilder;
 import tools.jackson.dataformat.yaml.YAMLMapper;
 import tools.jackson.dataformat.yaml.YAMLWriteFeature;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -42,17 +44,26 @@ import java.nio.file.StandardCopyOption;
 /**
  * Keeps the console configuration in {@code console.yaml} under the data directory, so it can be read, diffed and
  * edited by hand. A hand edit that leaves the version unchanged is overwritten by the next save from the UI, and
- * comments do not survive one.
+ * comments do not survive one: each save writes back the line pointing an editor at the distribution's schema.
  */
 class YamlConsoleConfigStore implements ConsoleConfigStore {
 
     static final String FILE_NAME = "console.yaml";
+    static final Path SCHEMA = Path.of("config", "console.schema.json");
 
     private final Path file;
+    private final Path schema;
+    private final String schemaComment;
     private final YAMLMapper mapper;
 
     YamlConsoleConfigStore(Path dataDir) {
+        this(dataDir, SCHEMA);
+    }
+
+    YamlConsoleConfigStore(Path dataDir, Path schema) {
         this.file = dataDir.resolve(FILE_NAME);
+        this.schema = schema;
+        this.schemaComment = "# yaml-language-server: $schema=" + schemaLocation(file, schema) + "\n";
         this.mapper = YAMLMapper.builder()
                 .disable(YAMLWriteFeature.WRITE_DOC_START_MARKER)
                 .enable(YAMLWriteFeature.MINIMIZE_QUOTES)
@@ -99,7 +110,12 @@ class YamlConsoleConfigStore implements ConsoleConfigStore {
             Files.createDirectories(file.getParent());
             Path temp = Files.createTempFile(file.getParent(), FILE_NAME, ".tmp");
             try {
-                mapper.writeValue(temp, saved);
+                try (Writer out = Files.newBufferedWriter(temp)) {
+                    if (Files.isRegularFile(schema)) {
+                        out.write(schemaComment);
+                    }
+                    mapper.writeValue(out, saved);
+                }
                 Files.move(temp, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             } finally {
                 Files.deleteIfExists(temp);
@@ -108,6 +124,15 @@ class YamlConsoleConfigStore implements ConsoleConfigStore {
             throw new ConsoleConfigStoreException("Cannot write the console configuration to " + file, e);
         }
         return saved;
+    }
+
+    private static String schemaLocation(Path file, Path schema) {
+        Path absoluteSchema = schema.toAbsolutePath().normalize();
+        try {
+            return file.toAbsolutePath().normalize().getParent().relativize(absoluteSchema).toString().replace(File.separatorChar, '/');
+        } catch (IllegalArgumentException e) {
+            return absoluteSchema.toUri().toString();
+        }
     }
 
     @JsonDeserialize(builder = ConsoleConfig.ConsoleConfigBuilder.class)

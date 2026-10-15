@@ -75,6 +75,7 @@
         <node.version>v24.21.0</node.version>
         <frontend-maven-plugin.version>2.0.2</frontend-maven-plugin.version>
         <springdoc.version>3.1.1</springdoc.version>
+        <json-schema-validator.version>3.0.8</json-schema-validator.version>
         <springdoc-openapi-maven-plugin.version>1.5</springdoc-openapi-maven-plugin.version>
         <staffix.version>0.9.1</staffix.version>
         <!-- Spring Boot's 4.35.1 is older than the gencode of staffix's opentelemetry-proto, which then fails to load -->
@@ -95,6 +96,11 @@
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>com.networknt</groupId>
+                <artifactId>json-schema-validator</artifactId>
+                <version>${json-schema-validator.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.lolaf.staffix.admin</groupId>
                 <artifactId>staffix-admin-connector-spi</artifactId>
@@ -238,11 +244,16 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
                     <configuration>
+                        <annotationProcessorPathsUseDepMgmt>true</annotationProcessorPathsUseDepMgmt>
                         <annotationProcessorPaths>
                             <path>
                                 <groupId>org.projectlombok</groupId>
                                 <artifactId>lombok</artifactId>
                                 <version>${lombok.version}</version>
+                            </path>
+                            <path>
+                                <groupId>org.springframework.boot</groupId>
+                                <artifactId>spring-boot-configuration-processor</artifactId>
                             </path>
                         </annotationProcessorPaths>
                     </configuration>

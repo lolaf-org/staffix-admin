@@ -112,6 +112,26 @@ class YamlConsoleConfigStoreTest {
     }
 
     @Test
+    void pointsEditorsAtTheSchemaWhenTheDistributionHasOne() throws IOException {
+        Path schema = Files.createDirectories(dataDir.resolve("config")).resolve("console.schema.json");
+        Files.writeString(schema, "{}");
+        YamlConsoleConfigStore store = new YamlConsoleConfigStore(dataDir.resolve("data"), schema);
+
+        ConsoleConfig saved = store.save(CONFIG);
+
+        assertThat(Files.readAllLines(dataDir.resolve("data").resolve(YamlConsoleConfigStore.FILE_NAME)))
+                .startsWith("# yaml-language-server: $schema=../config/console.schema.json", "version: 1");
+        assertThat(store.load()).isEqualTo(saved);
+    }
+
+    @Test
+    void writesNoSchemaLineWithoutTheSchema() throws IOException {
+        new YamlConsoleConfigStore(dataDir, dataDir.resolve("absent.schema.json")).save(CONFIG);
+
+        assertThat(Files.readAllLines(dataDir.resolve(YamlConsoleConfigStore.FILE_NAME))).first().isEqualTo("version: 1");
+    }
+
+    @Test
     void writesAFileOnlyItsOwnerReads() throws IOException {
         new YamlConsoleConfigStore(dataDir).save(CONFIG);
 

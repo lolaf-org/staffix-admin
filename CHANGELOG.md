@@ -45,6 +45,8 @@ or later with its HTTP admin API.
   references to environment variables or files, or stored encrypted under a master key; they are never shown back.
 - **Logins and audit**: operators log in through JAAS, as `READER` (views) or `WRITER` (also changes); every change,
   and every refused one, is written to an audit log.
+- **Schemas for the YAML files.** `config/` ships the JSON schemas of `application.yml` and `console.yaml`, so an
+  editor such as VS Code completes the settings and flags a misspelled name or a malformed value as you type.
 - **Light, dark and system themes.**
 - **A distribution and a Docker image.** `staffix-admin-0.9.0.tar.gz` on the GitHub Release, started with
   `bin/staffix-admin.sh`, and `ghcr.io/lolaf-org/staffix-admin:0.9.0`. Both ship an `admin` user (`WRITER`) and an

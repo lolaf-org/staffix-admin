@@ -51,7 +51,7 @@ public class ConnectorKind {
     @Singular
     List<Setting> settings;
 
-    static ConnectorKind of(String kind, ConnectorRole role, Class<?> settingsClass) {
+    public static ConnectorKind of(String kind, ConnectorRole role, Class<?> settingsClass) {
         Map<String, Parameter> parameters = Arrays.stream(bindingConstructor(settingsClass).getParameters())
                 .collect(Collectors.toMap(Parameter::getName, Function.identity()));
         return ConnectorKind.builder()

@@ -17,7 +17,7 @@ cd staffix-admin
 | `bin/staffix-admin.sh` | Starts the console from the distribution's root, with `JAVA_OPTS` and the `java` of `JAVA_HOME` when set |
 | `staffix-admin.jar` | The console, with the UI inside |
 | `plugins/` | The YAML store, the audit log, and the Prometheus, Loki, Elasticsearch and ClickHouse connectors: see [Plugins](plugins.md) |
-| `config/` | `application.yml`, `jaas.conf` and `users.properties` |
+| `config/` | `application.yml`, `jaas.conf`, `users.properties`, and the schemas an editor checks the YAML files with: see [Editing the YAML files](configuration.md#editing-the-yaml-files) |
 
 `users.properties` ships two users whose password is their name: `admin` (`WRITER`) for the UI, and `engine`
 (`ENGINE`) for engines to announce themselves; a `reader` (`READER`) is there commented out. Change both passwords
@@ -58,7 +58,7 @@ docker run -p 8080:8080 \
 
 - `config/` holds the image's copy of the distribution's, with the `admin` and `engine` users whose password is their
   name. Mount your own in its place, starting from the archive's `config/`: `application.yml`, `jaas.conf` and your
-  users or JAAS module. Hash a password with the image itself:
+  users or JAAS module, and the two `*.schema.json` if you edit the YAML files. Hash a password with the image itself:
   `docker run --rm --entrypoint java ghcr.io/lolaf-org/staffix-admin:0.9.0 -Dloader.main=org.lolaf.staffix.admin.server.security.jaas.PasswordHasher -jar staffix-admin.jar 'secret'`.
 - `/data` is the data directory: `console.yaml` lives there, so keep it on a volume.
 - `JAVA_OPTS` passes JVM options; any setting can also come from the environment

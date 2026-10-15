@@ -32,6 +32,9 @@ public class SecurityProperties {
      */
     @Nullable
     Resource jaasConfig;
+    /**
+     * The login context of the JAAS configuration.
+     */
     String loginContextName;
     /**
      * Roles granted to JAAS principals by name, e.g. an LDAP group: {@code cn=fix-ops: [WRITER]}. Principals of

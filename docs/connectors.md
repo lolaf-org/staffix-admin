@@ -35,7 +35,8 @@ Connectors live in the console configuration, `console.yaml` under the data dire
 default `data`, relative to the working directory), readable by the console's user only. Writers manage them in the
 Connectors tab: connectors with a form per kind and a connection test, the defaults, and each engine's emitters with
 the sessions using them. The file can also be edited by hand; changes apply without a restart. It also holds the
-[trace settings](logs-and-trace.md#trace-settings).
+[trace settings](logs-and-trace.md#trace-settings). An editor can check it against the schema the distribution ships:
+see [Editing the YAML files](configuration.md#editing-the-yaml-files).
 
 ```yaml
 version: 0

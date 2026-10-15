@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=application.schema.json
 # Read from config/ of the directory the console starts in; every setting is in docs/configuration.md.
 staffix:
   admin:
