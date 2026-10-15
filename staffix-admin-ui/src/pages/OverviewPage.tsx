@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 import { Alert, Card, Empty, Flex, Input, Select, Skeleton, Space, Tag, Tooltip, Typography, theme } from 'antd'
-import { PlusOutlined } from '@ant-design/icons'
+import { CaretDownOutlined, CaretRightOutlined, PlusOutlined } from '@ant-design/icons'
 import { useState } from 'react'
-import { Outlet, useLocation, useNavigate, useParams } from 'react-router'
+import { Outlet, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import type { Schemas } from '../api/client'
 import { sessionRoute, useEngineAlerts, useEngines, useGroups } from '../api/queries'
 import { STATUS_LABELS, STATUSES, type Status } from '../sessions/status'
@@ -89,6 +89,7 @@ function EngineCard({ engine }: { engine: Schemas['Engine'] }) {
   const groups = useGroups(engine.engineId)
   const filters = useSessionFilters()
   const [adding, setAdding] = useState(false)
+  const [folded, toggleFolded] = useFolded(engine.engineId)
   const alertsUnknown = useEnginesWithUnknownAlerts().has(engine.engineId) || groups.isError
 
   const shown = (groups.data ?? [])
@@ -113,8 +114,18 @@ function EngineCard({ engine }: { engine: Schemas['Engine'] }) {
   return (
     <Card
       size="small"
+      styles={{ body: folded ? { display: 'none' } : undefined }}
       title={
         <Space wrap>
+          <span
+            role="button"
+            aria-expanded={!folded}
+            aria-label={folded ? 'Show sessions' : 'Hide sessions'}
+            onClick={toggleFolded}
+            style={{ cursor: 'pointer' }}
+          >
+            {folded ? <CaretRightOutlined /> : <CaretDownOutlined />}
+          </span>
           <span>
             <Typography.Text type="secondary">Fix engine: </Typography.Text>
             <Tooltip title={engine.staffixVersion ? `staffix ${engine.staffixVersion}` : 'staffix version unknown'}>
@@ -160,6 +171,24 @@ function EngineCard({ engine }: { engine: Schemas['Engine'] }) {
       </div>
     </Card>
   )
+}
+
+/**
+ * Kept in the URL with the filters, so a folded engine stays folded across a reload.
+ */
+function useFolded(engineId: string): [boolean, () => void] {
+  const [params, setParams] = useSearchParams()
+  const folded = params.getAll('folded').includes(engineId)
+  const toggle = () =>
+    setParams(
+      (current) => {
+        if (folded) current.delete('folded', engineId)
+        else current.append('folded', engineId)
+        return current
+      },
+      { replace: true },
+    )
+  return [folded, toggle]
 }
 
 interface GroupBoxProps {
