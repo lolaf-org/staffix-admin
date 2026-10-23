@@ -350,24 +350,18 @@ final class Traffic {
         }
 
         /**
-         * Added on logon and removed on logout, as an application watching its own flow would: a session nobody can
-         * send on is not short of orders, and the silence restarts from the logon.
+         * Added once: staffix suspends it while the session is not logged in, since a session nobody can send on is not
+         * short of orders, and resets it at logon, so the silence restarts from there.
          */
         @Override
-        public void onLogon(FixSession session, DecodedFixMessage logon) {
-            orderFlow.restart();
-            session.getProbes().remove(ORDER_FLOW_PROBE);
+        public void onSessionCreated(FixSession session, FieldsRegistry fieldsRegistry, MessageTypeRegistry messageTypeRegistry,
+                                     List<FixMessageDecoder> decoders) {
             session.getProbes().add(Probe.builder()
                     .name(ORDER_FLOW_PROBE)
                     .description("Time since the last NewOrderSingle")
                     .evaluator(orderFlow)
                     .reminderInterval(Duration.ofMinutes(1))
                     .build());
-        }
-
-        @Override
-        public void onLogout(FixSession session, String message, DecodedFixMessage logoutMessage) {
-            session.getProbes().remove(ORDER_FLOW_PROBE);
         }
 
         /**
@@ -389,7 +383,12 @@ final class Traffic {
                 major = Optional.of(Alert.major("no order for more than " + majorAfter.toSeconds() + "s"));
             }
 
-            void restart() {
+            void onOrder() {
+                lastOrderNanos = System.nanoTime();
+            }
+
+            @Override
+            public void reset() {
                 lastOrderNanos = System.nanoTime();
             }
 
@@ -435,7 +434,7 @@ final class Traffic {
 
             @Override
             public void onDecoded(FixSession session, boolean possDupFlag, boolean possResend) {
-                orderFlow.restart();
+                orderFlow.onOrder();
                 String orderId = session.getFixSessionId().getSenderCompID().getValue() + "-" + orders.incrementAndGet();
                 Fill fill = new Fill(clOrdId, orderId, symbol, side, orderQty, price);
                 session.send(fill.encode(report.begin(), session.getClock().now()), null);

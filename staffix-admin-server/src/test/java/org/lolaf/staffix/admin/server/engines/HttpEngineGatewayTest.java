@@ -112,11 +112,14 @@ class HttpEngineGatewayTest {
     private static final String PROBES = """
             [{"name":"session-down","description":"Down inside session time","evaluationInterval":"PT1S",
               "runbookUrl":"https://wiki.example.com/session-down"},
-             {"name":"order-flow","description":"Time since the last order","evaluationInterval":"PT5S","reminderInterval":"PT1M"}]
+             {"name":"order-flow","description":"Time since the last order","evaluationInterval":"PT5S","reminderInterval":"PT1M",
+              "onlyWhileLoggedIn":true},
+             {"name":"orders","description":"Orders received","evaluationInterval":"PT1S","onlyWhileLoggedIn":true}]
             """;
     private static final String PROBE_STATES = """
             [{"probe":"session-down","level":"CRITICAL","message":"down","since":"2026-10-10T10:05:00Z",
-              "lastEvaluation":"2026-10-10T10:06:00Z"}]
+              "lastEvaluation":"2026-10-10T10:06:00Z"},
+             {"probe":"orders","lastEvaluation":"2026-10-10T09:59:00Z","suspended":true}]
             """;
 
     private volatile String sessionsVersion = "v1";
@@ -353,6 +356,18 @@ class HttpEngineGatewayTest {
     }
 
     @Test
+    void aProbeSaysWhetherItRunsOnlyWhileLoggedInAndWhetherItIsSuspended() {
+        probesVersion = "p1";
+
+        List<SessionProbe> probes = gateway.getProbes(trading());
+
+        assertThat(probes).extracting(SessionProbe::getName, SessionProbe::isOnlyWhileLoggedIn, SessionProbe::isSuspended)
+                .as("session-down is described as an engine before 0.9.2 does, without the flag")
+                .containsExactly(tuple("session-down", false, false), tuple("order-flow", true, false), tuple("orders", true, true));
+        assertThat(probes.get(2).getLastEvaluation()).isEqualTo(Instant.parse("2026-10-10T09:59:00Z"));
+    }
+
+    @Test
     void probeDefinitionsAreReadOnlyWhenTheirVersionMovesAndStatesOnEveryCall() {
         probesVersion = "p1";
 
@@ -361,7 +376,7 @@ class HttpEngineGatewayTest {
 
         assertThat(requests).containsExactly("GET status", "GET sessions", "GET sessions/alpha/trading/probes",
                 "GET sessions/alpha/trading/probes/states", "GET sessions/alpha/trading/probes/states");
-        assertThat(probes).extracting(SessionProbe::getName).containsExactly("session-down", "order-flow");
+        assertThat(probes).extracting(SessionProbe::getName).containsExactly("session-down", "order-flow", "orders");
         assertThat(probes.get(0).getLevel()).isEqualTo(AlertLevel.CRITICAL);
         assertThat(probes.get(0).getSince()).isEqualTo(Instant.parse("2026-10-10T10:05:00Z"));
         assertThat(probes.get(0).getEvaluationInterval()).isEqualTo(Duration.ofSeconds(1));
@@ -369,7 +384,7 @@ class HttpEngineGatewayTest {
         assertThat(probes.get(1).getLastEvaluation()).isNull();
         assertThat(probes.get(1).getReminderInterval()).isEqualTo(Duration.ofMinutes(1));
         assertThat(probes).extracting(SessionProbe::getRunbookUrl)
-                .containsExactly(URI.create("https://wiki.example.com/session-down"), null);
+                .containsExactly(URI.create("https://wiki.example.com/session-down"), null, null);
 
         probesVersion = "p2";
         clock.step(HttpEngineGateway.STATUS_FRESH);

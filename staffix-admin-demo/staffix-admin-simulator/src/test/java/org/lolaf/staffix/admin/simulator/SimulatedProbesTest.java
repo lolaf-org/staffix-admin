@@ -22,6 +22,7 @@ import org.lolaf.staffix.api.session.FixSessionStatus;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 class SimulatedProbesTest {
 
@@ -42,5 +43,23 @@ class SimulatedProbesTest {
         assertThat(probes.tick(2, FixSessionStatus.LOGGED_IN, NOW)).isEmpty();
         assertThat(probes.states()).noneMatch(ProbeState::isClearedManually);
         assertThat(probes.clear("large-order")).isFalse();
+    }
+
+    @Test
+    void theApplicationsProbesAreSuspendedWhileLoggedOutAndTheBuiltInOnesAreNot() {
+        SimulatedProbes probes = new SimulatedProbes(2);
+        probes.tick(0, FixSessionStatus.LOGGED_IN, NOW);
+
+        assertThat(probes.tick(1, FixSessionStatus.LOGGED_OUT_BY_OPERATOR, NOW)).singleElement().satisfies(cleared -> {
+            assertThat(cleared.getProbeName()).isEqualTo("large-order");
+            assertThat(cleared.getAlert()).isEmpty();
+            assertThat(cleared.isSuspended()).isTrue();
+        });
+        assertThat(probes.states()).extracting(ProbeState::getProbeName, ProbeState::isSuspended)
+                .containsExactly(tuple("session-down", false), tuple("large-order", true));
+        assertThat(probes.clear("large-order")).isFalse();
+
+        assertThat(probes.tick(2, FixSessionStatus.LOGGED_IN, NOW)).singleElement()
+                .satisfies(raised -> assertThat(raised.isSuspended()).isFalse());
     }
 }

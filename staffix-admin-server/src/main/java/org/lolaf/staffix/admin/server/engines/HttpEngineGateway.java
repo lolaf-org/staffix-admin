@@ -307,12 +307,14 @@ class HttpEngineGateway implements EngineGateway {
                 .description(definition.getDescription())
                 .evaluationInterval(Duration.parse(definition.getEvaluationInterval()))
                 .reminderInterval(definition.getReminderInterval() == null ? null : Duration.parse(definition.getReminderInterval()))
-                .runbookUrl(runbookUrl(definition.getRunbookUrl()));
+                .runbookUrl(runbookUrl(definition.getRunbookUrl()))
+                .onlyWhileLoggedIn(Boolean.TRUE.equals(definition.getOnlyWhileLoggedIn()));
         if (state != null) {
             probe.level(state.getLevel() == null ? null : AlertLevel.valueOf(state.getLevel()))
                     .message(state.getMessage())
                     .since(state.getSince() == null ? null : Instant.parse(state.getSince()))
-                    .lastEvaluation(Instant.parse(state.getLastEvaluation()));
+                    .lastEvaluation(Instant.parse(state.getLastEvaluation()))
+                    .suspended(state.isSuspended());
         }
         return probe.build();
     }

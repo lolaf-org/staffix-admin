@@ -40,6 +40,11 @@ final class ConnectorProbes {
         String reminderInterval;
         @Nullable
         String runbookUrl;
+        /**
+         * Absent from an engine before 0.9.2, which evaluates every probe whatever the session's state.
+         */
+        @Nullable
+        Boolean onlyWhileLoggedIn;
     }
 
     @Value
@@ -54,5 +59,6 @@ final class ConnectorProbes {
         @Nullable
         String since;
         String lastEvaluation;
+        boolean suspended;
     }
 }

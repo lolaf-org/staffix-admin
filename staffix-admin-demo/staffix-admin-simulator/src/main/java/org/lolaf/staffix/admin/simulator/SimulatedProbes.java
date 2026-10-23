@@ -32,7 +32,8 @@ import java.util.List;
  * The probes of one simulated session, evaluated on the simulator's one-second tick. Every session has staffix's
  * {@code session-down}; some also have a probe whose alert cycles on a fixed schedule, offset per session, so the
  * demo always has alerts being raised, changing level and clearing. {@code large-order} stands for an alert raised
- * from application code: the only one an operator can clear by hand, until its next cycle raises it again.
+ * from application code: the only one an operator can clear by hand, until its next cycle raises it again. As in
+ * staffix, the application's probes are suspended while the session is not logged in, the others always evaluated.
  */
 final class SimulatedProbes {
 
@@ -56,6 +57,7 @@ final class SimulatedProbes {
                 .name("session-down")
                 .description("Logged out inside its session time for longer than " + SESSION_DOWN_DELAY.toSeconds() + "s")
                 .evaluationInterval(Duration.ofSeconds(1))
+                .onlyWhileLoggedIn(false)
                 .build()));
         if (sessionIndex % 3 == 0) {
             probes.add(new Probe(ProbeDefinition.builder()
@@ -71,6 +73,7 @@ final class SimulatedProbes {
                     .name("async-store-queue")
                     .description("Messages waiting in the async store queue to be persisted")
                     .evaluationInterval(Duration.ofSeconds(10))
+                    .onlyWhileLoggedIn(false)
                     .build()));
         }
         if (sessionIndex % 5 == 2) {
@@ -121,8 +124,13 @@ final class SimulatedProbes {
         lastTick = tick;
         downTicks = status == FixSessionStatus.LOGGED_OUT_INSIDE_SESSION_TIME ? downTicks + 1 : 0;
         List<ProbeState> transitions = new ArrayList<>();
+        boolean loggedIn = status == FixSessionStatus.LOGGED_IN;
         for (Probe probe : probes) {
-            if (probe.evaluate(alert(probe.definition.getName(), tick), now)) {
+            if (probe.definition.isOnlyWhileLoggedIn() && !loggedIn) {
+                if (probe.suspend()) {
+                    transitions.add(probe.state());
+                }
+            } else if (probe.evaluate(alert(probe.definition.getName(), tick), now)) {
                 transitions.add(probe.state(probe.clearRequested && probe.alert == null));
             }
             probe.clearRequested = false;
@@ -170,12 +178,24 @@ final class SimulatedProbes {
         @Nullable Instant since;
         @Nullable Instant lastEvaluation;
         boolean clearRequested;
+        boolean suspended;
 
         Probe(ProbeDefinition definition) {
             this.definition = definition;
         }
 
+        /**
+         * Returns whether an ongoing alert was cleared.
+         */
+        boolean suspend() {
+            suspended = true;
+            boolean wasInAlert = alert != null;
+            alert = null;
+            return wasInAlert;
+        }
+
         boolean evaluate(@Nullable Alert next, Instant now) {
+            suspended = false;
             AlertLevel previous = alert == null ? null : alert.getLevel();
             if (alert == null && next != null) {
                 since = now;
@@ -199,6 +219,7 @@ final class SimulatedProbes {
                     .since(alert == null ? null : since)
                     .lastEvaluation(lastEvaluation)
                     .clearedManually(clearedManually)
+                    .suspended(suspended)
                     .build();
         }
     }

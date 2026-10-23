@@ -14,6 +14,16 @@ between releases. A section is written when the version it belongs to is being c
 carries the right number and date the first time and the workflow's check has exactly one heading it
 could mean.
 
+## [0.9.1] - WIP
+
+### Added
+
+- **A probe that runs only while its session is logged in says so**, in the session's alerts tab. While the session
+  is logged out, such a probe shows as "Suspended" rather than as normal with a last evaluation that no longer
+  moves. This needs engines on staffix 0.9.2; an older engine's probes show as before.
+- **The demo's application probes are suspended while their session is logged out**, as a staffix 0.9.2 engine's
+  are, so the demo shows both kinds side by side.
+
 ## [0.9.0] - 2026-10-15
 
 First public release. The staffix admin console is a web console for [staffix](https://github.com/lolaf-org/staffix)

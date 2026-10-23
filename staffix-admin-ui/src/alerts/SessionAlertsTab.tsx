@@ -34,6 +34,22 @@ function inAlertFirst(probes: SessionProbe[]): SessionProbe[] {
   return [...probes].sort((a, b) => rank(a) - rank(b))
 }
 
+function normalState(probe: SessionProbe) {
+  if (probe.suspended) {
+    return (
+      <Tooltip title="The session is not logged in, and this probe runs only while it is">
+        <Typography.Text type="secondary">Suspended</Typography.Text>
+      </Tooltip>
+    )
+  }
+  return <Typography.Text type="secondary">{probe.lastEvaluation ? 'Normal' : 'Not evaluated yet'}</Typography.Text>
+}
+
+function lastEvaluated(probe: SessionProbe): string {
+  if (!probe.lastEvaluation) return 'Not evaluated yet'
+  return `Last evaluated ${formatDateTime(Date.parse(probe.lastEvaluation))}${probe.suspended ? ', before the logout' : ''}`
+}
+
 function interval(iso: string | null | undefined): string {
   const duration = iso ? parseDuration(iso) : undefined
   return duration ? `${duration.amount} ${duration.unit}` : ''
@@ -56,9 +72,7 @@ export function SessionAlertsTab({ sessionRef }: { sessionRef: SessionRef }) {
         {
           title: 'State',
           width: 100,
-          render: (_, probe) =>
-            probe.level ? <AlertLevelTag level={probe.level} />
-              : <Typography.Text type="secondary">{probe.lastEvaluation ? 'Normal' : 'Not evaluated yet'}</Typography.Text>,
+          render: (_, probe) => (probe.level ? <AlertLevelTag level={probe.level} /> : normalState(probe)),
         },
         {
           title: 'Probe',
@@ -79,9 +93,10 @@ export function SessionAlertsTab({ sessionRef }: { sessionRef: SessionRef }) {
         {
           title: 'Evaluated',
           render: (_, probe) => (
-            <Tooltip title={probe.lastEvaluation ? `Last evaluated ${formatDateTime(Date.parse(probe.lastEvaluation))}` : 'Not evaluated yet'}>
+            <Tooltip title={lastEvaluated(probe)}>
               <Typography.Text type="secondary" style={{ whiteSpace: 'nowrap' }}>
                 every {interval(probe.evaluationInterval)}
+                {probe.onlyWhileLoggedIn && <> while logged in</>}
                 {probe.reminderInterval && <>, reminded every {interval(probe.reminderInterval)}</>}
               </Typography.Text>
             </Tooltip>

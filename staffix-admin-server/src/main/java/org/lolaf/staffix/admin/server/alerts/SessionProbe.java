@@ -43,6 +43,14 @@ public class SessionProbe {
      */
     @Nullable
     URI runbookUrl;
+    /**
+     * Evaluated only while the session is logged in, and suspended otherwise.
+     */
+    boolean onlyWhileLoggedIn;
+    /**
+     * Waiting for the session to log in; the probe is then normal and its last evaluation predates the logout.
+     */
+    boolean suspended;
     @Nullable
     AlertLevel level;
     @Nullable

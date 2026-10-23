@@ -74,7 +74,7 @@
         <springdoc.version>3.1.1</springdoc.version>
         <json-schema-validator.version>3.0.8</json-schema-validator.version>
         <springdoc-openapi-maven-plugin.version>1.5</springdoc-openapi-maven-plugin.version>
-        <staffix.version>0.9.1</staffix.version>
+        <staffix.version>0.9.2-SNAPSHOT</staffix.version>
         <!-- Spring Boot's 4.35.1 is older than the gencode of staffix's opentelemetry-proto, which then fails to load -->
         <protobuf-java.version>4.36.2</protobuf-java.version>
         <license-maven-plugin.version>5.1.2</license-maven-plugin.version>
