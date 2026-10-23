@@ -2,7 +2,7 @@
 
 The console without real engines: three simulated engines whose sessions drop, reconnect and follow session windows,
 and generated metrics and FIX logs. Their meters are described by staffix's own monitoring, and sessions not serving
-clients carry an application timer, `orders.pricing`, recorded per `venue`.
+clients carry an application timer, `orders.pricing`, and counter, `orders.sent`, both recorded per `venue`.
 
 | Module | |
 |---|---|

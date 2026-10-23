@@ -33,6 +33,7 @@ import java.util.Random;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 class SimulatedEngineTest {
 
@@ -53,15 +54,18 @@ class SimulatedEngineTest {
     }
 
     @Test
-    void describesASessionsMetersAsStaffixMonitoringDoesTheApplicationsPricingTimerIncluded() {
+    void describesASessionsMetersAsStaffixMonitoringDoesTheApplicationsTimerAndCounterIncluded() {
         FixSessionId trading = session("alpha", "trading").getFixSessionId();
 
         List<FixMeterDescriptor> meters = paris.getFixSessionMeters(trading);
 
         assertThat(meters).extracting(FixMeterDescriptor::getName)
                 .contains("messages.read.latency", "messages.write.latency", "session.logon.status", SimulatedMonitoring.PRICING_TIMER);
-        assertThat(meters).filteredOn(FixMeterDescriptor::isCustom).singleElement()
-                .satisfies(pricing -> assertThat(pricing.getTagKeys()).containsExactly(SimulatedMonitoring.VENUE));
+        assertThat(meters).filteredOn(FixMeterDescriptor::isCustom)
+                .extracting(FixMeterDescriptor::getName, FixMeterDescriptor::getType, FixMeterDescriptor::getTagKeys)
+                .containsExactlyInAnyOrder(
+                        tuple(SimulatedMonitoring.PRICING_TIMER, FixMeterDescriptor.Type.TIMER, List.of(SimulatedMonitoring.VENUE)),
+                        tuple(SimulatedMonitoring.SENT_COUNTER, FixMeterDescriptor.Type.COUNTER, List.of(SimulatedMonitoring.VENUE)));
         assertThat(session("alpha", "trading").getPluginContext(FixSessionsMonitoringContext.class)).get()
                 .extracting(FixSessionsMonitoringContext::getMeterDescriptors).isEqualTo(meters);
     }

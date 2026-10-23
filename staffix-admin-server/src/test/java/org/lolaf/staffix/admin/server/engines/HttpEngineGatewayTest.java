@@ -27,6 +27,7 @@ import org.lolaf.staffix.admin.server.SteppingClock;
 import org.lolaf.staffix.admin.server.alerts.ActiveAlert;
 import org.lolaf.staffix.admin.server.alerts.AlertLevel;
 import org.lolaf.staffix.admin.server.alerts.SessionProbe;
+import org.lolaf.staffix.admin.server.metrics.Meter;
 import org.lolaf.staffix.admin.server.dictionaries.DictionaryRef;
 import org.lolaf.staffix.admin.server.onboarding.EngineAnnouncement;
 import org.lolaf.staffix.admin.server.sessions.ApplicationSetting;
@@ -116,6 +117,12 @@ class HttpEngineGatewayTest {
               "onlyWhileLoggedIn":true},
              {"name":"orders","description":"Orders received","evaluationInterval":"PT1S","onlyWhileLoggedIn":true}]
             """;
+    private static final String METERS = """
+            [{"group":"alpha","name":"trading","meters":[
+              {"name":"messages.read.latency","type":"TIMER","description":"Read","tagKeys":["msgType"],"percentiles":true,"custom":false},
+              {"name":"orders.received","type":"COUNTER","description":"NewOrderSingle received","tagKeys":[],"percentiles":false,"custom":true},
+              {"name":"orders.size","type":"DISTRIBUTION_SUMMARY","description":"A type from a newer engine","tagKeys":[],"percentiles":false,"custom":true}]}]
+            """;
     private static final String PROBE_STATES = """
             [{"probe":"session-down","level":"CRITICAL","message":"down","since":"2026-10-10T10:05:00Z",
               "lastEvaluation":"2026-10-10T10:06:00Z"},
@@ -170,6 +177,7 @@ class HttpEngineGatewayTest {
             case "sessions/alpha/trading/probes" -> PROBES.getBytes(StandardCharsets.UTF_8);
             case "sessions/alpha/trading/probes/states" -> PROBE_STATES.getBytes(StandardCharsets.UTF_8);
             case "sessions" -> SESSIONS.getBytes(StandardCharsets.UTF_8);
+            case "meters" -> METERS.getBytes(StandardCharsets.UTF_8);
             case "dictionaries/default-FIX.4.4" -> "<fix/>".getBytes(StandardCharsets.UTF_8);
             case "session-settings-stores" -> "[{\"instanceId\":\"main\",\"persistent\":true}]".getBytes(StandardCharsets.UTF_8);
             case "session-components" -> SESSION_COMPONENTS.getBytes(StandardCharsets.UTF_8);
@@ -353,6 +361,13 @@ class HttpEngineGatewayTest {
         assertThat(gateway.listAlerts("alpha-engine")).extracting(ActiveAlert::getProbe, ActiveAlert::getRunbookUrl)
                 .containsExactly(tuple("queue", null), tuple("session-down", null),
                         tuple("queue", URI.create("https://wiki.example.com/queue")));
+    }
+
+    @Test
+    void anApplicationCounterIsListedAndAMeterOfAnUnknownTypeIsLeftOut() {
+        assertThat(gateway.getMeters("alpha-engine")).singleElement().satisfies(session -> assertThat(session.getMeters())
+                .extracting(Meter::getName, Meter::getType, Meter::isCustom)
+                .containsExactly(tuple("messages.read.latency", Meter.Type.TIMER, false), tuple("orders.received", Meter.Type.COUNTER, true)));
     }
 
     @Test

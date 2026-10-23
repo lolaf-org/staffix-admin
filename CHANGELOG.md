@@ -23,6 +23,15 @@ could mean.
   moves. This needs engines on staffix 0.9.2; an older engine's probes show as before.
 - **The demo's application probes are suspended while their session is logged out**, as a staffix 0.9.2 engine's
   are, so the demo shows both kinds side by side.
+- **Application counters are charted**, as a rate per second, from Prometheus, Elasticsearch and ClickHouse. staffix
+  0.9.2 lets an application publish counters; the ClickHouse connector reads them from a new `sumTable` setting,
+  `otel_metrics_sum` by default.
+
+### Fixed
+
+- **An engine whose application publishes a counter no longer loses all its metrics in the console.** The console
+  failed to read the engine's meters as soon as one was a counter; it now charts counters, and leaves out a kind
+  of meter it does not know instead of failing.
 
 ## [0.9.0] - 2026-10-15
 

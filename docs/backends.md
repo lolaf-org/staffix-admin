@@ -65,8 +65,8 @@ keeps the exact matches.
 ## ClickHouse
 
 The ClickHouse connectors read what the OpenTelemetry collector's `clickhouse` exporter (in the collector's contrib
-distribution) writes in its own schema: `otel_logs`, `otel_metrics_histogram` and `otel_metrics_gauge` of the `otel`
-database by default (each connector's `database` and tables). Let the exporter create them (`create_schema: true`),
+distribution) writes in its own schema: `otel_logs`, `otel_metrics_histogram`, `otel_metrics_gauge` and
+`otel_metrics_sum` (the counters) of the `otel` database by default (each connector's `database` and tables). Let the exporter create them (`create_schema: true`),
 as `staffix-admin-sandbox/docker/conf/otel-collector-clickhouse.yaml` does. The console talks to ClickHouse's HTTP
 interface (port 8123) as a user that only needs to read those tables.
 

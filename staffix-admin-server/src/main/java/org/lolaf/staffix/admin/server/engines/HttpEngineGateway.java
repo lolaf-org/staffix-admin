@@ -31,6 +31,7 @@ import org.lolaf.staffix.admin.server.sessions.SessionDetail;
 import org.lolaf.staffix.admin.server.sessions.SessionGroup;
 import org.lolaf.staffix.admin.server.sessions.SessionStatus;
 import org.lolaf.staffix.admin.server.sessions.SessionSummary;
+import org.lolaf.staffix.admin.server.metrics.Meter;
 import org.lolaf.staffix.admin.server.metrics.SessionMeters;
 import org.lolaf.staffix.admin.server.sessions.SessionComponents;
 import org.lolaf.staffix.admin.server.sessions.SessionSettingsStore;
@@ -46,6 +47,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriUtils;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ArrayNode;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -54,13 +56,16 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Calls the engines' HTTP admin connectors, version {@value #API_VERSION} of their API, with the token each announced.
@@ -74,6 +79,7 @@ class HttpEngineGateway implements EngineGateway {
      */
     static final Duration STATUS_FRESH = Duration.ofSeconds(1);
     static final String API_VERSION = "v1";
+    private static final Set<String> KNOWN_METER_TYPES = Arrays.stream(Meter.Type.values()).map(Enum::name).collect(Collectors.toSet());
 
     private final EngineRegistry registry;
     private final RestClient client;
@@ -145,9 +151,27 @@ class HttpEngineGateway implements EngineGateway {
         return List.of(call(engineId, HttpMethod.GET, List.of("session-settings-stores"), null, SessionSettingsStore[].class));
     }
 
+    /**
+     * A meter of a type this console does not know, from a newer engine, is left out rather than failing the whole
+     * listing, which would hide every meter of the engine.
+     */
     @Override
     public List<SessionMeters> getMeters(String engineId) {
-        return List.of(call(engineId, HttpMethod.GET, List.of("meters"), null, SessionMeters[].class));
+        JsonNode sessions = call(engineId, HttpMethod.GET, List.of("meters"), null, JsonNode.class);
+        for (JsonNode session : sessions) {
+            if (session.path("meters") instanceof ArrayNode meters) {
+                removeUnknownTypes(meters);
+            }
+        }
+        return List.of(jsonMapper.treeToValue(sessions, SessionMeters[].class));
+    }
+
+    private static void removeUnknownTypes(ArrayNode meters) {
+        for (int i = meters.size() - 1; i >= 0; i--) {
+            if (!KNOWN_METER_TYPES.contains(meters.get(i).path("type").asString(""))) {
+                meters.remove(i);
+            }
+        }
     }
 
     @Override

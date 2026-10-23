@@ -15,6 +15,7 @@
  */
 package org.lolaf.staffix.admin.sandbox;
 
+import org.lolaf.staffix.api.monitoring.Counter;
 import org.lolaf.staffix.api.monitoring.FixSessionsMonitoringContext;
 import org.lolaf.staffix.api.monitoring.Gauge;
 import org.lolaf.staffix.api.monitoring.Timer;
@@ -34,15 +35,18 @@ final class QuoteRoundTrips {
     static final String TIMER = "quote.round.trip";
     static final String PRICING_TIMER = "quote.pricing";
     static final String PENDING_GAUGE = "quotes.pending";
+    static final String RECEIVED_COUNTER = "quotes.received";
     static final String LAST_MID_GAUGE = "quote.last.mid";
 
     private final Map<String, Long> sentAt = new ConcurrentHashMap<>();
-    private volatile Timer roundTrip = Timer.VoidTimer.getInstance();
+    private Timer roundTrip = Timer.VoidTimer.getInstance();
+    private Counter received = Counter.VoidCounter.getInstance();
 
     void onSessionCreated(FixSession session) {
         Map<String, String> venue = Map.of("venue", session.getFixSessionId().getGroup());
         roundTrip = monitoring(session).getTimer(TIMER, "Time from sending a QuoteRequest to receiving its Quote.", venue);
         monitoring(session).getGauge(PENDING_GAUGE, "QuoteRequests sent and not yet quoted.", venue, sentAt::size);
+        received = monitoring(session).getCounter(RECEIVED_COUNTER, "Quotes received in answer to a QuoteRequest.", venue);
     }
 
     void sent(String quoteReqId) {
@@ -53,6 +57,7 @@ final class QuoteRoundTrips {
         Long sent = sentAt.remove(quoteReqId);
         if (sent != null) {
             roundTrip.record(System.nanoTime() - sent, TimeUnit.NANOSECONDS);
+            received.increment();
         }
     }
 

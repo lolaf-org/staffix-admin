@@ -133,7 +133,7 @@ class DemoTelemetry {
                 List<String> keys = sessions.stream().map(session -> key(session) + suffix).toList();
                 series.add(series(combination, from, to, step, window, t -> keys.stream()
                         .mapToDouble(key -> value(meter, statistic, quantile, heldValue, window, step, key, messageType, t))
-                        .reduce(0, statistic.equals("RATE") ? Double::sum : Math::max)));
+                        .reduce(0, statistic.equals("RATE") || statistic.equals("COUNTER_RATE") ? Double::sum : Math::max)));
             }
         }
         return sessions.isEmpty() ? List.of() : series;
@@ -195,6 +195,7 @@ class DemoTelemetry {
         return switch (statistic) {
             case "RATE" -> messageType != null ? MESSAGES_PER_SECOND.get(messageType) * wave * (0.8 + 0.4 * random)
                     : meter.equals("session.rtt") ? 1 / 30.0 : 5 * wave * (0.8 + 0.4 * random);
+            case "COUNTER_RATE" -> 2 * wave * (0.8 + 0.4 * random);
             case "QUANTILE" -> latency(median, quantile, random);
             case "MEAN" -> meter.equals("session.rtt") ? (350 + 150 * wave + 60 * random) * MICROS : 1.2 * latency(median, 0.5, random);
             case "VALUE" -> switch (meter) {

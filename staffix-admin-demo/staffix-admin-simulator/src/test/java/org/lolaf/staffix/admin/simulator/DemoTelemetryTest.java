@@ -73,6 +73,21 @@ class DemoTelemetryTest {
     }
 
     @Test
+    void ratesACounterPerVenueAddingUpTheSessions() {
+        List<String> byVenue = List.of(SimulatedMonitoring.VENUE);
+
+        List<DemoTelemetry.Series> perVenue = DemoTelemetry.metrics(sessions, SimulatedMonitoring.SENT_COUNTER, "COUNTER_RATE", null, null,
+                byVenue, Map.of(), FROM, TO, STEP, Duration.ofSeconds(20));
+        List<DemoTelemetry.Series> oneSession = DemoTelemetry.metrics(sessions.subList(0, 1), SimulatedMonitoring.SENT_COUNTER, "COUNTER_RATE",
+                null, null, byVenue, Map.of(), FROM, TO, STEP, Duration.ofSeconds(20));
+
+        assertThat(perVenue).extracting(DemoTelemetry.Series::labels)
+                .containsExactly(Map.of(SimulatedMonitoring.VENUE, "xpar"), Map.of(SimulatedMonitoring.VENUE, "xlon"));
+        assertThat(perVenue).extracting(DemoTelemetry.Series::rateWindow).containsOnly(20L);
+        assertThat(perVenue.getFirst().points().getFirst().value()).isGreaterThan(oneSession.getFirst().points().getFirst().value());
+    }
+
+    @Test
     void reportsNoRateWindowForTheClockOffset() {
         assertThat(DemoTelemetry.metrics(sessions, "session.clock.offset", "VALUE", null, null, BY_SESSION, Map.of(), FROM, TO, STEP, Duration.ofSeconds(20)))
                 .isNotEmpty()

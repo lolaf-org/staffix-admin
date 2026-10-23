@@ -103,6 +103,31 @@ class PrometheusMetricsSourceTest {
     }
 
     @Test
+    void readsACountersRateFromItsTotalNamedWithoutSuffix() {
+        response = """
+                {"status":"success","data":{"resultType":"matrix","result":[
+                 {"metric":{"venue":"venue_x"},"values":[[1790928000,"5"]]}]}}
+                """;
+
+        List<MetricSeries> series = source(TimeUnit.MILLISECONDS).query(MetricQuery.builder()
+                .engineId("alpha")
+                .meter("quotes.received")
+                .statistic(MetricStatistic.COUNTER_RATE)
+                .splitBy("venue")
+                .from(FROM)
+                .to(FROM.plusSeconds(600))
+                .step(Duration.ofSeconds(5))
+                .build());
+
+        assertThat(form.get("query")).isEqualTo("sum by (venue) (rate(quotes_received{fix_eid=\"alpha\"}[20s]))");
+        assertThat(series).singleElement().satisfies(one -> {
+            assertThat(one.getLabels()).containsExactly(Map.entry("venue", "venue_x"));
+            assertThat(one.getPoints()).extracting(MetricPoint::getValue).containsExactly(5.0);
+            assertThat(one.getRateWindow()).isEqualTo(Duration.ofSeconds(20));
+        });
+    }
+
+    @Test
     void ratesOverTheRequestedWindow() {
         List<MetricSeries> series = source(TimeUnit.MILLISECONDS).query(messages(MetricStatistic.RATE, "messages.read.latency", "i", Duration.ofSeconds(5))
                 .toBuilder().rateWindow(Duration.ofSeconds(30)).build());

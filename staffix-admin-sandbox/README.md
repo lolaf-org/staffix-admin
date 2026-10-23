@@ -93,8 +93,8 @@ NewOrderSingle naming the quote, which the venue fills, and `venue-x` copies its
 QuoteReqID (e.g. `venue-x-195`) in the Trace tab finds the request, the quote, the order, its fill and the drop copy,
 on both engines. `venue-y` publishes News on `market-data` and `venue-x` on the drop copy. `fixt-trading` is FIXT.1.1 with FIX 5.0 SP2 application messages; every other session is FIX 4.4.
 The applications publish their own meters through staffix's monitoring: the bank times `quote.round.trip` (a
-QuoteRequest until its Quote, tag `venue`) and reads `quotes.pending` from its requests in flight (a gauge read at each
-export); the venues time `quote.pricing` and set `quote.last.mid` on every quote (a gauge they set). All three engines share HTTP admin API port 8686. System properties `consoleUrl`,
+QuoteRequest until its Quote, tag `venue`), counts `quotes.received` (the Quotes answering its requests, tag `venue`)
+and reads `quotes.pending` from its requests in flight (a gauge read at each export); the venues time `quote.pricing` and set `quote.last.mid` on every quote (a gauge they set). All three engines share HTTP admin API port 8686. System properties `consoleUrl`,
 `consoleUsername`, `consolePassword`, `adminApiPort` and `otlpUrl` override the defaults.
 
 `venue-x` stores its messages in Postgres through staffix's JDBC store, and `venue-y` through the async store in

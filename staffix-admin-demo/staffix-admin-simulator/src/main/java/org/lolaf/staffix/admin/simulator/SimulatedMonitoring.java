@@ -37,6 +37,7 @@ import java.util.Optional;
 final class SimulatedMonitoring {
 
     static final String PRICING_TIMER = "orders.pricing";
+    static final String SENT_COUNTER = "orders.sent";
     static final String VENUE = "venue";
     static final List<String> VENUES = List.of("xpar", "xlon");
 
@@ -74,8 +75,10 @@ final class SimulatedMonitoring {
                             SimulatedFixSession.of(simulated, lock, Optional::empty), List.of(), List.of())
                     .flatMap(listener -> listener.getPluginContext());
             if (!instanceId.startsWith("clients")) {
-                context.ifPresent(monitoring -> VENUES.forEach(venue ->
-                        monitoring.getTimer(PRICING_TIMER, "Time to price an order before it is sent to the venue.", Map.of(VENUE, venue))));
+                context.ifPresent(monitoring -> VENUES.forEach(venue -> {
+                    monitoring.getTimer(PRICING_TIMER, "Time to price an order before it is sent to the venue.", Map.of(VENUE, venue));
+                    monitoring.getCounter(SENT_COUNTER, "Orders sent to the venue.", Map.of(VENUE, venue));
+                }));
             }
             return context;
         });

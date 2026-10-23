@@ -63,6 +63,7 @@ public class ClickHouseMetricsSource implements MetricsSource {
     private final ClickHouseClient client;
     private final String histogramTable;
     private final String gaugeTable;
+    private final String sumTable;
     private final double timerUnitsPerSecond;
     private final Duration minRateWindow;
 
@@ -70,13 +71,14 @@ public class ClickHouseMetricsSource implements MetricsSource {
         this.client = new ClickHouseClient(settings, builder, jsonMapper, MetricsSourceException::new);
         this.histogramTable = settings.getHistogramTable();
         this.gaugeTable = settings.getGaugeTable();
+        this.sumTable = settings.getSumTable();
         this.timerUnitsPerSecond = settings.getTimerBaseUnit().convert(1, TimeUnit.SECONDS);
         this.minRateWindow = settings.getMinRateWindow();
     }
 
     @Override
     public void testConnection() {
-        client.testConnection(Set.of(histogramTable, gaugeTable));
+        client.testConnection(Set.of(histogramTable, gaugeTable, sumTable));
     }
 
     @Override
@@ -93,6 +95,8 @@ public class ClickHouseMetricsSource implements MetricsSource {
         return switch (query.getStatistic()) {
             case RATE -> timers(query, new Statistic(step, stepsPerWindow, window,
                     buckets -> sum(buckets, SAMPLES) == 0 ? null : sum(buckets, "count") / (window.toMillis() / 1000.0)));
+            case COUNTER_RATE -> counters(query, new Statistic(step, stepsPerWindow, window,
+                    buckets -> sum(buckets, SAMPLES) == 0 ? null : sum(buckets, "increase") / (window.toMillis() / 1000.0)));
             case MEAN -> timers(query, new Statistic(step, stepsPerWindow, window,
                     buckets -> {
                         double count = sum(buckets, "count");
@@ -140,7 +144,7 @@ public class ClickHouseMetricsSource implements MetricsSource {
 
     /**
      * Each export's increase over the previous export of the same series, summed per bucket; a series' first row
-     * counts only when the series started after the rows read began.
+     * counts only when the series started after the rows read began. {@link #counters} reads a counter's total alike.
      */
     private List<MetricSeries> timers(MetricQuery query, Statistic statistic) {
         ClickHouseParameters parameters = new ClickHouseParameters();
@@ -159,6 +163,26 @@ public class ClickHouseMetricsSource implements MetricsSource {
                 + "lagInFrame(Count) OVER w AS prevCount, lagInFrame(Sum) OVER w AS prevSum, lagInFrame(BucketCounts) OVER w AS prevBuckets, "
                 + "row_number() OVER w AS n"
                 + " FROM " + parameters.add("Identifier", histogramTable)
+                + " WHERE " + String.join(" AND ", conditions(query, readFrom, parameters))
+                + " WINDOW w AS (PARTITION BY ResourceAttributes, Attributes, StartTimeUnix ORDER BY TimeUnix ROWS BETWEEN 1 PRECEDING AND CURRENT ROW)))"
+                + " WHERE (n > 1 OR StartTimeUnix >= " + readFrom + ") AND " + BUCKET + " >= " + parameters.add("Int64", start)
+                + " GROUP BY " + labelColumns + BUCKET;
+        return series(query, statistic, start, labels, client.query(sql, parameters));
+    }
+
+    private List<MetricSeries> counters(MetricQuery query, Statistic statistic) {
+        ClickHouseParameters parameters = new ClickHouseParameters();
+        long start = start(query, statistic);
+        String interval = parameters.add("Int64", statistic.interval().toMillis());
+        String readFrom = "toDateTime(" + parameters.add("Int64", Instant.ofEpochMilli(start).minus(PREVIOUS_EXPORT_LOOKBACK).getEpochSecond()) + ")";
+        List<String> labels = labels(query);
+        String labelColumns = labels.stream().map(label -> label + ", ").collect(Collectors.joining());
+        String sql = "SELECT " + labelColumns + BUCKET + ", sum(dValue) AS increase, count() AS " + SAMPLES
+                + " FROM (SELECT " + labelColumns + BUCKET + ", StartTimeUnix, n, Value - prevValue AS dValue"
+                + " FROM (SELECT " + labelExpressions(query, labels, parameters)
+                + "intDiv(toUnixTimestamp(TimeUnix) * 1000, " + interval + ") * " + interval + " AS " + BUCKET + ", "
+                + "Value, StartTimeUnix, lagInFrame(Value) OVER w AS prevValue, row_number() OVER w AS n"
+                + " FROM " + parameters.add("Identifier", sumTable)
                 + " WHERE " + String.join(" AND ", conditions(query, readFrom, parameters))
                 + " WINDOW w AS (PARTITION BY ResourceAttributes, Attributes, StartTimeUnix ORDER BY TimeUnix ROWS BETWEEN 1 PRECEDING AND CURRENT ROW)))"
                 + " WHERE (n > 1 OR StartTimeUnix >= " + readFrom + ") AND " + BUCKET + " >= " + parameters.add("Int64", start)

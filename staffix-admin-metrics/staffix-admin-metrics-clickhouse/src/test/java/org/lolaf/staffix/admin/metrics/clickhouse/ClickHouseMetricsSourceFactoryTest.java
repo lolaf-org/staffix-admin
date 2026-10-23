@@ -44,7 +44,7 @@ class ClickHouseMetricsSourceFactoryTest {
     }
 
     private static ClickHouseMetricsSettings settings(URI url) {
-        return new ClickHouseMetricsSettings(url, Duration.ofSeconds(2), "otel", "otel_metrics_histogram", "otel_metrics_gauge",
+        return new ClickHouseMetricsSettings(url, Duration.ofSeconds(2), "otel", "otel_metrics_histogram", "otel_metrics_gauge", "otel_metrics_sum",
                 "default", null, TimeUnit.MILLISECONDS, Duration.ofSeconds(10));
     }
 }

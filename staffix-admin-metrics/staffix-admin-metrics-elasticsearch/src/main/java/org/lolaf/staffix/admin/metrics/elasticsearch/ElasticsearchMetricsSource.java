@@ -25,15 +25,20 @@ import org.lolaf.staffix.admin.metrics.MetricsSourceException;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.function.UnaryOperator;
 
 import static org.lolaf.staffix.admin.elasticsearch.ElasticsearchQueries.TIMESTAMP;
 import static org.lolaf.staffix.admin.elasticsearch.ElasticsearchQueries.scope;
@@ -44,7 +49,7 @@ import static org.lolaf.staffix.admin.elasticsearch.ElasticsearchQueries.timeRan
  * Reads staffix's micrometer meters as the OpenTelemetry collector's {@code elasticsearch} exporter writes them with
  * its OTel mapping: a meter is the field {@code metrics.<meter>} of documents holding its tags as passthrough
  * attributes, a timer a delta {@code histogram} (or an {@code aggregate_metric_double} without a histogram), a gauge
- * a {@code double}. Points are computed per bucket of the query's step, each at the end of its bucket.
+ * a {@code double}, a counter a {@code double} holding its running total. Points are computed per bucket of the query's step, each at the end of its bucket.
  */
 public class ElasticsearchMetricsSource implements MetricsSource {
 
@@ -54,6 +59,10 @@ public class ElasticsearchMetricsSource implements MetricsSource {
     private static final String SUM = "sum";
     private static final String VALUE = "value";
     private static final String HELD = "held";
+    private static final String IDS = "ids";
+    private static final String TOTAL = "total";
+    private static final String STARTED = "started";
+    private static final String INCREASE = "increase";
     private static final int MAX_SPLIT_VALUES = 1000;
 
     private final ElasticsearchClient client;
@@ -79,6 +88,18 @@ public class ElasticsearchMetricsSource implements MetricsSource {
         Duration window = step.multipliedBy(stepsPerWindow);
         double timerUnitsPerSecond = timerUnitsPerSecond(query);
         return search(query, field, switch (query.getStatistic()) {
+            // a counter's documents hold its running total: each series' increase between buckets, the bucket before
+            // the window read only to compare the first one with
+            case COUNTER_RATE -> new Statistic(step, stepsPerWindow + 1, window,
+                    Map.of(IDS, Map.of("terms", Map.of("field", "_tsid", "size", MAX_SPLIT_VALUES), "aggs", Map.of(
+                            TOTAL, Map.of("max", Map.of("field", field)),
+                            STARTED, Map.of("max", Map.of("field", "start_timestamp"))))),
+                    buckets -> {
+                        List<Bucket> inWindow = buckets.subList(1, buckets.size());
+                        return inWindow.stream().mapToLong(Bucket::documents).sum() == 0 ? null
+                                : sum(inWindow, INCREASE) / (window.toMillis() / 1000.0);
+                    },
+                    ElasticsearchMetricsSource::increases);
             // the histograms are deltas: a window's rate is the recordings of its buckets over its length
             case RATE -> new Statistic(step, stepsPerWindow, window,
                     Map.of(COUNT, Map.of("value_count", Map.of("field", field))),
@@ -170,7 +191,7 @@ public class ElasticsearchMetricsSource implements MetricsSource {
                 .max(Comparator.naturalOrder())
                 .orElse(Instant.MIN);
         return bucketsByLabels.entrySet().stream()
-                .map(entry -> series(entry.getKey(), entry.getValue(), newestData, query, statistic))
+                .map(entry -> series(entry.getKey(), statistic.preparation().apply(entry.getValue()), newestData, query, statistic))
                 .filter(one -> !one.getPoints().isEmpty())
                 .toList();
     }
@@ -209,6 +230,32 @@ public class ElasticsearchMetricsSource implements MetricsSource {
         return builder.build();
     }
 
+    /**
+     * A series' first bucket counts its whole total only if it started within the buckets read; a lower total than
+     * the previous bucket's is the engine restarting.
+     */
+    private static List<Bucket> increases(List<Bucket> buckets) {
+        double readFrom = buckets.isEmpty() ? 0 : buckets.getFirst().start().toEpochMilli();
+        Map<String, Double> lastTotals = new HashMap<>();
+        List<Bucket> increases = new ArrayList<>(buckets.size());
+        for (Bucket bucket : buckets) {
+            double increase = 0;
+            for (JsonNode series : bucket.aggregations().path(IDS).path("buckets")) {
+                double total = series.path(TOTAL).path(VALUE).asDouble();
+                Double previous = lastTotals.put(series.path("key").asString(), total);
+                if (previous == null) {
+                    increase += series.path(STARTED).path(VALUE).asDouble() >= readFrom ? total : 0;
+                } else {
+                    increase += total >= previous ? total - previous : total;
+                }
+            }
+            ObjectNode aggregations = JsonNodeFactory.instance.objectNode();
+            aggregations.putObject(INCREASE).put(VALUE, increase);
+            increases.add(new Bucket(bucket.start(), bucket.documents(), aggregations));
+        }
+        return increases;
+    }
+
     private static double sum(List<Bucket> buckets, String aggregation) {
         return buckets.stream()
                 .map(bucket -> bucket.aggregations().path(aggregation).path(VALUE))
@@ -221,10 +268,15 @@ public class ElasticsearchMetricsSource implements MetricsSource {
 
     /**
      * How a statistic reads its buckets: each point reduces {@code bucketsPerPoint} buckets of {@code interval}, whose
-     * aggregations are {@code aggregations}; {@code rateWindow} is what the series report, null for no rate.
+     * aggregations are {@code aggregations}, once {@code preparation} has gone over a series' buckets;
+     * {@code rateWindow} is what the series report, null for no rate.
      */
     private record Statistic(Duration interval, int bucketsPerPoint, @Nullable Duration rateWindow,
-                             Map<String, Object> aggregations, Reducer reducer) {
+                             Map<String, Object> aggregations, Reducer reducer, UnaryOperator<List<Bucket>> preparation) {
+
+        Statistic(Duration interval, int bucketsPerPoint, @Nullable Duration rateWindow, Map<String, Object> aggregations, Reducer reducer) {
+            this(interval, bucketsPerPoint, rateWindow, aggregations, reducer, UnaryOperator.identity());
+        }
     }
 
     @FunctionalInterface

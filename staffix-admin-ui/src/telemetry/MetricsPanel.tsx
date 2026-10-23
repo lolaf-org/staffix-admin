@@ -285,6 +285,7 @@ function requestOf(selected: string, meter: Meter | undefined, statistic: string
   if (selected === MESSAGES) return { kind: 'messages' }
   if (!meter) return undefined
   if (meter.type === 'GAUGE') return { kind: 'meter', meter: meter.name, statistic: 'VALUE', splitBy: meter.tagKeys, gaugeUnit: meter.unit }
+  if (meter.type === 'COUNTER') return { kind: 'meter', meter: meter.name, statistic: 'COUNTER_RATE', splitBy: meter.tagKeys }
   if (statistic === MEAN || statistic === RATE) {
     return { kind: 'meter', meter: meter.name, statistic: statistic === MEAN ? 'MEAN' : 'RATE', splitBy: meter.tagKeys }
   }
@@ -292,7 +293,7 @@ function requestOf(selected: string, meter: Meter | undefined, statistic: string
 }
 
 function formatOf(request: MetricRequest | undefined, meter: Meter | undefined): (value: number) => string {
-  if (request?.kind !== 'meter' || request.statistic === 'RATE') return formatRateValue
+  if (request?.kind !== 'meter' || request.statistic === 'RATE' || request.statistic === 'COUNTER_RATE') return formatRateValue
   if (request.statistic === 'VALUE' && !meter?.unit) return (value) => String(Number(value.toFixed(3)))
   return formatSeconds
 }
@@ -300,6 +301,7 @@ function formatOf(request: MetricRequest | undefined, meter: Meter | undefined):
 function titleOf(selected: string, meter: Meter | undefined, statistic: string): string {
   if (selected === MESSAGES) return 'Messages per second'
   const name = BUILT_IN[selected]?.title ?? readableName(selected)
+  if (meter?.type === 'COUNTER') return `${name}, per second`
   if (meter?.type !== 'TIMER') return name
   return statistic === MEAN ? `${name}, mean` : statistic === RATE ? `${name}, per second` : `${name}, p${Number(statistic) * 100}`
 }

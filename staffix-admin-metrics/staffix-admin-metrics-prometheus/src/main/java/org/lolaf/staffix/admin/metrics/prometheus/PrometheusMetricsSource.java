@@ -105,6 +105,8 @@ public class PrometheusMetricsSource implements MetricsSource {
         return switch (query.getStatistic()) {
             case RATE -> queryRange(query, 1, tagsByLabel, window,
                     "sum by (" + by + ") (rate(" + meter + "_count{" + selector + "}[" + range + "]))");
+            case COUNTER_RATE -> queryRange(query, 1, tagsByLabel, window,
+                    "sum by (" + by + ") (rate(" + meter + "{" + selector + "}[" + range + "]))");
             case QUANTILE -> queryRange(query, timerUnitsPerSecond(query), tagsByLabel, window,
                     "histogram_quantile(" + Objects.requireNonNullElse(query.getQuantile(), 0.5) + ", sum by (le" + (by.isEmpty() ? "" : ", " + by)
                     + ") (rate(" + meter + "_bucket{" + selector + "}[" + range + "])))");

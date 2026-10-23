@@ -39,6 +39,9 @@ public class ClickHouseMetricsSettings implements ClickHouseConnection {
     String histogramTable;
     @Description("The table of the gauges. The default is the one the OpenTelemetry collector's clickhouse exporter creates.")
     String gaugeTable;
+    @Description("The table of the counters, which the exporter calls sums. The default is the one the OpenTelemetry "
+            + "collector's clickhouse exporter creates.")
+    String sumTable;
     @Description("The ClickHouse user the console queries as; it only needs to read the tables.")
     String username;
     @Description("The password of the username; leave empty for a user without one.")
@@ -57,6 +60,7 @@ public class ClickHouseMetricsSettings implements ClickHouseConnection {
                                      @DefaultValue("otel") String database,
                                      @DefaultValue("otel_metrics_histogram") String histogramTable,
                                      @DefaultValue("otel_metrics_gauge") String gaugeTable,
+                                     @DefaultValue("otel_metrics_sum") String sumTable,
                                      @DefaultValue("default") String username,
                                      @Nullable String password,
                                      @DefaultValue("milliseconds") TimeUnit timerBaseUnit,
@@ -66,6 +70,7 @@ public class ClickHouseMetricsSettings implements ClickHouseConnection {
         this.database = database;
         this.histogramTable = histogramTable;
         this.gaugeTable = gaugeTable;
+        this.sumTable = sumTable;
         this.username = username;
         this.password = password;
         this.timerBaseUnit = timerBaseUnit;

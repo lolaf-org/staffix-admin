@@ -24,6 +24,11 @@ public enum MetricStatistic {
      */
     RATE,
     /**
+     * A counter's increase per second, from the running total it exports; an engine restart, which starts the total
+     * again, is not a decrease.
+     */
+    COUNTER_RATE,
+    /**
      * A timer's {@link MetricQuery#getQuantile() quantile}, from its histogram.
      */
     QUANTILE,

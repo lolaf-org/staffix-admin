@@ -116,6 +116,42 @@ class ElasticsearchMetricsSourceTest {
     }
 
     @Test
+    void ratesACountersIncreasePerSeriesFromTheBucketBeforeTheWindowThroughARestart() {
+        long started = FROM_MILLIS - 60_000;
+        long startedInRange = FROM_MILLIS - 4_900;
+        response = "{\"aggregations\":{\"split\":{\"buckets\":[" + split("venue-x", buckets(-15, 5,
+                totals(1, "a", 10, started),
+                totals(1, "a", 20, started),
+                totals(2, "a", 30, started, "b", 5, startedInRange),
+                totals(2, "a", 40, started, "b", 15, startedInRange),
+                totals(2, "a", 3, FROM_MILLIS + 4_000, "b", 25, startedInRange),
+                "{\"doc_count\":0,\"ids\":{\"buckets\":[]}}")) + "]}}}";
+
+        List<MetricSeries> series = source(TimeUnit.MILLISECONDS).query(MetricQuery.builder()
+                .engineId("alpha-bank")
+                .meter("quotes.received")
+                .statistic(MetricStatistic.COUNTER_RATE)
+                .splitBy("venue")
+                .from(FROM)
+                .to(FROM.plusSeconds(10))
+                .step(Duration.ofSeconds(5))
+                .build());
+
+        JsonNode histogram = search.path("aggs").path("split").path("aggs").path("series");
+        assertThat(histogram.path("date_histogram").path("extended_bounds").path("min").asLong()).isEqualTo(FROM_MILLIS - 15_000);
+        assertThat(histogram.path("aggs").path("ids").path("terms").path("field").asString()).isEqualTo("_tsid");
+        assertThat(histogram.path("aggs").path("ids").path("aggs").path("total").path("max").path("field").asString())
+                .isEqualTo("metrics.quotes.received");
+        assertThat(series).containsExactly(MetricSeries.builder()
+                .label("venue", "venue-x")
+                .point(new MetricPoint(FROM, 2.5))
+                .point(new MetricPoint(FROM.plusSeconds(5), 3.5))
+                .point(new MetricPoint(FROM.plusSeconds(10), 3.3))
+                .rateWindow(Duration.ofSeconds(10))
+                .build());
+    }
+
+    @Test
     void ratesOverTheRequestedWindowInWholeSteps() {
         response = "{\"aggregations\":{\"series\":{\"buckets\":[]}}}";
 
@@ -267,6 +303,18 @@ class ElasticsearchMetricsSourceTest {
             json.append(i == 0 ? "" : ",").append("{\"key\":").append(key).append(',').append(buckets[i].substring(1));
         }
         return json.append(']').toString();
+    }
+
+    /**
+     * A bucket of a counter's series: its id, total and start time, in threes.
+     */
+    private static String totals(int documents, Object... series) {
+        StringBuilder ids = new StringBuilder();
+        for (int i = 0; i < series.length; i += 3) {
+            ids.append(i == 0 ? "" : ",").append("{\"key\":\"").append(series[i]).append("\",\"total\":{\"value\":")
+                    .append(series[i + 1]).append("},\"started\":{\"value\":").append(series[i + 2]).append("}}");
+        }
+        return "{\"doc_count\":" + documents + ",\"ids\":{\"buckets\":[" + ids + "]}}";
     }
 
     private static String split(String key, String buckets) {

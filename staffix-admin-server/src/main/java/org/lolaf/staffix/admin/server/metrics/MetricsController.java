@@ -210,7 +210,7 @@ public class MetricsController {
      * highest is kept, an upper bound of the true one.
      */
     private static List<MetricSeries> combineSameLabels(List<MetricSeries> series, MetricStatistic statistic) {
-        DoubleBinaryOperator combine = statistic == MetricStatistic.RATE ? Double::sum : Math::max;
+        DoubleBinaryOperator combine = statistic == MetricStatistic.RATE || statistic == MetricStatistic.COUNTER_RATE ? Double::sum : Math::max;
         Map<Map<String, String>, List<MetricSeries>> byLabels = new LinkedHashMap<>();
         series.forEach(one -> byLabels.computeIfAbsent(one.getLabels(), labels -> new ArrayList<>()).add(one));
         return byLabels.entrySet().stream()

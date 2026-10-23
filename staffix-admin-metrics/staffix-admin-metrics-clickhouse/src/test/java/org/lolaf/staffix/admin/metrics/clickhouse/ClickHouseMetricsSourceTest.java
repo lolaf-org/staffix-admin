@@ -106,6 +106,38 @@ class ClickHouseMetricsSourceTest {
     }
 
     @Test
+    void ratesACountersIncreaseBetweenExportsOfItsTotal() {
+        response = rows(
+                "{\"l0\":\"venue-x\",\"bucket\":" + (FROM_MILLIS - 10_000) + ",\"increase\":25,\"samples\":1}",
+                "{\"l0\":\"venue-x\",\"bucket\":" + (FROM_MILLIS - 5_000) + ",\"increase\":25,\"samples\":1}",
+                "{\"l0\":\"venue-x\",\"bucket\":" + FROM_MILLIS + ",\"increase\":15,\"samples\":1}");
+
+        List<MetricSeries> series = source(TimeUnit.MILLISECONDS).query(MetricQuery.builder()
+                .engineId("alpha-bank")
+                .meter("quotes.received")
+                .statistic(MetricStatistic.COUNTER_RATE)
+                .splitBy("venue")
+                .from(FROM)
+                .to(FROM.plusSeconds(10))
+                .step(Duration.ofSeconds(5))
+                .build());
+
+        assertThat(bound())
+                .contains("Value - prevValue AS dValue")
+                .contains("lagInFrame(Value) OVER w AS prevValue")
+                .contains("FROM 'otel_metrics_sum' WHERE MetricName = 'quotes.received' ")
+                .contains("PARTITION BY ResourceAttributes, Attributes, StartTimeUnix ORDER BY TimeUnix")
+                .contains("WHERE (n > 1 OR StartTimeUnix >= toDateTime('" + (FROM.getEpochSecond() - 310) + "'))")
+                .endsWith("GROUP BY l0, bucket FORMAT JSONEachRow");
+        assertThat(series).containsExactly(MetricSeries.builder()
+                .label("venue", "venue-x")
+                .point(new MetricPoint(FROM, 5))
+                .point(new MetricPoint(FROM.plusSeconds(5), 4))
+                .rateWindow(Duration.ofSeconds(10))
+                .build());
+    }
+
+    @Test
     void readsMeansInTheEnginesTimerUnit() {
         response = rows(
                 "{\"l0\":\"D\",\"bucket\":" + (FROM_MILLIS - 10_000) + ",\"count\":2,\"sum\":40,\"samples\":1}",
@@ -180,11 +212,11 @@ class ClickHouseMetricsSourceTest {
 
     @Test
     void testsTheConnectionByItsTables() {
-        response = rows("{\"name\":\"otel_metrics_histogram\"}", "{\"name\":\"otel_metrics_gauge\"}");
+        response = rows("{\"name\":\"otel_metrics_histogram\"}", "{\"name\":\"otel_metrics_gauge\"}", "{\"name\":\"otel_metrics_sum\"}");
 
         source(TimeUnit.MILLISECONDS).testConnection();
 
-        assertThat(bound()).contains("name IN ('otel_metrics_gauge', 'otel_metrics_histogram')");
+        assertThat(bound()).contains("name IN ('otel_metrics_gauge', 'otel_metrics_histogram', 'otel_metrics_sum')");
     }
 
     private static String rows(String... rows) {
@@ -206,7 +238,7 @@ class ClickHouseMetricsSourceTest {
     private ClickHouseMetricsSource source(TimeUnit timerBaseUnit) {
         URI url = URI.create("http://127.0.0.1:" + clickHouse.getAddress().getPort());
         return new ClickHouseMetricsSource(new ClickHouseMetricsSettings(url, Duration.ofSeconds(2), "otel", "otel_metrics_histogram",
-                "otel_metrics_gauge", "default", null, timerBaseUnit, Duration.ofSeconds(10)), RestClient.builder(), JSON);
+                "otel_metrics_gauge", "otel_metrics_sum", "default", null, timerBaseUnit, Duration.ofSeconds(10)), RestClient.builder(), JSON);
     }
 
     private static MetricQuery messages(MetricStatistic statistic, Duration step) {

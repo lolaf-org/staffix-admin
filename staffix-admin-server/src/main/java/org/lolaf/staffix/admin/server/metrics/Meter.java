@@ -69,6 +69,7 @@ public class Meter {
 
     public enum Type {
         TIMER,
+        COUNTER,
         GAUGE
     }
 }
