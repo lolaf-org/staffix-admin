@@ -126,7 +126,7 @@ class HttpEngineGatewayTest {
     private static final String PROBE_STATES = """
             [{"probe":"session-down","level":"CRITICAL","message":"down","since":"2026-10-10T10:05:00Z",
               "lastEvaluation":"2026-10-10T10:06:00Z"},
-             {"probe":"orders","lastEvaluation":"2026-10-10T09:59:00Z","suspended":true}]
+             {"probe":"orders","suspended":true}]
             """;
 
     private volatile String sessionsVersion = "v1";
@@ -379,7 +379,7 @@ class HttpEngineGatewayTest {
         assertThat(probes).extracting(SessionProbe::getName, SessionProbe::isOnlyWhileLoggedIn, SessionProbe::isSuspended)
                 .as("session-down is described as an engine before 0.9.2 does, without the flag")
                 .containsExactly(tuple("session-down", false, false), tuple("order-flow", true, false), tuple("orders", true, true));
-        assertThat(probes.get(2).getLastEvaluation()).isEqualTo(Instant.parse("2026-10-10T09:59:00Z"));
+        assertThat(probes.get(2).getLastEvaluation()).as("suspended before its first evaluation").isNull();
     }
 
     @Test

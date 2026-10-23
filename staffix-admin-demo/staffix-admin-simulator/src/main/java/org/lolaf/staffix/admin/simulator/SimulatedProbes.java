@@ -210,7 +210,7 @@ final class SimulatedProbes {
         }
 
         @Nullable ProbeState state(boolean clearedManually) {
-            if (lastEvaluation == null) {
+            if (lastEvaluation == null && !suspended) {
                 return null;
             }
             return ProbeState.builder()

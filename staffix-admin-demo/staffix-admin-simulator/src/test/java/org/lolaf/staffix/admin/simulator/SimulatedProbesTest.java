@@ -20,6 +20,7 @@ import org.lolaf.staffix.api.alerting.ProbeState;
 import org.lolaf.staffix.api.session.FixSessionStatus;
 
 import java.time.Instant;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
@@ -61,5 +62,15 @@ class SimulatedProbesTest {
 
         assertThat(probes.tick(2, FixSessionStatus.LOGGED_IN, NOW)).singleElement()
                 .satisfies(raised -> assertThat(raised.isSuspended()).isFalse());
+    }
+
+    @Test
+    void anApplicationsProbeLoggedOutFromTheStartIsSuspendedWithoutAnEvaluation() {
+        SimulatedProbes probes = new SimulatedProbes(2);
+
+        probes.tick(0, FixSessionStatus.LOGGED_OUT_BY_OPERATOR, NOW);
+
+        assertThat(probes.states()).extracting(ProbeState::getProbeName, ProbeState::isSuspended, ProbeState::getLastEvaluation)
+                .containsExactly(tuple("session-down", false, Optional.of(NOW)), tuple("large-order", true, Optional.empty()));
     }
 }

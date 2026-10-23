@@ -20,7 +20,8 @@ could mean.
 
 - **A probe that runs only while its session is logged in says so**, in the session's alerts tab. While the session
   is logged out, such a probe shows as "Suspended" rather than as normal with a last evaluation that no longer
-  moves. This needs engines on staffix 0.9.2; an older engine's probes show as before.
+  moves, or as not evaluated yet when the session has not logged in since the probe was added. This needs engines
+  on staffix 0.9.2; an older engine's probes show as before.
 - **The demo's application probes are suspended while their session is logged out**, as a staffix 0.9.2 engine's
   are, so the demo shows both kinds side by side.
 - **Application counters are charted**, as a rate per second, from Prometheus, Elasticsearch and ClickHouse. staffix

@@ -58,6 +58,10 @@ final class ConnectorProbes {
         String message;
         @Nullable
         String since;
+        /**
+         * Absent for a probe suspended before its first evaluation.
+         */
+        @Nullable
         String lastEvaluation;
         boolean suspended;
     }

@@ -337,7 +337,7 @@ class HttpEngineGateway implements EngineGateway {
             probe.level(state.getLevel() == null ? null : AlertLevel.valueOf(state.getLevel()))
                     .message(state.getMessage())
                     .since(state.getSince() == null ? null : Instant.parse(state.getSince()))
-                    .lastEvaluation(Instant.parse(state.getLastEvaluation()))
+                    .lastEvaluation(state.getLastEvaluation() == null ? null : Instant.parse(state.getLastEvaluation()))
                     .suspended(state.isSuspended());
         }
         return probe.build();
