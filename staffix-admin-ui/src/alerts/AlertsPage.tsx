@@ -25,6 +25,15 @@ import { RunbookLink } from './RunbookLink'
 type ActiveAlert = Schemas['ActiveAlert']
 
 /**
+ * Null for an alert of an engine component, such as its high availability, which belongs to no session.
+ */
+function sessionRefOf(alert: ActiveAlert) {
+  return alert.group != null && alert.sessionId != null
+    ? { engineId: alert.engineId, group: alert.group, sessionId: alert.sessionId }
+    : null
+}
+
+/**
  * Every engine's ongoing alerts in one table, as the console receives them: the worst first, then the oldest.
  */
 export function AlertsPage() {
@@ -46,23 +55,26 @@ export function AlertsPage() {
       )}
       <Table<ActiveAlert>
         size="small"
-        rowKey={(alert) => `${alert.engineId}/${alert.group}/${alert.sessionId}/${alert.probe}`}
+        rowKey={(alert) => `${alert.engineId}/${alert.component ?? `${alert.group}/${alert.sessionId}`}/${alert.probe}`}
         dataSource={alerts.data.alerts}
         pagination={false}
         locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No ongoing alert" /> }}
-        onRow={(alert) => ({
-          onClick: () => navigate({
-            pathname: sessionRoute({ engineId: alert.engineId, group: alert.group, sessionId: alert.sessionId }),
-            search: '?tab=alerts',
-          }),
-          style: { cursor: 'pointer' },
-        })}
+        onRow={(alert) => {
+          const sessionRef = sessionRefOf(alert)
+          return sessionRef
+            ? { onClick: () => navigate({ pathname: sessionRoute(sessionRef), search: '?tab=alerts' }), style: { cursor: 'pointer' } }
+            : {}
+        }}
         columns={[
           { title: 'Level', dataIndex: 'level', width: 100, render: (level: ActiveAlert['level']) => <AlertLevelTag level={level} /> },
           { title: 'Engine', dataIndex: 'engineId' },
           {
-            title: 'Session',
-            render: (_, alert) => (
+            title: 'Session or component',
+            render: (_, alert) => alert.component != null ? (
+              <Typography.Text style={{ whiteSpace: 'nowrap' }}>
+                {alert.component}<Typography.Text type="secondary"> component</Typography.Text>
+              </Typography.Text>
+            ) : (
               <Typography.Text style={{ whiteSpace: 'nowrap' }}>
                 {alert.group}.{alert.sessionId}
                 {alert.configId !== alert.sessionId && <Typography.Text type="secondary"> on {alert.configId}</Typography.Text>}
@@ -86,9 +98,10 @@ export function AlertsPage() {
           },
           {
             width: 80,
-            render: (_, alert) => (
-              <ClearAlertButton sessionRef={{ engineId: alert.engineId, group: alert.group, sessionId: alert.sessionId }} probe={alert.probe} />
-            ),
+            render: (_, alert) => {
+              const sessionRef = sessionRefOf(alert)
+              return sessionRef && <ClearAlertButton sessionRef={sessionRef} probe={alert.probe} />
+            },
           },
         ]}
       />

@@ -44,7 +44,7 @@ final class ConnectorProbes {
          * Absent from an engine before 0.9.2, which evaluates every probe whatever the session's state.
          */
         @Nullable
-        Boolean onlyWhileLoggedIn;
+        Boolean onlyWhileActive;
     }
 
     @Value

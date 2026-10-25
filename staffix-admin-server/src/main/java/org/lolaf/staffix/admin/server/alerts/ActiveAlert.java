@@ -37,14 +37,23 @@ public class ActiveAlert {
             Comparator.comparing(ActiveAlert::getLevel).reversed().thenComparing(ActiveAlert::getSince);
 
     String engineId;
+    /**
+     * The engine component the alert belongs to, such as {@code ha}; null for a session's alert, which has the
+     * session fields instead.
+     */
+    @Nullable
+    String component;
+    @Nullable
     String group;
     /**
      * The session's id, its main config's for an initiator.
      */
+    @Nullable
     String sessionId;
     /**
      * The config the alert was raised on: differs from the session id while an initiator runs a backup.
      */
+    @Nullable
     String configId;
     String probe;
     AlertLevel level;

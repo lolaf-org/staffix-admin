@@ -66,6 +66,7 @@ import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Calls the engines' HTTP admin connectors, version {@value #API_VERSION} of their API, with the token each announced.
@@ -157,7 +158,7 @@ class HttpEngineGateway implements EngineGateway {
      */
     @Override
     public List<SessionMeters> getMeters(String engineId) {
-        JsonNode sessions = call(engineId, HttpMethod.GET, List.of("meters"), null, JsonNode.class);
+        JsonNode sessions = call(engineId, HttpMethod.GET, List.of("sessions", "meters"), null, JsonNode.class);
         for (JsonNode session : sessions) {
             if (session.path("meters") instanceof ArrayNode meters) {
                 removeUnknownTypes(meters);
@@ -253,10 +254,19 @@ class HttpEngineGateway implements EngineGateway {
 
     @Override
     public List<ActiveAlert> listAlerts(String engineId) {
-        return sessions(engineId).stream()
-                .flatMap(session -> session.alerts().stream().map(alert -> activeAlert(engineId, alert)))
+        return Stream.concat(
+                        sessions(engineId).stream().flatMap(session -> session.alerts().stream()),
+                        componentAlerts(engineId).stream())
+                .map(alert -> activeAlert(engineId, alert))
                 .sorted(ActiveAlert.WORST_FIRST)
                 .toList();
+    }
+
+    private List<ConnectorAlerts.Alert> componentAlerts(String engineId) {
+        CachedStatus cached = statuses.get(engineId);
+        synchronized (cached) {
+            return cached.alerts.stream().filter(alert -> alert.getComponent() != null).toList();
+        }
     }
 
     @Override
@@ -299,6 +309,7 @@ class HttpEngineGateway implements EngineGateway {
     private static ActiveAlert activeAlert(String engineId, ConnectorAlerts.Alert alert) {
         return ActiveAlert.builder()
                 .engineId(engineId)
+                .component(alert.getComponent())
                 .group(alert.getGroup())
                 .sessionId(alert.getName())
                 .configId(alert.getSelectedConfig())
@@ -332,7 +343,7 @@ class HttpEngineGateway implements EngineGateway {
                 .evaluationInterval(Duration.parse(definition.getEvaluationInterval()))
                 .reminderInterval(definition.getReminderInterval() == null ? null : Duration.parse(definition.getReminderInterval()))
                 .runbookUrl(runbookUrl(definition.getRunbookUrl()))
-                .onlyWhileLoggedIn(Boolean.TRUE.equals(definition.getOnlyWhileLoggedIn()));
+                .onlyWhileLoggedIn(Boolean.TRUE.equals(definition.getOnlyWhileActive()));
         if (state != null) {
             probe.level(state.getLevel() == null ? null : AlertLevel.valueOf(state.getLevel()))
                     .message(state.getMessage())
@@ -392,7 +403,9 @@ class HttpEngineGateway implements EngineGateway {
         Map<List<String>, ConnectorSessions.Session> descriptions = new HashMap<>();
         described.getSessions().forEach(session -> descriptions.put(List.of(session.getGroup(), session.getName()), session));
         Map<List<String>, List<ConnectorAlerts.Alert>> alertsBySession = new HashMap<>();
-        alerts.forEach(alert -> alertsBySession.computeIfAbsent(List.of(alert.getGroup(), alert.getName()), key -> new ArrayList<>()).add(alert));
+        alerts.stream()
+                .filter(alert -> alert.getComponent() == null)
+                .forEach(alert -> alertsBySession.computeIfAbsent(List.of(alert.getGroup(), alert.getName()), key -> new ArrayList<>()).add(alert));
         List<EngineSession> joined = new ArrayList<>();
         for (ConnectorStatus.Session session : status.getSessions()) {
             List<String> key = List.of(session.getGroup(), session.getName());

@@ -27,6 +27,16 @@ could mean.
 - **Application counters are charted**, as a rate per second, from Prometheus, Elasticsearch and ClickHouse. staffix
   0.9.2 lets an application publish counters; the ClickHouse connector reads them from a new `sumTable` setting,
   `otel_metrics_sum` by default.
+- **Alerts of an engine's own components, such as its high availability, are listed** on the alerts page and counted
+  in the alert bell, named after the component instead of a session. They cannot be cleared from the console yet.
+
+### Changed
+
+- **Engines must run staffix 0.9.2.** The console follows the admin API of staffix 0.9.2, which renamed the route
+  listing the sessions' meters and the field telling a probe that runs only while its session is logged in; an
+  engine on 0.9.1 no longer shows its application meters.
+- **The sandbox's Alertmanager groups alerts by `source`**, the label staffix 0.9.2 puts the engine's id in (it was
+  `engine`).
 
 ### Fixed
 

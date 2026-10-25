@@ -39,6 +39,11 @@ class ConnectorAlerts {
     @Builder
     @Jacksonized
     static class Alert {
+        /**
+         * The engine component the alert belongs to, such as {@code ha}; null for a session's alert.
+         */
+        @Nullable
+        String component;
         String group;
         String name;
         String selectedConfig;

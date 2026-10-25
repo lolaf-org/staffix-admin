@@ -19,12 +19,15 @@ import org.junit.jupiter.api.Test;
 import org.lolaf.staffix.api.FixDictionaryId;
 import org.lolaf.staffix.api.admin.AdminApi;
 import org.lolaf.staffix.api.admin.FixInitiatorTargets;
+import org.lolaf.staffix.api.alerting.ProbeId;
+import org.lolaf.staffix.api.alerting.ProbeScope;
 import org.lolaf.staffix.api.monitoring.FixMeterDescriptor;
 import org.lolaf.staffix.api.monitoring.FixSessionsMonitoringContext;
 import org.lolaf.staffix.api.session.FixSession.FixSessionType;
 import org.lolaf.staffix.api.session.FixSession;
 import org.lolaf.staffix.api.session.FixSessionDesiredState;
 import org.lolaf.staffix.api.session.FixSessionId;
+import org.lolaf.staffix.api.session.FixSessionProbeScope;
 import org.lolaf.staffix.api.session.FixSessionSettings;
 import org.lolaf.staffix.api.version.FixRegularVersion;
 
@@ -72,10 +75,10 @@ class SimulatedEngineTest {
 
     @Test
     void refusesToClearAnAlertByHandAsStaffixRefusesAPolledCondition() {
-        FixSessionId trading = session("alpha", "trading").getFixSessionId();
+        ProbeScope trading = FixSessionProbeScope.of(session("alpha", "trading").getFixSessionId());
 
-        assertThat(paris.clearAlert(trading, "session-down")).isFalse();
-        assertThatThrownBy(() -> paris.clearAlert(trading, "unknown")).isInstanceOf(IllegalArgumentException.class);
+        assertThat(paris.clearAlert(ProbeId.of(trading, "session-down"))).isFalse();
+        assertThatThrownBy(() -> paris.clearAlert(ProbeId.of(trading, "unknown"))).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

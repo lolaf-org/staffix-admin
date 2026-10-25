@@ -22,9 +22,12 @@ import org.lolaf.staffix.api.admin.FixAcceptorSessions;
 import org.lolaf.staffix.api.admin.FixInitiatorTargets;
 import org.lolaf.staffix.api.admin.FixSessionComponents;
 import org.lolaf.staffix.api.alerting.ProbeDefinition;
+import org.lolaf.staffix.api.alerting.ProbeId;
+import org.lolaf.staffix.api.alerting.ProbeScope;
 import org.lolaf.staffix.api.alerting.ProbeState;
 import org.lolaf.staffix.api.alerting.ProbesListener;
-import org.lolaf.staffix.api.alerting.SessionProbeState;
+import org.lolaf.staffix.api.alerting.ScopedProbeState;
+import org.lolaf.staffix.api.ha.HaAdmin;
 import org.lolaf.staffix.api.application.FixApplicationSessionSettingDescriptor;
 import org.lolaf.staffix.api.logging.FixMessagesLoggerSettings;
 import org.lolaf.staffix.api.monitoring.FixMeterDescriptor;
@@ -32,6 +35,7 @@ import org.lolaf.staffix.api.monitoring.FixSessionsMonitoringContext;
 import org.lolaf.staffix.api.session.FixSession;
 import org.lolaf.staffix.api.session.FixSession.FixSessionType;
 import org.lolaf.staffix.api.session.FixSessionId;
+import org.lolaf.staffix.api.session.FixSessionProbeScope;
 import org.lolaf.staffix.api.session.FixSessionSettings;
 import org.lolaf.staffix.api.session.plugins.FixSessionsPluginSettings;
 
@@ -79,20 +83,20 @@ final class SimulatedEngine implements AdminApi {
      * Listeners are told after the engine's lock is released, as staffix tells them from its probes thread.
      */
     void tick(Random random) {
-        List<Map.Entry<FixSessionId, ProbeState>> transitions = tickSessions(random);
+        List<Map.Entry<ProbeScope, ProbeState>> transitions = tickSessions(random);
         transitions.forEach(transition -> probesListeners.forEach(listener ->
                 listener.onAlertTransition(transition.getKey(), transition.getValue())));
     }
 
-    private synchronized List<Map.Entry<FixSessionId, ProbeState>> tickSessions(Random random) {
+    private synchronized List<Map.Entry<ProbeScope, ProbeState>> tickSessions(Random random) {
         connections.forEach(connection -> connection.running().tick(random));
         long tick = ticks++;
         Instant now = Instant.now();
-        List<Map.Entry<FixSessionId, ProbeState>> transitions = new ArrayList<>();
+        List<Map.Entry<ProbeScope, ProbeState>> transitions = new ArrayList<>();
         for (SimulatedConnection connection : connections) {
             SimulatedSession running = connection.running();
             probes(connection).tick(tick, running.status(), now)
-                    .forEach(state -> transitions.add(Map.entry(running.fixSessionId(), state)));
+                    .forEach(state -> transitions.add(Map.entry(FixSessionProbeScope.of(running.fixSessionId()), state)));
         }
         return transitions;
     }
@@ -293,22 +297,32 @@ final class SimulatedEngine implements AdminApi {
     }
 
     @Override
-    public synchronized List<ProbeDefinition> getProbeDefinitions(FixSessionId fixSessionId) {
-        return probes(connectionRunning(fixSessionId)).definitions();
+    public List<FixMeterDescriptor> getEngineMeters() {
+        return List.of();
     }
 
     @Override
-    public synchronized List<ProbeState> getProbeStates(FixSessionId fixSessionId) {
-        return probes(connectionRunning(fixSessionId)).states();
+    public List<ProbeScope> getComponentProbeScopes() {
+        return List.of();
     }
 
     @Override
-    public synchronized List<SessionProbeState> getActiveAlerts() {
-        List<SessionProbeState> active = new ArrayList<>();
+    public synchronized List<ProbeDefinition> getProbeDefinitions(ProbeScope scope) {
+        return probes(connectionRunning(scope)).definitions();
+    }
+
+    @Override
+    public synchronized List<ProbeState> getProbeStates(ProbeScope scope) {
+        return probes(connectionRunning(scope)).states();
+    }
+
+    @Override
+    public synchronized List<ScopedProbeState> getActiveAlerts() {
+        List<ScopedProbeState> active = new ArrayList<>();
         for (SimulatedConnection connection : connections) {
             for (ProbeState state : probes(connection).states()) {
                 if (state.getAlert().isPresent()) {
-                    active.add(new SessionProbeState(connection.running().fixSessionId(), state,
+                    active.add(new ScopedProbeState(FixSessionProbeScope.of(connection.running().fixSessionId()), state,
                             probes(connection).runbookUrl(state.getProbeName())));
                 }
             }
@@ -317,8 +331,13 @@ final class SimulatedEngine implements AdminApi {
     }
 
     @Override
-    public synchronized boolean clearAlert(FixSessionId fixSessionId, String probeName) {
-        return probes(connectionRunning(fixSessionId)).clear(probeName);
+    public synchronized boolean clearAlert(ProbeId probeId) {
+        return probes(connectionRunning(probeId.getScope())).clear(probeId.getName());
+    }
+
+    @Override
+    public Optional<HaAdmin> getHa() {
+        return Optional.empty();
     }
 
     @Override
@@ -331,11 +350,11 @@ final class SimulatedEngine implements AdminApi {
         probesListeners.remove(listener);
     }
 
-    private SimulatedConnection connectionRunning(FixSessionId fixSessionId) {
+    private SimulatedConnection connectionRunning(ProbeScope scope) {
         return connections.stream()
-                .filter(connection -> connection.running().fixSessionId().equals(fixSessionId))
+                .filter(connection -> FixSessionProbeScope.of(connection.running().fixSessionId()).equals(scope))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("No initiator or acceptor manages session " + fixSessionId));
+                .orElseThrow(() -> new IllegalArgumentException("The engine evaluates no probes of " + scope));
     }
 
     @Override

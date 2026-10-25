@@ -57,7 +57,7 @@ final class SimulatedProbes {
                 .name("session-down")
                 .description("Logged out inside its session time for longer than " + SESSION_DOWN_DELAY.toSeconds() + "s")
                 .evaluationInterval(Duration.ofSeconds(1))
-                .onlyWhileLoggedIn(false)
+                .onlyWhileActive(false)
                 .build()));
         if (sessionIndex % 3 == 0) {
             probes.add(new Probe(ProbeDefinition.builder()
@@ -73,7 +73,7 @@ final class SimulatedProbes {
                     .name("async-store-queue")
                     .description("Messages waiting in the async store queue to be persisted")
                     .evaluationInterval(Duration.ofSeconds(10))
-                    .onlyWhileLoggedIn(false)
+                    .onlyWhileActive(false)
                     .build()));
         }
         if (sessionIndex % 5 == 2) {
@@ -126,7 +126,7 @@ final class SimulatedProbes {
         List<ProbeState> transitions = new ArrayList<>();
         boolean loggedIn = status == FixSessionStatus.LOGGED_IN;
         for (Probe probe : probes) {
-            if (probe.definition.isOnlyWhileLoggedIn() && !loggedIn) {
+            if (probe.definition.isOnlyWhileActive() && !loggedIn) {
                 if (probe.suspend()) {
                     transitions.add(probe.state());
                 }

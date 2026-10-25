@@ -108,14 +108,16 @@ class HttpEngineGatewayTest {
              {"group":"alpha","name":"trading","selectedConfig":"trading-drp","probe":"session-down","level":"CRITICAL",
               "message":"down","since":"2026-10-10T10:05:00Z","runbookUrl":"javascript:alert(1)"},
              {"group":"beta","name":"drop-copy","selectedConfig":"drop-copy","probe":"queue","level":"CRITICAL",
-              "message":"5000 queued","since":"2026-10-10T09:00:00Z"}]}
+              "message":"5000 queued","since":"2026-10-10T09:00:00Z"},
+             {"component":"ha","probe":"ha-followers","level":"MAJOR","message":"No follower connected",
+              "since":"2026-10-10T09:30:00Z"}]}
             """;
     private static final String PROBES = """
             [{"name":"session-down","description":"Down inside session time","evaluationInterval":"PT1S",
               "runbookUrl":"https://wiki.example.com/session-down"},
              {"name":"order-flow","description":"Time since the last order","evaluationInterval":"PT5S","reminderInterval":"PT1M",
-              "onlyWhileLoggedIn":true},
-             {"name":"orders","description":"Orders received","evaluationInterval":"PT1S","onlyWhileLoggedIn":true}]
+              "onlyWhileActive":true},
+             {"name":"orders","description":"Orders received","evaluationInterval":"PT1S","onlyWhileActive":true}]
             """;
     private static final String METERS = """
             [{"group":"alpha","name":"trading","meters":[
@@ -177,7 +179,7 @@ class HttpEngineGatewayTest {
             case "sessions/alpha/trading/probes" -> PROBES.getBytes(StandardCharsets.UTF_8);
             case "sessions/alpha/trading/probes/states" -> PROBE_STATES.getBytes(StandardCharsets.UTF_8);
             case "sessions" -> SESSIONS.getBytes(StandardCharsets.UTF_8);
-            case "meters" -> METERS.getBytes(StandardCharsets.UTF_8);
+            case "sessions/meters" -> METERS.getBytes(StandardCharsets.UTF_8);
             case "dictionaries/default-FIX.4.4" -> "<fix/>".getBytes(StandardCharsets.UTF_8);
             case "session-settings-stores" -> "[{\"instanceId\":\"main\",\"persistent\":true}]".getBytes(StandardCharsets.UTF_8);
             case "session-components" -> SESSION_COMPONENTS.getBytes(StandardCharsets.UTF_8);
@@ -344,14 +346,15 @@ class HttpEngineGatewayTest {
     }
 
     @Test
-    void anEnginesAlertsAreTheWorstFirstThenTheOldestNamedAfterTheSession() {
+    void anEnginesAlertsAreTheWorstFirstThenTheOldestNamedAfterTheSessionOrTheComponent() {
         alertsVersion = 5L;
 
         assertThat(gateway.listAlerts("alpha-engine"))
-                .extracting(alert -> alert.getGroup() + "." + alert.getSessionId() + "/" + alert.getConfigId() + " "
-                        + alert.getProbe() + " " + alert.getLevel())
+                .extracting(alert -> (alert.getComponent() != null ? alert.getComponent()
+                        : alert.getGroup() + "." + alert.getSessionId() + "/" + alert.getConfigId()) + " " + alert.getProbe() + " "
+                        + alert.getLevel())
                 .containsExactly("beta.drop-copy/drop-copy queue CRITICAL", "alpha.trading/trading-drp session-down CRITICAL",
-                        "alpha.trading/trading-drp queue WARNING");
+                        "ha ha-followers MAJOR", "alpha.trading/trading-drp queue WARNING");
     }
 
     @Test
@@ -359,7 +362,7 @@ class HttpEngineGatewayTest {
         alertsVersion = 5L;
 
         assertThat(gateway.listAlerts("alpha-engine")).extracting(ActiveAlert::getProbe, ActiveAlert::getRunbookUrl)
-                .containsExactly(tuple("queue", null), tuple("session-down", null),
+                .containsExactly(tuple("queue", null), tuple("session-down", null), tuple("ha-followers", null),
                         tuple("queue", URI.create("https://wiki.example.com/queue")));
     }
 
