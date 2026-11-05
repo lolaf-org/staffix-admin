@@ -51,6 +51,8 @@ final class SimulatedProbes {
     private int downTicks;
     private long lastTick;
     private long largeOrderClearedCycle = -1;
+    @Nullable
+    private String refusal;
 
     SimulatedProbes(int sessionIndex) {
         probes.add(new Probe(ProbeDefinition.builder()
@@ -86,6 +88,26 @@ final class SimulatedProbes {
                     .build()));
         }
         this.offset = sessionIndex * 37;
+    }
+
+    /**
+     * As staffix's {@code ha-replication}, raised for as long as the follower refuses the session.
+     */
+    void watchRefusal(String reason) {
+        refusal = reason;
+        probes.add(new Probe(ProbeDefinition.builder()
+                .name("ha-replication")
+                .description("While leading: a send went out without the follower's ack, or a follower refuses the session")
+                .evaluationInterval(Duration.ofSeconds(1))
+                .onlyWhileActive(false)
+                .build()));
+    }
+
+    /**
+     * A standby evaluates nothing: returns the alerts this ends, as staffix reports them cleared.
+     */
+    List<ProbeState> standDown() {
+        return probes.stream().filter(Probe::suspend).map(Probe::state).toList();
     }
 
     List<ProbeDefinition> definitions() {
@@ -143,6 +165,7 @@ final class SimulatedProbes {
             case "session-down" -> downTicks > SESSION_DOWN_DELAY.toSeconds() ? Alert.critical("down for " + downTicks + "s") : null;
             case "order-flow" -> orderFlow((int) ((tick + offset) % ORDER_FLOW_CYCLE));
             case LARGE_ORDER -> largeOrder(tick + offset);
+            case "ha-replication" -> Alert.major("the follower refuses the session: " + refusal);
             default -> queue((int) ((tick + offset) % QUEUE_CYCLE));
         };
     }

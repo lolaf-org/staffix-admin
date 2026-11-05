@@ -15,6 +15,7 @@
  */
 package org.lolaf.staffix.admin.simulator;
 
+import org.jspecify.annotations.Nullable;
 import org.lolaf.staffix.api.FixInitiatorTarget;
 import org.lolaf.staffix.api.InstanceProvider;
 import org.lolaf.staffix.api.admin.AdminApi;
@@ -50,6 +51,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -69,6 +71,9 @@ final class SimulatedEngine implements AdminApi {
     private final Map<SimulatedConnection, SimulatedProbes> probes = new LinkedHashMap<>();
     private final List<ProbesListener> probesListeners = new CopyOnWriteArrayList<>();
     private long ticks;
+    @Nullable
+    private SimulatedHaPair.Node ha;
+    private boolean standby;
 
     SimulatedEngine(String engineId, List<SimulatedConnection> connections, List<FixMessagesLoggerSettings> loggers,
                     List<FixSessionsPluginSettings<?>> plugins) {
@@ -83,12 +88,18 @@ final class SimulatedEngine implements AdminApi {
      * Listeners are told after the engine's lock is released, as staffix tells them from its probes thread.
      */
     void tick(Random random) {
+        if (ha != null) {
+            ha.tick();
+        }
         List<Map.Entry<ProbeScope, ProbeState>> transitions = tickSessions(random);
         transitions.forEach(transition -> probesListeners.forEach(listener ->
                 listener.onAlertTransition(transition.getKey(), transition.getValue())));
     }
 
     private synchronized List<Map.Entry<ProbeScope, ProbeState>> tickSessions(Random random) {
+        if (standby) {
+            return standDown();
+        }
         connections.forEach(connection -> connection.running().tick(random));
         long tick = ticks++;
         Instant now = Instant.now();
@@ -101,8 +112,61 @@ final class SimulatedEngine implements AdminApi {
         return transitions;
     }
 
+    synchronized void joinPair(SimulatedHaPair.Node node, boolean leading) {
+        ha = node;
+        setLeading(leading);
+    }
+
+    /**
+     * A standby holds its sessions down without a Logout, and takes them up when it leads.
+     */
+    synchronized void setLeading(boolean leading) {
+        standby = !leading;
+        connections.forEach(connection -> connection.running().drop(2));
+    }
+
+    /**
+     * Takes the leader's sequence numbers, as the replicated store would hold them.
+     */
+    synchronized void replicate(SimulatedEngine leader) {
+        Map<FixSessionId, SimulatedSession> leaderSessions = leader.runningConfigs().stream()
+                .collect(Collectors.toMap(SimulatedSession::fixSessionId, session -> session));
+        for (SimulatedConnection connection : connections) {
+            SimulatedSession session = connection.running();
+            SimulatedSession source = leaderSessions.get(session.fixSessionId());
+            if (source != null) {
+                session.incomingSeqNum = source.incomingSeqNum;
+                session.outgoingSeqNum = source.outgoingSeqNum;
+            }
+        }
+    }
+
+    private void requireLeading() {
+        if (standby) {
+            throw new IllegalStateException("Engine " + engineId + " is a standby: session actions run on the leader");
+        }
+    }
+
+    private List<Map.Entry<ProbeScope, ProbeState>> standDown() {
+        List<Map.Entry<ProbeScope, ProbeState>> transitions = new ArrayList<>();
+        for (SimulatedConnection connection : connections) {
+            probes(connection).standDown()
+                    .forEach(state -> transitions.add(Map.entry(FixSessionProbeScope.of(connection.running().fixSessionId()), state)));
+        }
+        return transitions;
+    }
+
     private SimulatedProbes probes(SimulatedConnection connection) {
-        return probes.computeIfAbsent(connection, added -> new SimulatedProbes(probes.size()));
+        SimulatedProbes existing = probes.get(connection);
+        if (existing != null) {
+            return existing;
+        }
+        SimulatedProbes added = new SimulatedProbes(probes.size());
+        if (ha != null && SimulatedHaPair.refused(connection.running().fixSessionId())) {
+            added.watchRefusal(SimulatedHaPair.REFUSAL);
+        }
+        probes.put(connection, added);
+        return added;
     }
 
     /**
@@ -124,16 +188,19 @@ final class SimulatedEngine implements AdminApi {
 
     @Override
     public synchronized void logonSession(FixSessionId fixSessionId) {
+        requireLeading();
         running(fixSessionId).logon();
     }
 
     @Override
     public synchronized void logoutSession(FixSessionId fixSessionId) {
+        requireLeading();
         running(fixSessionId).logout();
     }
 
     @Override
     public synchronized void resetSession(FixSessionId fixSessionId, ResetFixSessionMode resetFixSessionMode) {
+        requireLeading();
         SimulatedSession session = running(fixSessionId);
         switch (resetFixSessionMode) {
             case LOGOUT_LOGON_RESET_NUM_FLAG -> {
@@ -154,11 +221,13 @@ final class SimulatedEngine implements AdminApi {
 
     @Override
     public synchronized void setIncomingSeqNum(FixSessionId fixSessionId, long incomingSeqNum) {
+        requireLeading();
         running(fixSessionId).incomingSeqNum = incomingSeqNum;
     }
 
     @Override
     public synchronized void setOutgoingSeqNum(FixSessionId fixSessionId, long outgoingSeqNum) {
+        requireLeading();
         running(fixSessionId).outgoingSeqNum = outgoingSeqNum;
     }
 
@@ -174,6 +243,7 @@ final class SimulatedEngine implements AdminApi {
 
     @Override
     public synchronized void sendFixMessage(FixSessionId fixSessionId, String fixMessage, char separator, boolean possDupFlag) {
+        requireLeading();
         SimulatedSession session = running(fixSessionId);
         requireLoggedIn(session, "Sending");
         List<String> tags = Stream.of(fixMessage.split(Pattern.quote(String.valueOf(separator))))
@@ -336,8 +406,8 @@ final class SimulatedEngine implements AdminApi {
     }
 
     @Override
-    public Optional<HaAdmin> getHa() {
-        return Optional.empty();
+    public synchronized Optional<HaAdmin> getHa() {
+        return Optional.ofNullable(ha);
     }
 
     @Override

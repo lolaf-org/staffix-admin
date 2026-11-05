@@ -40,9 +40,10 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Three engines showing each case the console handles: initiators with backups, acceptors serving many groups,
+ * Engines showing each case the console handles: initiators with backups, acceptors serving many groups,
  * sessions that drop, follow a session window or were logged out, and emitters of every shape (an OTLP logger, one
- * behind an async wrapper, one exporting nothing; monitoring plugins measuring more or less).
+ * behind an async wrapper, one exporting nothing; monitoring plugins measuring more or less), and a high availability
+ * pair.
  */
 @UtilityClass
 class SimulationScenario {
@@ -57,7 +58,20 @@ class SimulationScenario {
     static final List<FixApplicationSessionSettingDescriptor> APPLICATION_SETTINGS = List.of(LOGON_PASSWORD, ACCOUNT);
 
     List<SimulatedEngine> engines() {
-        return List.of(paris(), london(), newYork());
+        SimulatedEngine genevaA = geneva("geneva-a");
+        SimulatedEngine genevaB = geneva("geneva-b");
+        new SimulatedHaPair("geneva-gateway", genevaA, genevaB);
+        return List.of(paris(), london(), newYork(), genevaA, genevaB);
+    }
+
+    private static SimulatedEngine geneva(String engineId) {
+        EngineBuilder engine = new EngineBuilder(engineId, "STAFFIX-GVA");
+        engine.acceptor("acme", "trading", "clients-acceptor");
+        engine.acceptor("acme", "market-data", "clients-acceptor");
+        engine.acceptor("acme", "drop-copy", "clients-acceptor");
+        engine.initiator("globex", "trading", "trading-drp");
+        engine.initiator("globex", "drop-copy");
+        return engine.build();
     }
 
     private static SimulatedEngine paris() {
