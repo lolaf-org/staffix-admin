@@ -21,6 +21,9 @@ import org.lolaf.staffix.admin.server.alerts.ActiveAlert;
 import org.lolaf.staffix.admin.server.alerts.AlertLevel;
 import org.lolaf.staffix.admin.server.alerts.SessionProbe;
 import org.lolaf.staffix.admin.server.dictionaries.DictionaryRef;
+import org.lolaf.staffix.admin.server.ha.HaSession;
+import org.lolaf.staffix.admin.server.ha.HaStatus;
+import org.lolaf.staffix.admin.server.ha.SwitchoverOutcome;
 import org.lolaf.staffix.admin.server.sessions.CompIds;
 import org.lolaf.staffix.admin.server.sessions.FixIdentity;
 import org.lolaf.staffix.admin.server.sessions.ApplicationSetting;
@@ -61,10 +64,12 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -306,6 +311,97 @@ class HttpEngineGateway implements EngineGateway {
         return definitions;
     }
 
+    @Override
+    public List<SessionProbe> getComponentProbes(String engineId, String component) {
+        CachedStatus cached = cached(engineId);
+        synchronized (cached) {
+            FreshRead<List<SessionProbe>> probes = refreshed(cached.componentProbes.get(component), () -> readComponentProbes(engineId, component));
+            cached.componentProbes.put(component, probes);
+            return probes.value();
+        }
+    }
+
+    private List<SessionProbe> readComponentProbes(String engineId, String component) {
+        Map<String, ConnectorProbes.State> states = new HashMap<>();
+        for (ConnectorProbes.State state : call(engineId, HttpMethod.GET, List.of("engine", component, "probes", "states"), null,
+                ConnectorProbes.State[].class)) {
+            states.put(state.getProbe(), state);
+        }
+        return Stream.of(call(engineId, HttpMethod.GET, List.of("engine", component, "probes"), null, ConnectorProbes.Probe[].class))
+                .map(definition -> probe(definition, states.get(definition.getName())))
+                .toList();
+    }
+
+    @Override
+    public void clearComponentAlert(String engineId, String component, String probe) {
+        operate(engineId, HttpMethod.POST, List.of("engine", component, "probes", probe, "clear"), null);
+    }
+
+    @Override
+    public Optional<HaStatus> getHa(String engineId) {
+        CachedStatus cached = cached(engineId);
+        synchronized (cached) {
+            cached.ha = refreshed(cached.ha, () -> readHa(engineId));
+            return cached.ha.value();
+        }
+    }
+
+    private Optional<HaStatus> readHa(String engineId) {
+        // outside the try: an unknown engine is a 404 too, but not an engine without high availability
+        registry.get(engineId);
+        try {
+            return Optional.of(call(engineId, HttpMethod.GET, List.of("ha"), null, HaStatus.class));
+        } catch (GatewayException e) {
+            if (e.getStatusCode().value() == 404) {
+                return Optional.empty();
+            }
+            throw e;
+        }
+    }
+
+    @Override
+    public List<HaSession> getHaSessions(String engineId) {
+        CachedStatus cached = cached(engineId);
+        synchronized (cached) {
+            cached.haSessions = refreshed(cached.haSessions,
+                    () -> List.of(call(engineId, HttpMethod.GET, List.of("ha", "sessions"), null, HaSession[].class)));
+            return cached.haSessions.value();
+        }
+    }
+
+    @Override
+    public SwitchoverOutcome switchover(String engineId) {
+        try {
+            return call(engineId, HttpMethod.POST, List.of("ha", "switchover"), null, ConnectorSwitchover.class).outcome();
+        } finally {
+            markStale(engineId);
+        }
+    }
+
+    @Override
+    public void setCandidate(String engineId, boolean candidate) {
+        operate(engineId, HttpMethod.POST, List.of("ha", "candidacy"), Map.of("candidate", candidate));
+    }
+
+    @Override
+    public void resync(String engineId) {
+        operate(engineId, HttpMethod.POST, List.of("ha", "resync"), null);
+    }
+
+    @Override
+    public void resyncSession(SessionRef session) {
+        operate(session.getEngineId(), HttpMethod.POST, List.of("ha", "sessions", session.getGroup(), session.getSessionId(), "resync"), null);
+    }
+
+    private CachedStatus cached(String engineId) {
+        return statuses.computeIfAbsent(engineId, id -> new CachedStatus());
+    }
+
+    private <T> FreshRead<T> refreshed(@Nullable FreshRead<T> last, Supplier<T> read) {
+        Instant now = clock.instant();
+        return last != null && now.isBefore(last.at().plus(STATUS_FRESH)) ? last : new FreshRead<>(read.get(), now);
+    }
+
     private static ActiveAlert activeAlert(String engineId, ConnectorAlerts.Alert alert) {
         return ActiveAlert.builder()
                 .engineId(engineId)
@@ -433,6 +529,9 @@ class HttpEngineGateway implements EngineGateway {
         if (cached != null) {
             synchronized (cached) {
                 cached.at = null;
+                cached.ha = null;
+                cached.haSessions = null;
+                cached.componentProbes.clear();
             }
         }
     }
@@ -542,6 +641,12 @@ class HttpEngineGateway implements EngineGateway {
     private record CachedProbes(String version, List<ConnectorProbes.Probe> definitions) {
     }
 
+    private record FreshRead<T>(T value, Instant at) {
+    }
+
+    record ConnectorSwitchover(SwitchoverOutcome outcome) {
+    }
+
     /**
      * Also holds a failed call, so the viewers waiting on an engine that does not answer do not each wait out the
      * request timeout in turn. The description, the alerts and each session's probes are kept until the status
@@ -556,6 +661,9 @@ class HttpEngineGateway implements EngineGateway {
         @Nullable Long alertsVersion;
         List<ConnectorAlerts.Alert> alerts = List.of();
         final Map<List<String>, CachedProbes> probes = new HashMap<>();
+        @Nullable FreshRead<Optional<HaStatus>> ha;
+        @Nullable FreshRead<List<HaSession>> haSessions;
+        final Map<String, FreshRead<List<SessionProbe>>> componentProbes = new HashMap<>();
 
         boolean isFresh(RegisteredEngine current, Instant now) {
             return engine != null && at != null && now.isBefore(at.plus(STATUS_FRESH))

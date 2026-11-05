@@ -22,6 +22,9 @@ import org.lolaf.staffix.admin.server.dictionaries.DictionaryRef;
 import org.lolaf.staffix.admin.server.engines.EngineGateway;
 import org.lolaf.staffix.admin.server.engines.GatewayException;
 import org.lolaf.staffix.admin.server.engines.SessionRef;
+import org.lolaf.staffix.admin.server.ha.HaSession;
+import org.lolaf.staffix.admin.server.ha.HaStatus;
+import org.lolaf.staffix.admin.server.ha.SwitchoverOutcome;
 import org.lolaf.staffix.admin.server.sessions.ApplicationSetting;
 import org.lolaf.staffix.admin.server.sessions.ResetMode;
 import org.lolaf.staffix.admin.server.sessions.SessionDetail;
@@ -34,6 +37,7 @@ import tools.jackson.databind.node.JsonNodeFactory;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -217,6 +221,52 @@ class SimulatedEngineGateway implements EngineGateway {
     @Override
     public List<SessionProbe> getProbes(SessionRef session) {
         return List.of();
+    }
+
+    @Override
+    public List<SessionProbe> getComponentProbes(String engineId, String component) {
+        return List.of();
+    }
+
+    @Override
+    public void clearComponentAlert(String engineId, String component, String probe) {
+        throw GatewayException.rejected("Probe " + probe + " is not in alert, or its alert cannot be cleared by hand");
+    }
+
+    @Override
+    public Optional<HaStatus> getHa(String engineId) {
+        engine(engineId);
+        return Optional.empty();
+    }
+
+    @Override
+    public List<HaSession> getHaSessions(String engineId) {
+        throw noHighAvailability(engineId);
+    }
+
+    @Override
+    public SwitchoverOutcome switchover(String engineId) {
+        throw noHighAvailability(engineId);
+    }
+
+    @Override
+    public void setCandidate(String engineId, boolean candidate) {
+        throw noHighAvailability(engineId);
+    }
+
+    @Override
+    public void resync(String engineId) {
+        throw noHighAvailability(engineId);
+    }
+
+    @Override
+    public void resyncSession(SessionRef session) {
+        throw noHighAvailability(session.getEngineId());
+    }
+
+    private GatewayException noHighAvailability(String engineId) {
+        engine(engineId);
+        return GatewayException.notFound("This engine has no high availability");
     }
 
     /**

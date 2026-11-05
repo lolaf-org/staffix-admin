@@ -37,6 +37,9 @@ import org.lolaf.staffix.admin.server.sessions.SessionDetail;
 import org.lolaf.staffix.admin.server.sessions.SessionGroup;
 import org.lolaf.staffix.admin.server.sessions.SessionStatus;
 import org.lolaf.staffix.admin.server.sessions.SessionSummary;
+import org.lolaf.staffix.admin.server.ha.HaRole;
+import org.lolaf.staffix.admin.server.ha.HaStatus;
+import org.lolaf.staffix.admin.server.ha.SwitchoverOutcome;
 import org.lolaf.staffix.admin.server.sessions.SessionComponents;
 import org.lolaf.staffix.admin.server.sessions.SessionSettingsStore;
 import org.lolaf.staffix.admin.server.TestTls;
@@ -131,6 +134,21 @@ class HttpEngineGatewayTest {
              {"probe":"orders","suspended":true}]
             """;
 
+    private static final String HA = """
+            {"nodeId":"1","pairName":"gateway","role":"LEADER","epoch":7,"leaderId":"1","leadershipValid":true,
+             "leaderElection":"PrimosLeaderElection","roleSince":"2026-10-10T10:00:00Z","transferLeadershipSupported":true,
+             "candidacySupported":true,"candidate":true,
+             "followers":[{"nodeId":"2","link":1,"address":"/10.0.0.2:40000","connected":true,"inSync":true,
+               "snapshotInProgress":false,"unsentBytes":0,"lagMillis":3}],
+             "droppedFollowers":[{"nodeId":"3","link":1,"droppedAt":"2026-10-10T10:05:00Z","heldOffUntil":"2026-10-10T10:05:02Z"}]}
+            """;
+
+    private static final String HA_SESSIONS = """
+            [{"group":"alpha","name":"trading","fixSessionType":"INITIATOR","replicationMode":"SYNC_RECEIVED",
+              "replicationAckTimeout":"PT1S","inSync":false,"notReplicatedReason":"storage shared with the leader",
+              "unprotected":true,"unacknowledgedSends":2,"nextIncomingSeqNum":-1,"nextOutgoingSeqNum":-1,"handedOver":false}]
+            """;
+
     private volatile String sessionsVersion = "v1";
     /**
      * Null serves the status of an engine older than alerting, without its versions.
@@ -179,6 +197,11 @@ class HttpEngineGatewayTest {
             case "sessions/alpha/trading/probes" -> PROBES.getBytes(StandardCharsets.UTF_8);
             case "sessions/alpha/trading/probes/states" -> PROBE_STATES.getBytes(StandardCharsets.UTF_8);
             case "sessions" -> SESSIONS.getBytes(StandardCharsets.UTF_8);
+            case "ha" -> HA.getBytes(StandardCharsets.UTF_8);
+            case "ha/sessions" -> HA_SESSIONS.getBytes(StandardCharsets.UTF_8);
+            case "ha/switchover" -> "{\"outcome\":\"NO_FOLLOWER_IN_SYNC\"}".getBytes(StandardCharsets.UTF_8);
+            case "engine/ha/probes" -> PROBES.getBytes(StandardCharsets.UTF_8);
+            case "engine/ha/probes/states" -> PROBE_STATES.getBytes(StandardCharsets.UTF_8);
             case "sessions/meters" -> METERS.getBytes(StandardCharsets.UTF_8);
             case "dictionaries/default-FIX.4.4" -> "<fix/>".getBytes(StandardCharsets.UTF_8);
             case "session-settings-stores" -> "[{\"instanceId\":\"main\",\"persistent\":true}]".getBytes(StandardCharsets.UTF_8);
@@ -292,6 +315,82 @@ class HttpEngineGatewayTest {
         assertThat(bodies.get("PUT sessions/alpha/trading/seqnums")).isEqualTo("{\"outgoing\":42}");
         assertThat(bodies.get("POST sessions/alpha/trading/messages"))
                 .contains("\"messages\":[\"35=B|\",\"35=B|148=again|\"]", "\"separator\":\"|\"", "\"possDup\":true");
+    }
+
+    @Test
+    void aPairNodeReadsItsStatusAndSessions() {
+        HaStatus ha = gateway.getHa("alpha-engine").orElseThrow();
+
+        assertThat(ha.getPairName()).isEqualTo("gateway");
+        assertThat(ha.getRole()).isEqualTo(HaRole.LEADER);
+        assertThat(ha.getRoleSince()).isEqualTo(Instant.parse("2026-10-10T10:00:00Z"));
+        assertThat(ha.getFollowers()).singleElement().satisfies(follower -> {
+            assertThat(follower.getLink()).isEqualTo(1);
+            assertThat(follower.getLagMillis()).isEqualTo(3);
+        });
+        assertThat(ha.getDroppedFollowers()).singleElement()
+                .satisfies(dropped -> assertThat(dropped.getHeldOffUntil()).isEqualTo(Instant.parse("2026-10-10T10:05:02Z")));
+        assertThat(gateway.getHaSessions("alpha-engine")).singleElement().satisfies(session -> {
+            assertThat(session.getReplicationMode()).isEqualTo("SYNC_RECEIVED");
+            assertThat(session.getReplicationAckTimeout()).isEqualTo(Duration.ofSeconds(1));
+            assertThat(session.getNotReplicatedReason()).isEqualTo("storage shared with the leader");
+        });
+    }
+
+    @Test
+    void anEngineAnsweringNotFoundHasNoHighAvailability() {
+        statuses.put("GET ha", 404);
+
+        assertThat(gateway.getHa("alpha-engine")).isEmpty();
+    }
+
+    @Test
+    void anUnknownEngineIsNotAnEngineWithoutHighAvailability() {
+        assertThatThrownBy(() -> gateway.getHa("no-such-engine")).isInstanceOf(GatewayException.class);
+    }
+
+    @Test
+    void anUnreachableHighAvailabilityIsAFailureNotAnAbsence() {
+        statuses.put("GET ha", 500);
+
+        assertThatThrownBy(() -> gateway.getHa("alpha-engine")).isInstanceOf(GatewayException.class);
+    }
+
+    @Test
+    void highAvailabilityReadsShareOneCallWithinTheFreshnessWindowAndAnActionEndsIt() {
+        gateway.getHa("alpha-engine");
+        gateway.getHa("alpha-engine");
+        gateway.getHaSessions("alpha-engine");
+        gateway.getHaSessions("alpha-engine");
+        assertThat(requests).containsExactly("GET ha", "GET ha/sessions");
+
+        gateway.resync("alpha-engine");
+        gateway.getHa("alpha-engine");
+        assertThat(requests).containsExactly("GET ha", "GET ha/sessions", "POST ha/resync", "GET ha");
+
+        clock.step(HttpEngineGateway.STATUS_FRESH);
+        gateway.getHa("alpha-engine");
+        assertThat(requests).endsWith("GET ha", "GET ha");
+    }
+
+    @Test
+    void highAvailabilityActionsAddressTheEngineAndTheSession() {
+        assertThat(gateway.switchover("alpha-engine")).isEqualTo(SwitchoverOutcome.NO_FOLLOWER_IN_SYNC);
+        gateway.setCandidate("alpha-engine", false);
+        gateway.resyncSession(trading());
+
+        assertThat(requests).containsExactly("POST ha/switchover", "POST ha/candidacy", "POST ha/sessions/alpha/trading/resync");
+        assertThat(bodies.get("POST ha/candidacy")).isEqualTo("{\"candidate\":false}");
+    }
+
+    @Test
+    void aComponentsProbesCarryTheirStatesAndItsAlertClears() {
+        assertThat(gateway.getComponentProbes("alpha-engine", "ha")).isNotEmpty();
+        gateway.getComponentProbes("alpha-engine", "ha");
+        assertThat(requests).containsExactly("GET engine/ha/probes/states", "GET engine/ha/probes");
+
+        gateway.clearComponentAlert("alpha-engine", "ha", "ha-followers");
+        assertThat(requests).contains("POST engine/ha/probes/ha-followers/clear");
     }
 
     @Test

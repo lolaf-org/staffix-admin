@@ -19,6 +19,9 @@ import org.jspecify.annotations.Nullable;
 import org.lolaf.staffix.admin.server.alerts.ActiveAlert;
 import org.lolaf.staffix.admin.server.alerts.SessionProbe;
 import org.lolaf.staffix.admin.server.dictionaries.DictionaryRef;
+import org.lolaf.staffix.admin.server.ha.HaSession;
+import org.lolaf.staffix.admin.server.ha.HaStatus;
+import org.lolaf.staffix.admin.server.ha.SwitchoverOutcome;
 import org.lolaf.staffix.admin.server.sessions.ApplicationSetting;
 import org.lolaf.staffix.admin.server.sessions.ResetMode;
 import org.lolaf.staffix.admin.server.sessions.SessionDetail;
@@ -29,6 +32,7 @@ import org.lolaf.staffix.admin.server.sessions.SessionSettingsStore;
 import tools.jackson.databind.JsonNode;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Operations on a registered engine's sessions. Session operations act on the config the session runs: an
@@ -128,4 +132,38 @@ public interface EngineGateway {
      *                          condition does
      */
     void clearAlert(SessionRef session, String probe);
+
+    /**
+     * The probes of an engine component, such as {@code ha}, with their live state.
+     */
+    List<SessionProbe> getComponentProbes(String engineId, String component);
+
+    /**
+     * @throws GatewayException a conflict when the probe is not in alert or its evaluator refuses
+     */
+    void clearComponentAlert(String engineId, String component, String probe);
+
+    /**
+     * Empty for an engine without high availability, older ones included.
+     */
+    Optional<HaStatus> getHa(String engineId);
+
+    /**
+     * @throws GatewayException not found for an engine without high availability
+     */
+    List<HaSession> getHaSessions(String engineId);
+
+    /**
+     * @throws GatewayException a conflict when this node does not lead
+     */
+    SwitchoverOutcome switchover(String engineId);
+
+    /**
+     * False takes the node out of elections for maintenance.
+     */
+    void setCandidate(String engineId, boolean candidate);
+
+    void resync(String engineId);
+
+    void resyncSession(SessionRef session);
 }
