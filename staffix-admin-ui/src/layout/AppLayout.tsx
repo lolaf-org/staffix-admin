@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import { Badge, Button, Flex, Layout, Segmented, Spin, Tabs, Tag, Tooltip, Typography, theme } from 'antd'
-import { ApiOutlined, AppstoreOutlined, BellOutlined, AreaChartOutlined, DesktopOutlined, FileSearchOutlined, LogoutOutlined, NodeIndexOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
+import { ApiOutlined, AppstoreOutlined, BellOutlined, AreaChartOutlined, ClusterOutlined, DesktopOutlined, FileSearchOutlined, LogoutOutlined, NodeIndexOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
 import { useQueryClient } from '@tanstack/react-query'
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router'
 import { isUnauthorized } from '../api/client'
@@ -27,6 +27,7 @@ const { Header, Content } = Layout
 
 const TABS = [
   { path: '/', label: 'Sessions', icon: <AppstoreOutlined /> },
+  { path: '/ha', label: 'High availability', icon: <ClusterOutlined /> },
   { path: '/alerts', label: 'Alerts', icon: <BellOutlined /> },
   { path: '/metrics', label: 'Metrics', icon: <AreaChartOutlined /> },
   { path: '/logs', label: 'Logs', icon: <FileSearchOutlined /> },

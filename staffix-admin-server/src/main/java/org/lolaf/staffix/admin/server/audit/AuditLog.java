@@ -69,14 +69,21 @@ public class AuditLog {
      * For an action whose outcome describes it, such as what a save changed; {@code attempted} describes a failure.
      */
     public <T> T record(String attempted, Supplier<T> action, Function<T, String> done) {
+        return record(null, attempted, action, done);
+    }
+
+    /**
+     * As {@link #record(String, Supplier, Function)}, for an action on an engine as a whole.
+     */
+    public <T> T record(@Nullable String engineId, String attempted, Supplier<T> action, Function<T, String> done) {
         T result;
         try {
             result = action.get();
         } catch (RuntimeException e) {
-            write(entry(attempted).outcome(AuditOutcome.FAILED).reason(reason(e)).build());
+            write(entry(attempted).engineId(engineId).outcome(AuditOutcome.FAILED).reason(reason(e)).build());
             throw e;
         }
-        write(entry(done.apply(result)).outcome(AuditOutcome.OK).build());
+        write(entry(done.apply(result)).engineId(engineId).outcome(AuditOutcome.OK).build());
         return result;
     }
 

@@ -49,6 +49,52 @@ export function useHaPairs() {
   })
 }
 
+const HA_ENGINE = '/api/ha/engines/{engineId}'
+
+const SWITCHOVER_MESSAGES: Record<Schemas['SwitchoverResult']['outcome'], string> = {
+  TRANSFERRED: 'Leadership switched over',
+  NO_FOLLOWER_IN_SYNC: 'Not switched over: no follower is in sync',
+  NOT_HANDED_OVER: 'Not switched over: the follower did not take every write, the sessions resumed here',
+  NOT_TRANSFERRED: 'Not switched over: the election did not move leadership, the sessions resumed here',
+}
+
+function useHaMutation<V, R>(mutationFn: (variables: V) => Promise<R>, report: (result: R, message: ReturnType<typeof App.useApp>['message']) => void) {
+  const queryClient = useQueryClient()
+  const { message } = App.useApp()
+  return useMutation({
+    mutationFn,
+    onSuccess: (result) => {
+      report(result, message)
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['ha'] }),
+        queryClient.invalidateQueries({ queryKey: ['groups'] }),
+      ])
+    },
+    onError: (error) => message.error(error.message),
+  })
+}
+
+export function useSwitchover(engineId: string) {
+  return useHaMutation(
+    (_: undefined) => call(api.POST(`${HA_ENGINE}/switchover`, { params: { path: { engineId } } })),
+    ({ outcome }, message) => (outcome === 'TRANSFERRED' ? message.success : message.warning)(SWITCHOVER_MESSAGES[outcome]),
+  )
+}
+
+export function useSetCandidate(engineId: string) {
+  return useHaMutation(
+    (candidate: boolean) => call(api.POST(`${HA_ENGINE}/candidacy`, { params: { path: { engineId } }, body: { candidate } })),
+    (_, message) => message.success(`Candidacy of ${engineId} changed`),
+  )
+}
+
+export function useResync(engineId: string) {
+  return useHaMutation(
+    (_: undefined) => call(api.POST(`${HA_ENGINE}/resync`, { params: { path: { engineId } } })),
+    (_, message) => message.success('Re-sync requested'),
+  )
+}
+
 /**
  * Session ids are unique within their group only, so a session is always named by both.
  */
@@ -202,6 +248,13 @@ export function useAddSession(engineId: string) {
 }
 
 const SESSION = '/api/engines/{engineId}/groups/{group}/sessions/{sessionId}'
+
+export function useResyncSession(ref: SessionRef) {
+  return useHaMutation(
+    (_: undefined) => call(api.POST(`${HA_ENGINE}/groups/{group}/sessions/{sessionId}/resync`, { params: { path: { ...ref } } })),
+    (_, message) => message.success(`Re-sync of ${ref.group}.${ref.sessionId} requested`),
+  )
+}
 
 export function useLogon(ref: SessionRef) {
   return useEngineMutation(ref.engineId, () => call(api.POST(`${SESSION}/logon`, sessionPath(ref))), 'Logon requested')

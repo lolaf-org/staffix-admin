@@ -16,7 +16,7 @@
 import { Alert, Card, Empty, Flex, Input, Select, Skeleton, Space, Tag, Tooltip, Typography, theme } from 'antd'
 import { CaretDownOutlined, CaretRightOutlined, PlusOutlined } from '@ant-design/icons'
 import { useState } from 'react'
-import { Outlet, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
+import { Link, Outlet, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import type { Schemas } from '../api/client'
 import { sessionRoute, useEngineAlerts, useEngines, useGroups, useHaPairs } from '../api/queries'
 import { NodeTag } from '../ha/NodeTag'
@@ -141,7 +141,7 @@ function EngineCard({ engine, pair }: { engine: Schemas['Engine']; pair?: HaPair
           {pair?.name ? (
             <span>
               <Typography.Text type="secondary">HA pair: </Typography.Text>
-              <Typography.Text strong>{pair.name}</Typography.Text>
+              <Link to="/ha"><Typography.Text strong>{pair.name}</Typography.Text></Link>
             </span>
           ) : (
             <>
