@@ -13,12 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { CheckCircleFilled, CloseCircleFilled, ReloadOutlined, SwapOutlined, ToolOutlined, WarningFilled } from '@ant-design/icons'
-import { Alert, Card, Descriptions, Empty, Flex, Skeleton, Table, Tag, theme, Tooltip, Typography } from 'antd'
+import { CaretDownOutlined, CaretRightOutlined, CheckCircleFilled, CloseCircleFilled, ReloadOutlined, SwapOutlined, ToolOutlined, WarningFilled } from '@ant-design/icons'
+import { Alert, Card, Collapse, Descriptions, Empty, Flex, Skeleton, Space, Table, Tag, theme, Tooltip, Typography } from 'antd'
 import { useComponentProbes, useGroups, useHaPairs, useResync, useResyncSession, useSetCandidate, useSwitchover } from '../api/queries'
 import { AlertLevelTag } from '../alerts/AlertLevelTag'
 import { ClearComponentAlertButton } from '../alerts/ClearAlertButton'
+import { useFolded } from '../layout/useFolded'
 import { WriteButton } from '../sessions/WriteButton'
+import { HaCharts } from './HaCharts'
 import { NodeTag } from './NodeTag'
 import { leaderOf, shownNode, standbyState, type HaNode, type HaPair, type StandbyState } from './pairs'
 
@@ -46,9 +48,28 @@ export function HaPage() {
 
 function PairCard({ pair }: { pair: HaPair }) {
   const leader = leaderOf(pair)
+  const [folded, toggleFolded] = useFolded(pair.name ?? pair.nodes[0]!.engineId)
   return (
-    <Card size="small" title={pair.name ? <>HA pair: <Typography.Text strong>{pair.name}</Typography.Text></> : pair.nodes[0]?.engineId}>
-      <Flex vertical gap={12}>
+    <Card
+      size="small"
+      styles={{ body: folded ? { display: 'none' } : undefined }}
+      title={
+        <Space wrap>
+          <span
+            role="button"
+            aria-expanded={!folded}
+            aria-label={folded ? 'Show the pair' : 'Hide the pair'}
+            onClick={toggleFolded}
+            style={{ cursor: 'pointer' }}
+          >
+            {folded ? <CaretRightOutlined /> : <CaretDownOutlined />}
+          </span>
+          {pair.name ? <span>HA pair: <Typography.Text strong>{pair.name}</Typography.Text></span> : pair.nodes[0]?.engineId}
+          {pair.nodes.map((node) => <NodeTag key={node.engineId} node={node} leads={node === leader} />)}
+        </Space>
+      }
+    >
+      {!folded && <Flex vertical gap={12}>
         {!leader && <Alert type="warning" title="No leader: the sessions are down until a node is elected" />}
         {!pair.name && <Alert type="info" title="High availability without a pair name: set pairName to group this node with its pair" />}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: 12 }}>
@@ -56,8 +77,14 @@ function PairCard({ pair }: { pair: HaPair }) {
             <NodeCard key={node.engineId} node={node} leads={node === leader} />
           ))}
         </div>
-        <PairSessions pair={pair} />
-      </Flex>
+        <Collapse
+          size="small"
+          defaultActiveKey={['sessions']}
+          destroyOnHidden
+          items={[{ key: 'sessions', label: 'Sessions', children: <PairSessions pair={pair} /> }]}
+        />
+        <HaCharts pair={pair} />
+      </Flex>}
     </Card>
   )
 }

@@ -16,9 +16,10 @@
 import { Alert, Card, Empty, Flex, Input, Select, Skeleton, Space, Tag, Tooltip, Typography, theme } from 'antd'
 import { CaretDownOutlined, CaretRightOutlined, PlusOutlined } from '@ant-design/icons'
 import { useState } from 'react'
-import { Link, Outlet, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
+import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router'
 import type { Schemas } from '../api/client'
 import { sessionRoute, useEngineAlerts, useEngines, useGroups, useHaPairs } from '../api/queries'
+import { useFolded } from '../layout/useFolded'
 import { NodeTag } from '../ha/NodeTag'
 import { leaderOf, pairOf, shownNode, standbyState, type HaPair } from '../ha/pairs'
 import { STATUS_LABELS, STATUSES, type Status } from '../sessions/status'
@@ -200,24 +201,6 @@ function EngineCard({ engine, pair }: { engine: Schemas['Engine']; pair?: HaPair
       </div>
     </Card>
   )
-}
-
-/**
- * Kept in the URL with the filters, so a folded engine stays folded across a reload.
- */
-function useFolded(engineId: string): [boolean, () => void] {
-  const [params, setParams] = useSearchParams()
-  const folded = params.getAll('folded').includes(engineId)
-  const toggle = () =>
-    setParams(
-      (current) => {
-        if (folded) current.delete('folded', engineId)
-        else current.append('folded', engineId)
-        return current
-      },
-      { replace: true },
-    )
-  return [folded, toggle]
 }
 
 interface GroupBoxProps {

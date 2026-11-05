@@ -146,6 +146,10 @@ final class SimulatedEngine implements AdminApi {
         }
     }
 
+    synchronized Optional<SimulatedHaPair.Node> haNode() {
+        return Optional.ofNullable(ha);
+    }
+
     private void requireLeading() {
         if (standby) {
             throw new IllegalStateException("Engine " + engineId + " is a standby: session actions run on the leader");

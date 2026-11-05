@@ -70,7 +70,7 @@ final class DemoServer {
             Map<String, String> query = query(exchange.getRequestURI().getRawQuery());
             Object body = switch (exchange.getRequestURI().getPath()) {
                 case "/demo/health" -> null;
-                case "/demo/metrics" -> DemoTelemetry.metrics(sessions(query), query.get("meter"), query.get("statistic"),
+                case "/demo/metrics" -> query.get("meter").startsWith("ha.") ? haMetrics(query) : DemoTelemetry.metrics(sessions(query), query.get("meter"), query.get("statistic"),
                         query.containsKey("quantile") ? Double.valueOf(query.get("quantile")) : null,
                         query.containsKey("value") ? Double.valueOf(query.get("value")) : null,
                         List.copyOf(values(query.get("splitBy"))), filters(query.get("tagFilters")),
@@ -91,6 +91,15 @@ final class DemoServer {
         } catch (RuntimeException e) {
             send(exchange, 400, problem(400, e.toString()));
         }
+    }
+
+    private List<DemoTelemetry.Series> haMetrics(Map<String, String> query) {
+        SimulatedEngine engine = engines.get(query.get("engineId"));
+        if (engine == null || engine.haNode().isEmpty()) {
+            return List.of();
+        }
+        return DemoHaTelemetry.metrics(engine.haNode().get(), query.get("meter"), List.copyOf(values(query.get("splitBy"))),
+                Instant.parse(query.get("from")), Instant.parse(query.get("to")), Duration.ofSeconds(Long.parseLong(query.get("step"))));
     }
 
     private List<SimulatedSession> sessions(Map<String, String> query) {

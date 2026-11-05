@@ -31,6 +31,7 @@ import org.lolaf.staffix.api.session.FixSessionSettings.HaSessionSettings.Replic
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.TreeMap;
 
 /**
  * Two engines replicating to each other, leadership moving on a script so the console's pair views change on their
@@ -65,12 +66,18 @@ final class SimulatedHaPair {
     private Node leader;
     private Node lastLeader;
     private Instant roleSince = Instant.now();
+    private final Instant started = roleSince;
+    /**
+     * Who led from each instant, null while nobody did, so the meters read back what happened.
+     */
+    private final TreeMap<Instant, @Nullable Node> leaders = new TreeMap<>();
 
     SimulatedHaPair(String pairName, SimulatedEngine first, SimulatedEngine second) {
         this.pairName = pairName;
         this.nodes = new Node[]{new Node("1", first), new Node("2", second)};
         leader = nodes[0];
         lastLeader = nodes[0];
+        leaders.put(Instant.EPOCH, nodes[0]);
         first.joinPair(nodes[0], true);
         second.joinPair(nodes[1], false);
     }
@@ -98,6 +105,7 @@ final class SimulatedHaPair {
         }
         leader = next;
         roleSince = Instant.now();
+        leaders.put(roleSince, next);
     }
 
     private Node other(Node node) {
@@ -148,6 +156,33 @@ final class SimulatedHaPair {
 
         SimulatedHaProbes probes() {
             return probes;
+        }
+
+        String nodeId() {
+            return nodeId;
+        }
+
+        /**
+         * The script's tick at that instant, the script having run the same way before the simulator started.
+         */
+        int phaseAt(Instant t) {
+            return (int) Math.floorMod(t.getEpochSecond() - started.getEpochSecond(), (long) CYCLE_TICKS);
+        }
+
+        boolean ledAt(Instant t) {
+            synchronized (SimulatedHaPair.this) {
+                return leaders.floorEntry(t).getValue() == this;
+            }
+        }
+
+        /**
+         * As staffix's {@code ha.role}: 2 leader, 1 follower, 0 unknown.
+         */
+        double roleAt(Instant t) {
+            synchronized (SimulatedHaPair.this) {
+                Node ledBy = leaders.floorEntry(t).getValue();
+                return ledBy == null ? 0 : ledBy == this ? 2 : 1;
+            }
         }
 
         /**
