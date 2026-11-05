@@ -17,6 +17,8 @@ package org.lolaf.staffix.admin.simulator;
 
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.lolaf.staffix.api.alerting.Alert;
+import org.lolaf.staffix.api.alerting.ProbeState;
 import org.lolaf.staffix.api.ha.HaAdmin;
 import org.lolaf.staffix.api.ha.HaSessionStatus;
 import org.lolaf.staffix.api.ha.HaStatus;
@@ -46,6 +48,10 @@ final class SimulatedHaPair {
     static final String REFUSAL = "its storage is shared with the leader";
     private static final int RESYNC_TICKS = 5;
     private static final Duration ACK_TIMEOUT = Duration.ofSeconds(1);
+    /**
+     * Staffix's {@code followerLagAlertThreshold} default.
+     */
+    private static final int LAG_ALERT_TICKS = 5;
 
     private final String pairName;
     private final Node[] nodes;
@@ -131,12 +137,44 @@ final class SimulatedHaPair {
 
         private final String nodeId;
         private final SimulatedEngine engine;
+        private final SimulatedHaProbes probes = new SimulatedHaProbes();
         private boolean candidate = true;
 
         void tick() {
             if (this == nodes[0]) {
                 SimulatedHaPair.this.tick();
             }
+        }
+
+        SimulatedHaProbes probes() {
+            return probes;
+        }
+
+        /**
+         * Returns the alerts raised, changed or cleared.
+         */
+        List<ProbeState> evaluateProbes() {
+            synchronized (SimulatedHaPair.this) {
+                return probes.evaluate(this::alert, Instant.now());
+            }
+        }
+
+        private @Nullable Alert alert(String probe) {
+            return switch (probe) {
+                case SimulatedHaProbes.FOLLOWERS -> leader == this ? followersAlert() : null;
+                case SimulatedHaProbes.LEADER_LINK -> leader != null && leader != this && snapshotting()
+                        ? Alert.warning("Connected to the leader, not holding every session in full") : null;
+                default -> leader == null ? Alert.critical("This node has no role") : null;
+            };
+        }
+
+        private @Nullable Alert followersAlert() {
+            String follower = other(this).nodeId;
+            int stalledTicks = stalled() ? tick - STALL_TICK + 1 : 0;
+            if (stalledTicks > LAG_ALERT_TICKS) {
+                return Alert.major("Follower " + follower + " has not applied a write for " + stalledTicks + "s");
+            }
+            return snapshotting() ? Alert.warning("Follower " + follower + " is catching up by snapshot") : null;
         }
 
         @Override

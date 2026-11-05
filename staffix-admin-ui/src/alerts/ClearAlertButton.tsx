@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { useClearAlert, type SessionRef } from '../api/queries'
+import { useClearAlert, useClearComponentAlert, type SessionRef } from '../api/queries'
 import { WriteButton } from '../sessions/WriteButton'
 
 /**
@@ -28,6 +28,22 @@ export function ClearAlertButton({ sessionRef, probe }: { sessionRef: SessionRef
         size="small"
         loading={clear.isPending}
         confirm={`Clear the ${probe} alert? Only an alert raised from application code accepts it.`}
+        onConfirm={() => clear.mutate(probe)}
+      >
+        Clear
+      </WriteButton>
+    </span>
+  )
+}
+
+export function ClearComponentAlertButton({ engineId, component, probe }: { engineId: string, component: string, probe: string }) {
+  const clear = useClearComponentAlert(engineId, component)
+  return (
+    <span onClick={(event) => event.stopPropagation()}>
+      <WriteButton
+        size="small"
+        loading={clear.isPending}
+        confirm={`Clear the ${probe} alert? A polled condition refuses it.`}
         onConfirm={() => clear.mutate(probe)}
       >
         Clear

@@ -19,7 +19,7 @@ import type { Schemas } from '../api/client'
 import { sessionRoute, useAlerts } from '../api/queries'
 import { AlertLevelTag } from './AlertLevelTag'
 import { AlertSince } from './AlertSince'
-import { ClearAlertButton } from './ClearAlertButton'
+import { ClearAlertButton, ClearComponentAlertButton } from './ClearAlertButton'
 import { RunbookLink } from './RunbookLink'
 
 type ActiveAlert = Schemas['ActiveAlert']
@@ -61,9 +61,10 @@ export function AlertsPage() {
         locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No ongoing alert" /> }}
         onRow={(alert) => {
           const sessionRef = sessionRefOf(alert)
-          return sessionRef
-            ? { onClick: () => navigate({ pathname: sessionRoute(sessionRef), search: '?tab=alerts' }), style: { cursor: 'pointer' } }
-            : {}
+          if (sessionRef) {
+            return { onClick: () => navigate({ pathname: sessionRoute(sessionRef), search: '?tab=alerts' }), style: { cursor: 'pointer' } }
+          }
+          return alert.component === 'ha' ? { onClick: () => navigate('/ha'), style: { cursor: 'pointer' } } : {}
         }}
         columns={[
           { title: 'Level', dataIndex: 'level', width: 100, render: (level: ActiveAlert['level']) => <AlertLevelTag level={level} /> },
@@ -100,7 +101,8 @@ export function AlertsPage() {
             width: 80,
             render: (_, alert) => {
               const sessionRef = sessionRefOf(alert)
-              return sessionRef && <ClearAlertButton sessionRef={sessionRef} probe={alert.probe} />
+              if (sessionRef) return <ClearAlertButton sessionRef={sessionRef} probe={alert.probe} />
+              return alert.component != null && <ClearComponentAlertButton engineId={alert.engineId} component={alert.component} probe={alert.probe} />
             },
           },
         ]}

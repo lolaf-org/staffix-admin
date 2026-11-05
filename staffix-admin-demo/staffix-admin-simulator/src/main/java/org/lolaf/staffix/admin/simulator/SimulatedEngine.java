@@ -16,6 +16,7 @@
 package org.lolaf.staffix.admin.simulator;
 
 import org.jspecify.annotations.Nullable;
+import org.lolaf.staffix.api.ComponentProbeScope;
 import org.lolaf.staffix.api.FixInitiatorTarget;
 import org.lolaf.staffix.api.InstanceProvider;
 import org.lolaf.staffix.api.admin.AdminApi;
@@ -62,6 +63,7 @@ import java.util.stream.Stream;
 final class SimulatedEngine implements AdminApi {
 
     private static final String SETTINGS_STORE = "simulated";
+    private static final ProbeScope HA_SCOPE = ComponentProbeScope.of("ha");
 
     private final String engineId;
     private final List<SimulatedConnection> connections;
@@ -91,7 +93,10 @@ final class SimulatedEngine implements AdminApi {
         if (ha != null) {
             ha.tick();
         }
-        List<Map.Entry<ProbeScope, ProbeState>> transitions = tickSessions(random);
+        List<Map.Entry<ProbeScope, ProbeState>> transitions = new ArrayList<>(tickSessions(random));
+        if (ha != null) {
+            ha.evaluateProbes().forEach(state -> transitions.add(Map.entry(HA_SCOPE, state)));
+        }
         transitions.forEach(transition -> probesListeners.forEach(listener ->
                 listener.onAlertTransition(transition.getKey(), transition.getValue())));
     }
@@ -372,18 +377,18 @@ final class SimulatedEngine implements AdminApi {
     }
 
     @Override
-    public List<ProbeScope> getComponentProbeScopes() {
-        return List.of();
+    public synchronized List<ProbeScope> getComponentProbeScopes() {
+        return ha == null ? List.of() : List.of(HA_SCOPE);
     }
 
     @Override
     public synchronized List<ProbeDefinition> getProbeDefinitions(ProbeScope scope) {
-        return probes(connectionRunning(scope)).definitions();
+        return scope.equals(HA_SCOPE) ? ha.probes().definitions() : probes(connectionRunning(scope)).definitions();
     }
 
     @Override
     public synchronized List<ProbeState> getProbeStates(ProbeScope scope) {
-        return probes(connectionRunning(scope)).states();
+        return scope.equals(HA_SCOPE) ? ha.probes().states() : probes(connectionRunning(scope)).states();
     }
 
     @Override
@@ -397,11 +402,18 @@ final class SimulatedEngine implements AdminApi {
                 }
             }
         }
+        if (ha != null) {
+            ha.probes().states().stream().filter(state -> state.getAlert().isPresent())
+                    .forEach(state -> active.add(new ScopedProbeState(HA_SCOPE, state, null)));
+        }
         return active;
     }
 
     @Override
     public synchronized boolean clearAlert(ProbeId probeId) {
+        if (probeId.getScope().equals(HA_SCOPE)) {
+            return false;
+        }
         return probes(connectionRunning(probeId.getScope())).clear(probeId.getName());
     }
 

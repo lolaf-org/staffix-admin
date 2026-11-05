@@ -194,7 +194,7 @@ final class SimulatedProbes {
         return phase >= 50 && phase < 80 ? Alert.warning((250 + phase * 7) + " events queued, WARNING from 250") : null;
     }
 
-    private static final class Probe {
+    static final class Probe {
 
         final ProbeDefinition definition;
         @Nullable Alert alert;

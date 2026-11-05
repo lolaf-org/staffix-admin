@@ -15,7 +15,9 @@
  */
 import { CheckCircleFilled, CloseCircleFilled, ReloadOutlined, SwapOutlined, ToolOutlined, WarningFilled } from '@ant-design/icons'
 import { Alert, Card, Descriptions, Empty, Flex, Skeleton, Table, Tag, theme, Tooltip, Typography } from 'antd'
-import { useGroups, useHaPairs, useResync, useResyncSession, useSetCandidate, useSwitchover } from '../api/queries'
+import { useComponentProbes, useGroups, useHaPairs, useResync, useResyncSession, useSetCandidate, useSwitchover } from '../api/queries'
+import { AlertLevelTag } from '../alerts/AlertLevelTag'
+import { ClearComponentAlertButton } from '../alerts/ClearAlertButton'
 import { WriteButton } from '../sessions/WriteButton'
 import { NodeTag } from './NodeTag'
 import { leaderOf, shownNode, standbyState, type HaNode, type HaPair, type StandbyState } from './pairs'
@@ -24,6 +26,7 @@ import { leaderOf, shownNode, standbyState, type HaNode, type HaPair, type Stand
  * Past this a follower reads as stalled, whatever its last acknowledgement says: `inSync` is as of that acknowledgement.
  */
 const STALLED_LAG_MILLIS = 3000
+const HA_COMPONENT = 'ha'
 
 export function HaPage() {
   const pairs = useHaPairs()
@@ -88,6 +91,7 @@ function NodeCard({ node, leads }: { node: HaNode; leads: boolean }) {
               title={`Follower ${dropped.nodeId} dropped as too slow at ${new Date(dropped.droppedAt).toLocaleTimeString()}${dropped.heldOffUntil ? `, held off until ${new Date(dropped.heldOffUntil).toLocaleTimeString()}` : ''}`}
             />
           ))}
+          <NodeProbes engineId={node.engineId} />
           {status.leader && (
             <Typography.Text>
               <Health ok={status.leader.connected && status.leader.inSync} />
@@ -97,6 +101,25 @@ function NodeCard({ node, leads }: { node: HaNode; leads: boolean }) {
         </Flex>
       )}
     </Card>
+  )
+}
+
+function NodeProbes({ engineId }: { engineId: string }) {
+  const probes = useComponentProbes(engineId, HA_COMPONENT)
+  if (!probes.data || probes.data.length === 0) return null
+  return (
+    <Flex vertical gap={4}>
+      {probes.data.map((probe) => (
+        <Flex key={probe.name} gap={6} align="center" wrap>
+          <Tooltip title={probe.description}>
+            <Typography.Text code>{probe.name}</Typography.Text>
+          </Tooltip>
+          {probe.level ? <AlertLevelTag level={probe.level} /> : <Typography.Text type="secondary">normal</Typography.Text>}
+          {probe.message && <Typography.Text>{probe.message}</Typography.Text>}
+          {probe.level && <ClearComponentAlertButton engineId={engineId} component={HA_COMPONENT} probe={probe.name} />}
+        </Flex>
+      ))}
+    </Flex>
   )
 }
 

@@ -267,6 +267,37 @@ export function useLogout(ref: SessionRef) {
 /**
  * The engine clears the alert at its next evaluation tick, so the refreshed lists may show it until the next poll.
  */
+const COMPONENT_PROBES = '/api/engines/{engineId}/components/{component}/probes'
+
+/**
+ * Fails for an engine publishing no alerts for the component, which then has nothing to show.
+ */
+export function useComponentProbes(engineId: string, component: string) {
+  return useQuery({
+    queryKey: ['component-probes', engineId, component],
+    queryFn: () => call(api.GET(COMPONENT_PROBES, { params: { path: { engineId, component } } })),
+    refetchInterval: POLL_INTERVAL_MS,
+    retry: false,
+  })
+}
+
+export function useClearComponentAlert(engineId: string, component: string) {
+  const queryClient = useQueryClient()
+  const { message } = App.useApp()
+  return useMutation({
+    mutationFn: (probe: string) =>
+      call(api.POST(`${COMPONENT_PROBES}/{probe}/clear`, { params: { path: { engineId, component, probe } } })),
+    onSuccess: (_, probe) => {
+      message.success(`Clear of ${probe} requested`)
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['alerts'] }),
+        queryClient.invalidateQueries({ queryKey: ['component-probes', engineId, component] }),
+      ])
+    },
+    onError: (error) => message.error(error.message),
+  })
+}
+
 export function useClearAlert(ref: SessionRef) {
   const queryClient = useQueryClient()
   const { message } = App.useApp()

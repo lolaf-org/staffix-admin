@@ -16,6 +16,8 @@
 package org.lolaf.staffix.admin.simulator;
 
 import org.junit.jupiter.api.Test;
+import org.lolaf.staffix.api.ComponentProbeScope;
+import org.lolaf.staffix.api.alerting.ProbeId;
 import org.lolaf.staffix.api.ha.HaAdmin;
 import org.lolaf.staffix.api.ha.HaSessionStatus;
 import org.lolaf.staffix.api.ha.LeaderElection.Role;
@@ -113,6 +115,35 @@ class SimulatedHaPairTest {
         ticksUntil(2);
         assertThat(first.getActiveAlerts()).noneMatch(alert -> alert.getProbeState().getProbeName().equals("ha-replication"));
         assertThat(second.getActiveAlerts()).anyMatch(alert -> alert.getProbeState().getProbeName().equals("ha-replication"));
+    }
+
+    private List<String> haAlerts(SimulatedEngine engine) {
+        return engine.getActiveAlerts().stream()
+                .filter(alert -> alert.getScope().getType().equals(ComponentProbeScope.TYPE))
+                .map(alert -> alert.getProbeState().getProbeName())
+                .toList();
+    }
+
+    @Test
+    void theComponentAlertsFollowTheScript() {
+        assertThat(first.getComponentProbeScopes()).singleElement().satisfies(scope -> assertThat(scope.getName()).isEqualTo("ha"));
+        ticksUntil(SimulatedHaPair.STALL_TICK + 7);
+        assertThat(haAlerts(first)).containsExactly("ha-followers");
+        assertThat(haAlerts(second)).isEmpty();
+
+        ticksUntil(SimulatedHaPair.SNAPSHOT_TICK - SimulatedHaPair.STALL_TICK - 7 + 1);
+        assertThat(haAlerts(second)).containsExactly("ha-leader-link");
+
+        ticksUntil(SimulatedHaPair.FAILOVER_TICK - SimulatedHaPair.SNAPSHOT_TICK - 1);
+        assertThat(haAlerts(first)).containsExactly("ha-leadership");
+        assertThat(haAlerts(second)).containsExactly("ha-leadership");
+    }
+
+    @Test
+    void aComponentAlertCannotBeClearedByHand() {
+        ticksUntil(SimulatedHaPair.FAILOVER_TICK);
+
+        assertThat(first.clearAlert(ProbeId.of(first.getComponentProbeScopes().getFirst(), "ha-leadership"))).isFalse();
     }
 
     @Test

@@ -97,6 +97,17 @@ class HaControllerTest {
     }
 
     @Test
+    void aComponentAlertIsClearedThroughTheEngineAndAudited() throws Exception {
+        doNothing().when(gateway).clearComponentAlert("geneva-a", "ha", "ha-followers");
+
+        mockMvc.perform(post("/api/engines/geneva-a/components/ha/probes/ha-followers/clear").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(auditSink).record(argThat(entry -> entry.getOperation().equals("clear alert ha-followers of ha")
+                && "geneva-a".equals(entry.getEngineId())));
+    }
+
+    @Test
     @WithMockUser(roles = "READER")
     void aReaderCannotActOnThePair() throws Exception {
         mockMvc.perform(post(ENGINE + "/switchover").with(csrf())).andExpect(status().isForbidden());
