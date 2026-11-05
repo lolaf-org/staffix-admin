@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipContentProps, type TooltipValueType } from 'recharts'
-import { Flex, Typography, theme } from 'antd'
+import { Flex, Tooltip as AntTooltip, Typography, theme } from 'antd'
 import { formatClock, formatClockSeconds, formatDateTime } from './format'
 
 export interface ChartSeries {
@@ -26,6 +26,10 @@ export interface ChartSeries {
 
 interface Props {
   title: string
+  /**
+   * What the chart measures, shown as a tooltip on its title.
+   */
+  description?: string
   series: ChartSeries[]
   format: (value: number) => string
   /**
@@ -41,7 +45,7 @@ interface Props {
 
 const MINUTE_TICKS_FROM_MS = 10 * 60_000
 
-export function MetricChart({ title, series, format, yTicks, height = 220, marker }: Props) {
+export function MetricChart({ title, description, series, format, yTicks, height = 220, marker }: Props) {
   const { token } = theme.useToken()
   const rows = mergeByTimestamp(series)
   const span = rows.length > 1 ? rows[rows.length - 1]!['t']! - rows[0]!['t']! : 0
@@ -50,7 +54,9 @@ export function MetricChart({ title, series, format, yTicks, height = 220, marke
 
   return (
     <div style={{ flex: '1 1 300px', minWidth: 0 }}>
-      <Typography.Text strong>{title}</Typography.Text>
+      <AntTooltip title={description}>
+        <Typography.Text strong style={description ? { cursor: 'help' } : undefined}>{title}</Typography.Text>
+      </AntTooltip>
       <ResponsiveContainer width="100%" height={height}>
         <LineChart data={rows} margin={{ top: 12, right: 16, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} stroke={token.colorBorderSecondary} />

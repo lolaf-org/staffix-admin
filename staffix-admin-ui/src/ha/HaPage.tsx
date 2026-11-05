@@ -64,7 +64,7 @@ function PairCard({ pair }: { pair: HaPair }) {
           >
             {folded ? <CaretRightOutlined /> : <CaretDownOutlined />}
           </span>
-          {pair.name ? <span>HA pair: <Typography.Text strong>{pair.name}</Typography.Text></span> : pair.nodes[0]?.engineId}
+          {pair.name ? <span><Typography.Text type="secondary">HA pair: </Typography.Text><Typography.Text strong>{pair.name}</Typography.Text></span> : pair.nodes[0]?.engineId}
           {pair.nodes.map((node) => <NodeTag key={node.engineId} node={node} leads={node === leader} />)}
         </Space>
       }
