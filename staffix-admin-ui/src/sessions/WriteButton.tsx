@@ -14,8 +14,14 @@
  * limitations under the License.
  */
 import { Button, Popconfirm, Tooltip, type ButtonProps } from 'antd'
+import { createContext, useContext } from 'react'
 import type { ReactNode } from 'react'
 import { useCanWrite } from '../api/queries'
+
+/**
+ * Why the actions below it cannot run, whatever the operator's role, such as a session on a standby.
+ */
+export const WriteBlock = createContext<string | undefined>(undefined)
 
 interface Props extends Omit<ButtonProps, 'onClick'> {
   onConfirm: () => void
@@ -30,6 +36,14 @@ interface Props extends Omit<ButtonProps, 'onClick'> {
  */
 export function WriteButton({ onConfirm, confirm, disabled, ...button }: Props) {
   const canWrite = useCanWrite()
+  const blocked = useContext(WriteBlock)
+  if (blocked) {
+    return (
+      <Tooltip title={blocked}>
+        <Button {...button} disabled />
+      </Tooltip>
+    )
+  }
   if (!canWrite) {
     return (
       <Tooltip title="Requires the writer role">

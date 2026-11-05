@@ -45,5 +45,10 @@ public class HaPair {
          */
         @Nullable
         HaStatus status;
+        /**
+         * What this node replicates or holds; empty while it does not answer.
+         */
+        @Singular
+        List<HaSession> sessions;
     }
 }

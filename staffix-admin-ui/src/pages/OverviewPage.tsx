@@ -18,7 +18,9 @@ import { CaretDownOutlined, CaretRightOutlined, PlusOutlined } from '@ant-design
 import { useState } from 'react'
 import { Outlet, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import type { Schemas } from '../api/client'
-import { sessionRoute, useEngineAlerts, useEngines, useGroups } from '../api/queries'
+import { sessionRoute, useEngineAlerts, useEngines, useGroups, useHaPairs } from '../api/queries'
+import { NodeTag } from '../ha/NodeTag'
+import { leaderOf, pairOf, shownNode, standbyState, type HaPair } from '../ha/pairs'
 import { STATUS_LABELS, STATUSES, type Status } from '../sessions/status'
 import { AddSessionModal } from '../sessions/AddSessionModal'
 import { StatusBadge } from '../sessions/StatusBadge'
@@ -31,12 +33,19 @@ import { ALERT_LEVEL_LABELS, ALERT_LEVELS, worstLevel, type AlertLevel } from '.
 
 export function OverviewPage() {
   const engines = useEngines()
+  const pairs = useHaPairs()
   const filters = useSessionFilters()
 
   if (engines.isPending) return <Skeleton active />
   if (engines.isError) return <Alert type="error" title={engines.error.message} />
 
-  const shown = engines.data.filter((e) => filters.engines.length === 0 || filters.engines.includes(e.engineId))
+  const isSelected = (engineId: string) => filters.engines.length === 0 || filters.engines.includes(engineId)
+  const cards = engines.data.flatMap((engine): { engine: Schemas['Engine']; pair?: HaPair }[] => {
+    const pair = pairOf(pairs.data ?? [], engine.engineId)
+    if (!pair) return isSelected(engine.engineId) ? [{ engine }] : []
+    const shownInPairCard = shownNode(pair).engineId === engine.engineId
+    return shownInPairCard && pair.nodes.some((node) => isSelected(node.engineId)) ? [{ engine, pair }] : []
+  })
 
   return (
     <Flex vertical gap={16}>
@@ -76,20 +85,21 @@ export function OverviewPage() {
           style={{ minWidth: 200, maxWidth: '100%' }}
         />
       </Flex>
-      {shown.length === 0 && <Empty description="No engine has announced itself yet" />}
-      {shown.map((engine) => (
-        <EngineCard key={engine.engineId} engine={engine} />
+      {cards.length === 0 && <Empty description="No engine has announced itself yet" />}
+      {cards.map(({ engine, pair }) => (
+        <EngineCard key={pair?.name ?? engine.engineId} engine={engine} pair={pair} />
       ))}
       <Outlet />
     </Flex>
   )
 }
 
-function EngineCard({ engine }: { engine: Schemas['Engine'] }) {
+function EngineCard({ engine, pair }: { engine: Schemas['Engine']; pair?: HaPair }) {
   const groups = useGroups(engine.engineId)
   const filters = useSessionFilters()
   const [adding, setAdding] = useState(false)
-  const [folded, toggleFolded] = useFolded(engine.engineId)
+  const [folded, toggleFolded] = useFolded(pair?.name ?? engine.engineId)
+  const leader = pair && leaderOf(pair)
   const alertsUnknown = useEnginesWithUnknownAlerts().has(engine.engineId) || groups.isError
 
   const shown = (groups.data ?? [])
@@ -106,6 +116,8 @@ function EngineCard({ engine }: { engine: Schemas['Engine'] }) {
     const key = `${alert.group}.${alert.sessionId}`
     alertsBySession.set(key, [...(alertsBySession.get(key) ?? []), alert])
   }
+  const standbys = pair?.name ? sessions.map((s) => standbyState(pair, s.group, s.id)) : []
+  const unprotected = standbys.filter((standby) => standby.health !== 'ok')
   const alertCounts = ALERT_LEVELS.map((level) => ({
     level,
     count: sessions.filter((s) => s.alertLevel === level).length,
@@ -126,13 +138,28 @@ function EngineCard({ engine }: { engine: Schemas['Engine'] }) {
           >
             {folded ? <CaretRightOutlined /> : <CaretDownOutlined />}
           </span>
-          <span>
-            <Typography.Text type="secondary">Fix engine: </Typography.Text>
-            <Tooltip title={engine.staffixVersion ? `staffix ${engine.staffixVersion}` : 'staffix version unknown'}>
-              <Typography.Text strong>{engine.engineId}</Typography.Text>
-            </Tooltip>
-          </span>
-          {engine.reachable ? <Tag color="success">reachable</Tag> : <Tag color="error">unreachable</Tag>}
+          {pair?.name ? (
+            <span>
+              <Typography.Text type="secondary">HA pair: </Typography.Text>
+              <Typography.Text strong>{pair.name}</Typography.Text>
+            </span>
+          ) : (
+            <>
+              <span>
+                <Typography.Text type="secondary">Fix engine: </Typography.Text>
+                <Tooltip title={engine.staffixVersion ? `staffix ${engine.staffixVersion}` : 'staffix version unknown'}>
+                  <Typography.Text strong>{engine.engineId}</Typography.Text>
+                </Tooltip>
+              </span>
+              {engine.reachable ? <Tag color="success">reachable</Tag> : <Tag color="error">unreachable</Tag>}
+            </>
+          )}
+          {pair?.nodes.map((node) => <NodeTag key={node.engineId} node={node} leads={node === leader} />)}
+          {unprotected.length > 0 && (
+            <Tag color={unprotected.some((standby) => standby.health === 'error') ? 'error' : 'warning'}>
+              {unprotected.length} session{unprotected.length > 1 ? 's' : ''} not protected by the standby
+            </Tag>
+          )}
         </Space>
       }
       extra={
@@ -161,12 +188,14 @@ function EngineCard({ engine }: { engine: Schemas['Engine'] }) {
         </Space>
       }
     >
+      {pair && !leader && <Alert type="warning" title="No leader: sessions shown as last known" style={{ marginBottom: 12 }} />}
+      {pair && !pair.name && <Alert type="info" title="High availability without a pair name: set pairName to group this node with its pair" style={{ marginBottom: 12 }} />}
       {groups.isPending && <Skeleton active paragraph={{ rows: 2 }} />}
       {groups.isError && <Alert type="error" title={groups.error.message} />}
       {groups.isSuccess && shown.length === 0 && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No matching session" />}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 480px), 1fr))', gap: 12 }}>
         {shown.map((group) => (
-          <GroupBox key={group.group} engineId={engine.engineId} group={group} alertsBySession={alertsBySession} stale={alertsUnknown} />
+          <GroupBox key={group.group} engineId={engine.engineId} group={group} alertsBySession={alertsBySession} stale={alertsUnknown} pair={pair?.name ? pair : undefined} />
         ))}
       </div>
     </Card>
@@ -199,9 +228,13 @@ interface GroupBoxProps {
    * The engine does not answer: its sessions are shown as last known.
    */
   stale: boolean
+  /**
+   * Named pairs only: an unnamed node's standby is unknown.
+   */
+  pair?: HaPair
 }
 
-function GroupBox({ engineId, group, alertsBySession, stale }: GroupBoxProps) {
+function GroupBox({ engineId, group, alertsBySession, stale, pair }: GroupBoxProps) {
   const { token } = theme.useToken()
   const navigate = useNavigate()
   const location = useLocation()
@@ -237,6 +270,7 @@ function GroupBox({ engineId, group, alertsBySession, stale }: GroupBoxProps) {
               session={session}
               alerts={alertsBySession.get(`${group.group}.${session.id}`) ?? []}
               stale={stale}
+              standby={pair && standbyState(pair, group.group, session.id)}
               selected={selected.engineId === engineId && selected.group === group.group && selected.sessionId === session.id}
               onClick={() => navigate({ pathname: sessionRoute(ref), search: location.search })}
             />

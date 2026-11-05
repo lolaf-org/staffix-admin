@@ -16,11 +16,13 @@
 import { Alert, Drawer, Skeleton, Tabs } from 'antd'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
-import { useSession, type SessionRef } from '../api/queries'
+import { useHaPairs, useSession, type SessionRef } from '../api/queries'
+import { standbyReason } from '../ha/pairs'
 import { StatusBadge } from './StatusBadge'
 import { SendMessageTab } from './SendMessageTab'
 import { SessionSettingsTab } from './SessionSettingsTab'
 import { SessionStatusTab } from './SessionStatusTab'
+import { WriteBlock } from './WriteButton'
 import { SessionTelemetryTab } from '../telemetry/SessionTelemetryTab'
 import { SessionAlertsTab } from '../alerts/SessionAlertsTab'
 
@@ -30,6 +32,8 @@ export function SessionDrawer() {
   const navigate = useNavigate()
   const location = useLocation()
   const session = useSession(ref)
+  const pairs = useHaPairs()
+  const onStandby = standbyReason(pairs.data ?? [], ref.engineId)
   const [searchParams, setSearchParams] = useSearchParams()
   const [initialTab] = useState(searchParams.get('tab') ?? 'status')
   useEffect(() => {
@@ -51,12 +55,13 @@ export function SessionDrawer() {
     >
       {session.isPending && <Skeleton active />}
       {session.isError && <Alert type="error" title={session.error.message} />}
+      {onStandby && <Alert type="info" title={onStandby} style={{ marginBottom: 12 }} />}
       {session.isSuccess && (
         <Tabs
           destroyOnHidden
           defaultActiveKey={initialTab}
           items={[
-            { key: 'status', label: 'Status', children: <SessionStatusTab sessionRef={ref} detail={session.data} /> },
+            { key: 'status', label: 'Status', children: <WriteBlock value={onStandby}><SessionStatusTab sessionRef={ref} detail={session.data} /></WriteBlock> },
             {
               key: 'settings',
               label: 'Settings',
@@ -69,7 +74,7 @@ export function SessionDrawer() {
             },
             { key: 'metrics', label: 'Metrics', children: <SessionTelemetryTab sessionRef={ref} summary={session.data.summary} view="metrics" /> },
             { key: 'logs', label: 'Logs', children: <SessionTelemetryTab sessionRef={ref} summary={session.data.summary} view="logs" /> },
-            { key: 'send', label: 'Send message', children: <SendMessageTab sessionRef={ref} summary={session.data.summary} /> },
+            { key: 'send', label: 'Send message', children: <WriteBlock value={onStandby}><SendMessageTab sessionRef={ref} summary={session.data.summary} /></WriteBlock> },
           ]}
         />
       )}

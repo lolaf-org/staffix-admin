@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 import { Flex, Tooltip, Typography, theme } from 'antd'
-import { PauseCircleOutlined } from '@ant-design/icons'
+import { PauseCircleOutlined, WarningFilled } from '@ant-design/icons'
 import type { Schemas } from '../api/client'
 import { STATUS_COLORS, STATUS_LABELS } from './status'
 import { formatIdentity } from './identity'
 import { AlertBell } from '../alerts/AlertBell'
 import { ALERT_LEVEL_LABELS } from '../alerts/levels'
+import type { StandbyState } from '../ha/pairs'
 
 interface Props {
   session: Schemas['SessionSummary']
@@ -33,21 +34,31 @@ interface Props {
    * The engine does not answer: dimmed, without its alert bell, its last known state only in the tooltip.
    */
   stale?: boolean
+  /**
+   * Where the standby stands, for a session of a high availability pair. A running session the standby does not
+   * protect takes its own colour, apart from the status colours; a session that is down keeps its status colour.
+   */
+  standby?: StandbyState
 }
+
+const STANDBY_TEXT_TYPES = { ok: 'secondary', warning: 'warning', error: 'danger' } as const
 
 /**
  * 50% over Ant Design's 250 px, so a full FIX session id usually fits on one line.
  */
 const TOOLTIP_MAX_WIDTH = 375
 
-export function SessionBox({ session, alerts, selected, onClick, stale = false }: Props) {
+export function SessionBox({ session, alerts, selected, onClick, stale = false, standby }: Props) {
   const { token } = theme.useToken()
-  const colors = {
-    success: { background: token.colorSuccessBg, border: token.colorSuccess },
-    warning: { background: token.colorWarningBg, border: token.colorWarning },
-    orange: { background: token.orange1, border: token.orange },
-    error: { background: token.colorErrorBg, border: token.colorError },
-  }[STATUS_COLORS[session.status]]
+  const statusColor = STATUS_COLORS[session.status]
+  const colors = statusColor === 'success' && standby && standby.health !== 'ok'
+    ? { background: token.purple1, border: token.purple }
+    : {
+        success: { background: token.colorSuccessBg, border: token.colorSuccess },
+        warning: { background: token.colorWarningBg, border: token.colorWarning },
+        orange: { background: token.orange1, border: token.orange },
+        error: { background: token.colorErrorBg, border: token.colorError },
+      }[statusColor]
   const operatorLoggedOut = session.desiredState === 'LOGGED_OUT'
   const mono = { fontFamily: token.fontFamilyCode, fontSize: 12 }
 
@@ -58,6 +69,7 @@ export function SessionBox({ session, alerts, selected, onClick, stale = false }
         <>
           <div>{formatIdentity(session.identity)}</div>
           {stale && <div>Last known state: the engine does not answer</div>}
+          {standby && <div>Standby: {standby.text}</div>}
           <div>{STATUS_LABELS[session.status]}</div>
           {stale && session.alertLevel && <div>Last known worst alert: {ALERT_LEVEL_LABELS[session.alertLevel]}</div>}
           {!stale && alerts.map((alert) => (
@@ -116,6 +128,12 @@ export function SessionBox({ session, alerts, selected, onClick, stale = false }
         <Typography.Text type="secondary" ellipsis style={{ fontSize: 11 }}>
           instance {session.instanceId}
         </Typography.Text>
+        {standby && (
+          <Typography.Text type={STANDBY_TEXT_TYPES[standby.health]} strong={standby.health !== 'ok'} ellipsis style={{ fontSize: 11 }}>
+            {standby.health !== 'ok' && <WarningFilled style={{ marginRight: 4 }} />}
+            Standby: {standby.text}
+          </Typography.Text>
+        )}
       </button>
     </Tooltip>
   )

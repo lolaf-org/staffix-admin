@@ -72,7 +72,7 @@ public class HaPairs {
         try {
             Optional<HaStatus> status = gateway.getHa(engineId);
             remember(engineId, status.map(HaStatus::getPairName).orElse(null));
-            return status.map(ha -> HaPair.Node.builder().engineId(engineId).status(ha).build());
+            return status.map(ha -> HaPair.Node.builder().engineId(engineId).status(ha).sessions(gateway.getHaSessions(engineId)).build());
         } catch (GatewayException e) {
             return silent(engineId);
         }

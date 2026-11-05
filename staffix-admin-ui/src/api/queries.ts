@@ -41,6 +41,14 @@ export function useEngines() {
   })
 }
 
+export function useHaPairs() {
+  return useQuery({
+    queryKey: ['ha', 'pairs'],
+    queryFn: () => call(api.GET('/api/ha/pairs')),
+    refetchInterval: POLL_INTERVAL_MS,
+  })
+}
+
 /**
  * Session ids are unique within their group only, so a session is always named by both.
  */

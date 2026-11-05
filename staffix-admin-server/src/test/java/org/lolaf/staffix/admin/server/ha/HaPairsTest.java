@@ -76,6 +76,15 @@ class HaPairsTest {
     }
 
     @Test
+    void aNodeCarriesTheSessionsItReplicates() {
+        engine("engine-1", "gateway");
+        HaSession session = HaSession.builder().group("alpha").name("trading").build();
+        when(gateway.getHaSessions("engine-1")).thenReturn(List.of(session));
+
+        assertThat(pairs.list().get(0).getNodes().get(0).getSessions()).containsExactly(session);
+    }
+
+    @Test
     void anEngineWithoutHighAvailabilityIsLeftOut() {
         engines.add(Engine.builder().engineId("plain").reachable(true).lastAnnouncedAt(Instant.EPOCH).build());
 
