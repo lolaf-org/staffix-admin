@@ -64,7 +64,7 @@ class SimulatedHaPairTest {
         FixSession onStandby = second.getManagedFixSessions().getFirst();
 
         assertThatThrownBy(() -> second.logonSession(onStandby.getFixSessionId()))
-                .isInstanceOf(IllegalStateException.class).hasMessageContaining("standby");
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("does not lead");
         assertThat(second.runningConfigs()).noneMatch(session -> session.loggedIn);
         assertThat(first.runningConfigs()).anyMatch(session -> session.loggedIn);
     }
