@@ -79,8 +79,17 @@ export function replicationState(pair: HaPair, group: string, sessionId: string)
   if (!onFollower) return { text: 'not started', health: 'error' }
   const behind = onFollower.pendingWrites > MAX_PENDING_WRITES
   const pending = behind ? `, ${onFollower.pendingWrites.toLocaleString('en-US')} writes pending` : ''
-  if (!onFollower.handedOver && !onFollower.inSync) return { text: `catching up${pending}`, health: 'warning' }
-  return { text: `${onFollower.handedOver ? 'handed over' : 'in sync'}${pending}`, health: behind ? 'warning' : 'ok' }
+  const lost = lostWrites(shown, onShown) + lostWrites(follower, onFollower)
+  if (!onFollower.handedOver && !onFollower.inSync) return { text: `catching up${pending}${lost}`, health: 'warning' }
+  return { text: `${onFollower.handedOver ? 'handed over' : 'in sync'}${pending}${lost}`, health: behind || lost ? 'warning' : 'ok' }
+}
+
+/**
+ * Per node: each store can hold what the other lost, and a re-sync makes the follower match the leader, holes included.
+ */
+function lostWrites(node: HaNode, session: NonNullable<ReturnType<typeof sessionOn>>): string {
+  if (session.lostWrites === 0) return ''
+  return `, ${session.lostWrites.toLocaleString('en-US')} ${session.lostWrites === 1 ? 'write' : 'writes'} lost on ${node.engineId}`
 }
 
 /**

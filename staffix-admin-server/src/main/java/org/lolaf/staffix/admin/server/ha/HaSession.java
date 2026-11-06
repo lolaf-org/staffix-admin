@@ -58,4 +58,9 @@ public class HaSession {
      * What the follower has yet to store, which delays its takeover though it reads as in sync.
      */
     long pendingWrites;
+    /**
+     * Messages this node's store gave up on since its last reset. A re-sync clears it on the follower by copying the
+     * leader's store, holes included.
+     */
+    long lostWrites;
 }
