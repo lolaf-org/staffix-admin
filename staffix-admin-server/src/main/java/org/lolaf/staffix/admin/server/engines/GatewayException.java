@@ -76,4 +76,8 @@ public class GatewayException extends ErrorResponseException {
         return new GatewayException(HttpStatus.BAD_GATEWAY,
                 "Engine '" + engineId + "' did not answer: " + cause.getMessage(), cause);
     }
+
+    public boolean isUnanswered() {
+        return getCause() != null;
+    }
 }

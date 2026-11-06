@@ -331,7 +331,7 @@ class HttpEngineGateway implements EngineGateway {
     public List<SessionProbe> getComponentProbes(String engineId, String component) {
         CachedStatus cached = cached(engineId);
         synchronized (cached) {
-            FreshRead<List<SessionProbe>> probes = refreshed(cached.componentProbes.get(component), () -> readComponentProbes(engineId, component));
+            FreshRead<List<SessionProbe>> probes = refreshed(cached, cached.componentProbes.get(component), () -> readComponentProbes(engineId, component));
             cached.componentProbes.put(component, probes);
             return probes.get();
         }
@@ -357,7 +357,7 @@ class HttpEngineGateway implements EngineGateway {
     public Optional<HaStatus> getHa(String engineId) {
         CachedStatus cached = cached(engineId);
         synchronized (cached) {
-            cached.ha = refreshed(cached.ha, () -> readHa(engineId));
+            cached.ha = refreshed(cached, cached.ha, () -> readHa(engineId));
             return cached.ha.get();
         }
     }
@@ -379,7 +379,7 @@ class HttpEngineGateway implements EngineGateway {
     public List<HaSession> getHaSessions(String engineId) {
         CachedStatus cached = cached(engineId);
         synchronized (cached) {
-            cached.haSessions = refreshed(cached.haSessions,
+            cached.haSessions = refreshed(cached, cached.haSessions,
                     () -> List.of(call(engineId, HttpMethod.GET, List.of("ha", "sessions"), null, HaSession[].class)));
             return cached.haSessions.get();
         }
@@ -419,15 +419,19 @@ class HttpEngineGateway implements EngineGateway {
         return statuses.computeIfAbsent(engineId, id -> new CachedStatus());
     }
 
-    private <T> FreshRead<T> refreshed(@Nullable FreshRead<T> last, Supplier<T> read) {
-        if (last != null && clock.instant().isBefore(last.freshUntil())) {
+    private <T> FreshRead<T> refreshed(CachedStatus cached, @Nullable FreshRead<T> last, Supplier<T> read) {
+        Instant now = clock.instant();
+        if (last != null && now.isBefore(last.freshUntil())) {
             return last;
         }
+        cached.failIfUnanswered(now);
         try {
             T value = read.get();
             return new FreshRead<>(value, null, clock.instant().plus(STATUS_FRESH));
         } catch (GatewayException e) {
-            return new FreshRead<>(null, e, failureFreshUntil());
+            Instant freshUntil = failureFreshUntil();
+            cached.rememberIfUnanswered(e, freshUntil);
+            return new FreshRead<>(null, e, freshUntil);
         }
     }
 
@@ -488,7 +492,9 @@ class HttpEngineGateway implements EngineGateway {
         RegisteredEngine engine = registry.get(engineId);
         CachedStatus cached = statuses.computeIfAbsent(engineId, id -> new CachedStatus());
         synchronized (cached) {
-            if (!cached.isFresh(engine, clock.instant())) {
+            Instant now = clock.instant();
+            if (!cached.isFresh(engine, now)) {
+                cached.failIfUnanswered(now);
                 cached.engine = engine;
                 try {
                     ConnectorStatus status = call(engineId, HttpMethod.GET, List.of("status"), null, ConnectorStatus.class);
@@ -502,6 +508,7 @@ class HttpEngineGateway implements EngineGateway {
                 } catch (GatewayException e) {
                     cached.failure = e;
                     cached.freshUntil = failureFreshUntil();
+                    cached.rememberIfUnanswered(e, cached.freshUntil);
                 }
             }
             if (cached.failure != null) {
@@ -563,6 +570,7 @@ class HttpEngineGateway implements EngineGateway {
         if (cached != null) {
             synchronized (cached) {
                 cached.freshUntil = null;
+                cached.unanswered = null;
                 cached.ha = null;
                 cached.haSessions = null;
                 cached.componentProbes.clear();
@@ -708,8 +716,9 @@ class HttpEngineGateway implements EngineGateway {
 
     /**
      * Also holds a failed call, for as long as the request timeout: the viewers waiting on an engine that does not
-     * answer do not each wait it out in turn, and a poll does not spend all its time waiting. The description, the
-     * alerts and each session's probes are kept until the status reports another version of them.
+     * answer do not each wait it out in turn, and a poll does not spend all its time waiting. Reads share this lock, so
+     * an engine that did not answer fails all of them: each waiting in its turn would keep the lock busy. The
+     * description, the alerts and each session's probes are kept until the status reports another version of them.
      */
     private static final class CachedStatus {
         @Nullable RegisteredEngine engine;
@@ -717,12 +726,25 @@ class HttpEngineGateway implements EngineGateway {
         @Nullable ConnectorSessions described;
         @Nullable List<EngineSession> sessions;
         @Nullable GatewayException failure;
+        @Nullable FreshRead<Void> unanswered;
         @Nullable Long alertsVersion;
         List<ConnectorAlerts.Alert> alerts = List.of();
         final Map<List<String>, CachedProbes> probes = new HashMap<>();
         @Nullable FreshRead<Optional<HaStatus>> ha;
         @Nullable FreshRead<List<HaSession>> haSessions;
         final Map<String, FreshRead<List<SessionProbe>>> componentProbes = new HashMap<>();
+
+        void failIfUnanswered(Instant now) {
+            if (unanswered != null && now.isBefore(unanswered.freshUntil())) {
+                unanswered.get();
+            }
+        }
+
+        void rememberIfUnanswered(GatewayException e, Instant freshUntil) {
+            if (e.isUnanswered()) {
+                unanswered = new FreshRead<>(null, e, freshUntil);
+            }
+        }
 
         boolean isFresh(RegisteredEngine current, Instant now) {
             return engine != null && freshUntil != null && now.isBefore(freshUntil)

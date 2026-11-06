@@ -63,6 +63,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -165,6 +166,7 @@ class HttpEngineGatewayTest {
     private final Map<String, String> bodies = new ConcurrentHashMap<>();
     private final Map<String, Integer> statuses = new ConcurrentHashMap<>();
     private final Map<String, Duration> takes = new ConcurrentHashMap<>();
+    private final Set<String> hanging = ConcurrentHashMap.newKeySet();
     private final SteppingClock clock = new SteppingClock();
     private HttpServer connector;
     /**
@@ -204,6 +206,9 @@ class HttpEngineGatewayTest {
         String request = exchange.getRequestMethod() + " " + path;
         requests.add(request);
         clock.step(takes.getOrDefault(request, Duration.ZERO));
+        if (hanging.contains(request)) {
+            sleep(REQUEST_TIMEOUT.plusMillis(200));
+        }
         bodies.put(request, new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
         if (path.equals("ha/switchover") || path.equals("ha/candidacy")) {
             sleep(switchoverTakes);
@@ -520,6 +525,65 @@ class HttpEngineGatewayTest {
         gateway.listGroups("alpha-engine");
 
         assertThat(requests).containsExactly("GET ha", "GET status", "GET sessions");
+    }
+
+    @Test
+    void anEngineThatDoesNotAnswerAHighAvailabilityReadFailsItsOtherReadsAtOnce() {
+        hangs("GET ha");
+        assertThatThrownBy(() -> gateway.getHa("alpha-engine")).isInstanceOf(GatewayException.class);
+
+        assertThatThrownBy(() -> gateway.getHaSessions("alpha-engine")).hasMessageContaining("did not answer");
+        assertThatThrownBy(() -> gateway.getComponentProbes("alpha-engine", "ha")).hasMessageContaining("did not answer");
+        assertThatThrownBy(() -> gateway.listGroups("alpha-engine")).hasMessageContaining("did not answer");
+
+        assertThat(requests).containsExactly("GET ha");
+    }
+
+    @Test
+    void anEngineThatDoesNotAnswerAStatusReadFailsItsOtherReadsAtOnce() {
+        hangs("GET status");
+        assertThatThrownBy(() -> gateway.listGroups("alpha-engine")).isInstanceOf(GatewayException.class);
+
+        assertThatThrownBy(() -> gateway.getHa("alpha-engine")).hasMessageContaining("did not answer");
+
+        assertThat(requests).containsExactly("GET status");
+    }
+
+    @Test
+    void aFailureTheEngineAnsweredLeavesItsOtherReadsAlone() {
+        failsAfterTheRequestTimeout("GET ha");
+        assertThatThrownBy(() -> gateway.getHa("alpha-engine")).isInstanceOf(GatewayException.class);
+
+        assertThat(gateway.listGroups("alpha-engine")).isNotEmpty();
+    }
+
+    @Test
+    void allReadsAreTriedAgainARequestTimeoutAfterTheEngineDidNotAnswer() {
+        hangs("GET ha");
+        assertThatThrownBy(() -> gateway.getHa("alpha-engine")).isInstanceOf(GatewayException.class);
+        hanging.clear();
+        takes.clear();
+
+        clock.step(REQUEST_TIMEOUT);
+
+        assertThat(gateway.listGroups("alpha-engine")).isNotEmpty();
+    }
+
+    @Test
+    void anActionForgetsThatTheEngineDidNotAnswer() {
+        hangs("GET ha");
+        assertThatThrownBy(() -> gateway.getHa("alpha-engine")).isInstanceOf(GatewayException.class);
+        hanging.clear();
+        takes.clear();
+
+        gateway.resync("alpha-engine");
+
+        assertThat(gateway.listGroups("alpha-engine")).isNotEmpty();
+    }
+
+    private void hangs(String request) {
+        hanging.add(request);
+        takes.put(request, REQUEST_TIMEOUT);
     }
 
     private void failsAfterTheRequestTimeout(String request) {
