@@ -406,6 +406,7 @@
                                 <exclude>**/src/config/**</exclude>
                                 <exclude>staffix-admin-sandbox/console/**</exclude>
                                 <exclude>staffix-admin-sandbox/docker/conf/**</exclude>
+                                <exclude>staffix-admin-sandbox/witness/**</exclude>
                                 <exclude>**/*.html</exclude>
                                 <exclude>**/.dockerignore</exclude>
                                 <exclude>lombok.config</exclude>
