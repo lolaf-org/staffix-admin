@@ -52,6 +52,7 @@ public class SandboxHaNode {
     private static final String SECRET = "sandbox-secret-change-it";
     private static final int WITNESS_PORT = 7340;
     private static final Duration NEWS_INTERVAL = Duration.ofMillis(500);
+    private static final int EVENTS_BATCHING = 1000;
 
     static int fixPort(int nodeId) {
         return 7300 + nodeId;
@@ -69,7 +70,10 @@ public class SandboxHaNode {
         SandboxDatabase database = new SandboxDatabase(settings, "venue_y_" + nodeId, firstStart);
         SandboxEngine engine = new SandboxEngine(engineId, settings)
                 .messagesStore(AsyncMessagesStoreSettings.builder()
-                        .asyncStoreSettings(AsyncStoreSettings.builder().asyncQueueDirectory(queueDirectory.toString()).build())
+                        .asyncStoreSettings(AsyncStoreSettings.builder()
+                                .asyncQueueDirectory(queueDirectory.toString())
+                                .eventsBatching(EVENTS_BATCHING)
+                                .build())
                         .wrappedFixMessagesStoreSettings(SandboxApplication.jdbcStore(database))
                         .build())
                 .alertsPublisher(SandboxApplication.alertmanager(settings))

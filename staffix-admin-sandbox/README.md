@@ -99,7 +99,8 @@ and reads `quotes.pending` from its requests in flight (a gauge read at each exp
 `consoleUsername`, `consolePassword`, `adminApiPort` and `otlpUrl` override the defaults.
 
 `venue-x` stores its messages in Postgres through staffix's JDBC store, and each `venue-y` node through the async store
-in front of the JDBC store; `alpha-bank` keeps them in memory. `venue-x` and each node have their own schema (`venue_x`,
+in front of the JDBC store, writing in batches so a follower stores a snapshot in seconds; `alpha-bank` keeps them in
+memory. `venue-x` and each node have their own schema (`venue_x`,
 `venue_y_1`, `venue_y_2`) in the `staffix` database, recreated at each start from the DDL the build generates with
 staffix's DDL plugin (a node restarted alone keeps its own). Both
 venues post their alerts to Alertmanager, labelled `env=sandbox` (its UI on http://localhost:9093, which notifies
