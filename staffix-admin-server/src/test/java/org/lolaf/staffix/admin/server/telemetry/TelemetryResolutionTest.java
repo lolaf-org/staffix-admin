@@ -69,7 +69,7 @@ class TelemetryResolutionTest {
     }
 
     private MetricsResult readLatency(MetricStatistic statistic, @Nullable Duration rateWindow) {
-        return metricsController.queryMetrics("alpha", null, null, "messages.read.latency", statistic, 0.99, List.of("fix.mt"), null,
+        return metricsController.queryMetrics("alpha", null, null, null, "messages.read.latency", statistic, 0.99, List.of("fix.mt"), null,
                 FROM, TO, rateWindow);
     }
 
@@ -213,12 +213,26 @@ class TelemetryResolutionTest {
         };
         when(sources.metrics("alpha", null, null)).thenReturn(new TelemetrySources.Resolved<>(List.of(source), List.of(), Map.of()));
 
-        metricsController.queryMetrics("alpha", null, null, "messages.encoding.latency", MetricStatistic.MEAN, 0.99, null, null, FROM, TO, null);
-        metricsController.queryMetrics("alpha", null, null, "orders.pricing", MetricStatistic.QUANTILE, 0.9, List.of("venue"), null, FROM, TO, null);
+        metricsController.queryMetrics("alpha", null, null, null, "messages.encoding.latency", MetricStatistic.MEAN, 0.99, null, null, FROM, TO, null);
+        metricsController.queryMetrics("alpha", null, null, null, "orders.pricing", MetricStatistic.QUANTILE, 0.9, List.of("venue"), null, FROM, TO, null);
 
         assertThat(queries).extracting(MetricQuery::getTagFilters, MetricQuery::getQuantile, MetricQuery::getSplitBy).containsExactly(
                 tuple(Map.of("fix.md", "o"), null, List.of()),
                 tuple(Map.of(), 0.9, List.of("venue")));
+    }
+
+    @Test
+    void readsAnEngineMeterThroughTheMonitoringPluginGivenRatherThanItsSessions() {
+        List<MetricQuery> queries = new ArrayList<>();
+        MetricsSource source = query -> {
+            queries.add(query);
+            return List.of();
+        };
+        when(sources.engineMetrics("alpha", "ha-metrics")).thenReturn(new TelemetrySources.Resolved<>(List.of(source), List.of(), Map.of()));
+
+        metricsController.queryMetrics("alpha", null, null, "ha-metrics", "ha.role", MetricStatistic.VALUE, 0.99, null, null, FROM, TO, null);
+
+        assertThat(queries).extracting(MetricQuery::getMeter).containsExactly("ha.role");
     }
 
     @Test

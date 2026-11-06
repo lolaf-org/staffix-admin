@@ -140,7 +140,7 @@ class HttpEngineGatewayTest {
              "candidacySupported":true,"candidate":true,
              "followers":[{"nodeId":"2","link":1,"address":"/10.0.0.2:40000","connected":true,"inSync":true,
                "snapshotInProgress":false,"unsentBytes":0,"lagMillis":3}],
-             "switchoverMaxDuration":"PT4S",
+             "switchoverMaxDuration":"PT4S","monitoringInstanceId":"metrics",
              "droppedFollowers":[{"nodeId":"3","link":1,"droppedAt":"2026-10-10T10:05:00Z","heldOffUntil":"2026-10-10T10:05:02Z"}]}
             """;
 
@@ -333,6 +333,7 @@ class HttpEngineGatewayTest {
     @Test
     void aPairNodeReadsItsStatusAndSessions() {
         HaStatus ha = gateway.getHa("alpha-engine").orElseThrow();
+        assertThat(ha.getMonitoringInstanceId()).isEqualTo("metrics");
 
         assertThat(ha.getPairName()).isEqualTo("gateway");
         assertThat(ha.getRole()).isEqualTo(HaRole.LEADER);

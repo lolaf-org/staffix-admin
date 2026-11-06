@@ -71,6 +71,16 @@ public class TelemetrySources {
     }
 
     /**
+     * What the engine publishes through this monitoring plugin itself, which its sessions need not use.
+     *
+     * @throws IllegalArgumentException if a connector's stored settings cannot make a source
+     */
+    public Resolved<MetricsSource> engineMetrics(String engineId, String monitoring) {
+        return resolve(Map.of(Emitters.ofEngine(monitoring), List.of()), emitters -> telemetry.metrics(engineId, List.of(emitters)),
+                emitters -> monitor(engineId, emitters));
+    }
+
+    /**
      * @param sessionId a config id: an initiator's backup reads as its session
      * @throws IllegalArgumentException if a connector's stored settings cannot make a source
      */
@@ -94,6 +104,11 @@ public class TelemetrySources {
         if (sessionsByEmitters.isEmpty()) {
             return new Resolved<>(everySource.get(), List.of(), Map.of());
         }
+        return resolve(sessionsByEmitters, sourcesOf, monitorOf);
+    }
+
+    private <S> Resolved<S> resolve(Map<Emitters, List<String>> sessionsByEmitters, Function<Emitters, List<S>> sourcesOf,
+                                    Function<Emitters, Optional<EngineEmitterSettings.Monitor>> monitorOf) {
         Set<S> sources = new LinkedHashSet<>();
         Set<String> notCollected = new TreeSet<>();
         Map<S, Set<Optional<TimeUnit>>> unitsBySource = new HashMap<>();

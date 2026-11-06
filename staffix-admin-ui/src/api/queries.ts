@@ -409,6 +409,8 @@ export interface MetricScope {
   engineId: string
   group?: string
   sessionId?: string
+  /** Reads what the engine publishes itself through this plugin rather than through its sessions. */
+  monitoringInstanceId?: string
 }
 
 /**

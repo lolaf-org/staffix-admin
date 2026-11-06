@@ -21,9 +21,13 @@ import { formatRateValue, formatSeconds } from '../telemetry/format'
 import { seriesColors } from '../telemetry/series'
 import { TimeRangeSelector, type Period } from '../telemetry/TimeRangeSelector'
 import { useThemeMode } from '../theme/ThemeMode'
-import { shownNode, type HaPair } from './pairs'
+import { shownNode, type HaNode, type HaPair } from './pairs'
 
 const ROLE_NAMES: Record<number, string> = { 2: 'leader', 1: 'follower', 0: 'unknown' }
+
+function engineScope(node: HaNode) {
+  return { engineId: node.engineId, monitoringInstanceId: node.status?.monitoringInstanceId ?? undefined }
+}
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1 << 20) return `${(bytes / (1 << 20)).toFixed(1)} MiB`
@@ -151,8 +155,8 @@ function PairChart({ pair, spec, period, live }: PairChartProps) {
   const split = spec.request.splitBy[0]
   const first = split ? shownNode(pair) : pair.nodes[0]!
   const second = split ? undefined : pair.nodes[1]
-  const firstMetrics = useMetrics({ engineId: first.engineId }, spec.request, period, undefined, live)
-  const secondMetrics = useMetrics({ engineId: second?.engineId ?? first.engineId }, second ? spec.request : undefined, period, undefined, live)
+  const firstMetrics = useMetrics(engineScope(first), spec.request, period, undefined, live)
+  const secondMetrics = useMetrics(engineScope(second ?? first), second ? spec.request : undefined, period, undefined, live)
 
   const named = (engineId: string, metrics: typeof firstMetrics) =>
     (metrics.data?.series ?? []).map((s) => ({ name: split ? s.labels[split] ?? engineId : engineId, points: s.points }))

@@ -93,12 +93,14 @@ public class MetricsController {
     /**
      * One series per combination of the {@code splitBy} tags' values. A rate is averaged over {@code rateWindow},
      * else the step, widened to hold two of the engines' exports and to the backend's own minimum; the result says to
-     * what.
+     * what. {@code monitoringInstanceId} reads what the engine publishes itself through that plugin, for an engine
+     * meter its sessions may not share.
      */
     @GetMapping("/api/metrics")
     public MetricsResult queryMetrics(@RequestParam String engineId,
                                       @RequestParam(required = false) @Nullable String group,
                                       @RequestParam(required = false) @Nullable String sessionId,
+                                      @RequestParam(required = false) @Nullable String monitoringInstanceId,
                                       @RequestParam String meter,
                                       @RequestParam MetricStatistic statistic,
                                       @RequestParam(defaultValue = "0.99") @DecimalMin("0") @DecimalMax("1") double quantile,
@@ -120,7 +122,7 @@ public class MetricsController {
         if (RECORDED_DIRECTION.containsKey(meter)) {
             query.tagFilter(DIRECTION, RECORDED_DIRECTION.get(meter));
         }
-        return query(engineId, group, sessionId, from, to, rateWindow, statistic, List.of(query));
+        return query(engineId, group, sessionId, monitoringInstanceId, from, to, rateWindow, statistic, List.of(query));
     }
 
     /**
@@ -134,7 +136,7 @@ public class MetricsController {
                                            @RequestParam Instant from,
                                            @RequestParam Instant to,
                                            @RequestParam(required = false) @Nullable Duration rateWindow) {
-        return query(engineId, group, sessionId, from, to, rateWindow, MetricStatistic.RATE, List.of(
+        return query(engineId, group, sessionId, null, from, to, rateWindow, MetricStatistic.RATE, List.of(
                 messageRate(READ, FixMessageDirection.IN.getValue()),
                 messageRate(WRITE, FixMessageDirection.OUT.getValue())));
     }
@@ -148,11 +150,14 @@ public class MetricsController {
                 .tagFilter(DIRECTION, direction);
     }
 
-    private MetricsResult query(String engineId, @Nullable String group, @Nullable String sessionId, Instant from, Instant to,
+    private MetricsResult query(String engineId, @Nullable String group, @Nullable String sessionId,
+                                @Nullable String monitoringInstanceId, Instant from, Instant to,
                                 @Nullable Duration rateWindow, MetricStatistic statistic, List<MetricQuery.MetricQueryBuilder> queries) {
         requirePositive(rateWindow);
         TelemetrySources.Resolved<MetricsSource> resolved = TelemetryProblems.requireSources("metrics", engineId, group, sessionId,
-                () -> telemetrySources.metrics(engineId, group, sessionId));
+                () -> monitoringInstanceId == null
+                        ? telemetrySources.metrics(engineId, group, sessionId)
+                        : telemetrySources.engineMetrics(engineId, monitoringInstanceId));
         TimeRange range = TimeRange.of(from, to);
         Duration step = range.chartStep();
         try {

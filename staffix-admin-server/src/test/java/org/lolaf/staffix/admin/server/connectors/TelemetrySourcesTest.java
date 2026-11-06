@@ -105,6 +105,17 @@ class TelemetrySourcesTest {
     }
 
     @Test
+    void readsAnEngineMeterThroughItsMonitoringPluginWhateverItsSessionsUse() {
+        MetricsSource metrics = query -> List.of();
+        when(telemetry.metrics("alpha", List.of(Emitters.ofEngine("ha-metrics")))).thenReturn(List.of(metrics));
+        when(emitterSettings.monitor("alpha", "ha-metrics")).thenReturn(Optional.of(new EngineEmitterSettings.Monitor(
+                List.of("OtlpMicrometerMonitoringManagerSettings"), null, TimeUnit.MICROSECONDS, Duration.ofSeconds(5))));
+
+        assertThat(sources.engineMetrics("alpha", "ha-metrics")).isEqualTo(new TelemetrySources.Resolved<>(List.of(metrics), List.of(),
+                Map.of(metrics, TimeUnit.MICROSECONDS), Map.of(metrics, Duration.ofSeconds(5))));
+    }
+
+    @Test
     void readsABackupConfigAsItsSession() {
         assertThat(sources.logs("alpha", "beta", "trading-drp").sources()).containsExactly(INITIATORS_LOGS);
     }

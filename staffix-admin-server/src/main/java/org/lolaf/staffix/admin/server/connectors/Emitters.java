@@ -21,9 +21,17 @@ import org.lolaf.staffix.admin.server.sessions.SessionSummary;
 /**
  * The engine instances a session's telemetry goes through, which select the connectors it is read from.
  *
- * @param monitoring null when the session is not monitored
+ * @param messagesLogger null for an engine's own telemetry
+ * @param monitoring     null when the session is not monitored
  */
-public record Emitters(String messagesLogger, @Nullable String monitoring) {
+public record Emitters(@Nullable String messagesLogger, @Nullable String monitoring) {
+
+    /**
+     * The emitter of what an engine publishes itself rather than through a session.
+     */
+    public static Emitters ofEngine(String monitoring) {
+        return new Emitters(null, monitoring);
+    }
 
     public static Emitters of(SessionSummary session) {
         return new Emitters(session.getMessagesLoggerInstanceId(), session.getMonitoringInstanceId());
