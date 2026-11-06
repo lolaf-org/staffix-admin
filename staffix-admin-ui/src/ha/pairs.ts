@@ -18,6 +18,11 @@ import type { Schemas } from '../api/client'
 export type HaPair = Schemas['HaPair']
 export type HaNode = Schemas['Node']
 
+/**
+ * A count below this is a live session's writes in flight, changing at each poll: nothing a takeover would wait for.
+ */
+const MAX_PENDING_WRITES = 1_000
+
 export function leaderOf(pair: HaPair): HaNode | undefined {
   return pair.nodes.find((node) => node.status?.role === 'LEADER')
 }
@@ -72,8 +77,10 @@ export function replicationState(pair: HaPair, group: string, sessionId: string)
   const refusal = onFollower?.notReplicatedReason ?? onShown.notReplicatedReason
   if (refusal) return { text: `refused (${refusal})`, health: 'error' }
   if (!onFollower) return { text: 'not started', health: 'error' }
-  if (onFollower.handedOver) return { text: 'handed over', health: 'ok' }
-  return onFollower.inSync ? { text: 'in sync', health: 'ok' } : { text: 'catching up', health: 'warning' }
+  const behind = onFollower.pendingWrites > MAX_PENDING_WRITES
+  const pending = behind ? `, ${onFollower.pendingWrites.toLocaleString('en-US')} writes pending` : ''
+  if (!onFollower.handedOver && !onFollower.inSync) return { text: `catching up${pending}`, health: 'warning' }
+  return { text: `${onFollower.handedOver ? 'handed over' : 'in sync'}${pending}`, health: behind ? 'warning' : 'ok' }
 }
 
 /**

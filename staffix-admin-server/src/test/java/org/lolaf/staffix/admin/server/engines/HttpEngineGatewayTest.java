@@ -146,7 +146,7 @@ class HttpEngineGatewayTest {
     private static final String HA_SESSIONS = """
             [{"group":"alpha","name":"trading","fixSessionType":"INITIATOR","replicationMode":"SYNC_RECEIVED",
               "replicationAckTimeout":"PT1S","inSync":false,"notReplicatedReason":"storage shared with the leader",
-              "unprotected":true,"unacknowledgedSends":2,"nextIncomingSeqNum":-1,"nextOutgoingSeqNum":-1,"handedOver":false}]
+              "unprotected":true,"unacknowledgedSends":2,"nextIncomingSeqNum":-1,"nextOutgoingSeqNum":-1,"handedOver":false,"pendingWrites":3}]
             """;
 
     private volatile String sessionsVersion = "v1";
@@ -334,6 +334,7 @@ class HttpEngineGatewayTest {
             assertThat(session.getReplicationMode()).isEqualTo("SYNC_RECEIVED");
             assertThat(session.getReplicationAckTimeout()).isEqualTo(Duration.ofSeconds(1));
             assertThat(session.getNotReplicatedReason()).isEqualTo("storage shared with the leader");
+            assertThat(session.getPendingWrites()).isEqualTo(3);
         });
     }
 

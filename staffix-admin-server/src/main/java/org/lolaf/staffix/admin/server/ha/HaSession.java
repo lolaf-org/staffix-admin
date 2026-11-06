@@ -54,4 +54,8 @@ public class HaSession {
      * Taking it over keeps its outgoing sequence number.
      */
     boolean handedOver;
+    /**
+     * What the follower has yet to store, which delays its takeover though it reads as in sync.
+     */
+    long pendingWrites;
 }
