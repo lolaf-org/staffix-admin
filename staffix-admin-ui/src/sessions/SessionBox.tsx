@@ -20,7 +20,7 @@ import { STATUS_COLORS, STATUS_LABELS } from './status'
 import { formatIdentity } from './identity'
 import { AlertBell } from '../alerts/AlertBell'
 import { ALERT_LEVEL_LABELS } from '../alerts/levels'
-import type { StandbyState } from '../ha/pairs'
+import { needsAttention, type ReplicationState } from '../ha/pairs'
 
 interface Props {
   session: Schemas['SessionSummary']
@@ -35,23 +35,23 @@ interface Props {
    */
   stale?: boolean
   /**
-   * Where the standby stands, for a session of a high availability pair. A running session the standby does not
+   * How a session of a high availability pair replicates. A running session the follower does not
    * protect takes its own colour, apart from the status colours; a session that is down keeps its status colour.
    */
-  standby?: StandbyState
+  replication?: ReplicationState
 }
 
-const STANDBY_TEXT_TYPES = { ok: 'secondary', warning: 'warning', error: 'danger' } as const
+const REPLICATION_TEXT_TYPES = { none: 'secondary', ok: 'secondary', warning: 'warning', error: 'danger' } as const
 
 /**
  * 50% over Ant Design's 250 px, so a full FIX session id usually fits on one line.
  */
 const TOOLTIP_MAX_WIDTH = 375
 
-export function SessionBox({ session, alerts, selected, onClick, stale = false, standby }: Props) {
+export function SessionBox({ session, alerts, selected, onClick, stale = false, replication }: Props) {
   const { token } = theme.useToken()
   const statusColor = STATUS_COLORS[session.status]
-  const colors = statusColor === 'success' && standby && standby.health !== 'ok'
+  const colors = statusColor === 'success' && replication && needsAttention(replication)
     ? { background: token.purple1, border: token.purple }
     : {
         success: { background: token.colorSuccessBg, border: token.colorSuccess },
@@ -69,7 +69,7 @@ export function SessionBox({ session, alerts, selected, onClick, stale = false, 
         <>
           <div>{formatIdentity(session.identity)}</div>
           {stale && <div>Last known state: the engine does not answer</div>}
-          {standby && <div>Standby: {standby.text}</div>}
+          {replication && <div>Replication: {replication.text}</div>}
           <div>{STATUS_LABELS[session.status]}</div>
           {stale && session.alertLevel && <div>Last known worst alert: {ALERT_LEVEL_LABELS[session.alertLevel]}</div>}
           {!stale && alerts.map((alert) => (
@@ -128,10 +128,10 @@ export function SessionBox({ session, alerts, selected, onClick, stale = false, 
         <Typography.Text type="secondary" ellipsis style={{ fontSize: 11 }}>
           instance {session.instanceId}
         </Typography.Text>
-        {standby && (
-          <Typography.Text type={STANDBY_TEXT_TYPES[standby.health]} strong={standby.health !== 'ok'} ellipsis style={{ fontSize: 11 }}>
-            {standby.health !== 'ok' && <WarningFilled style={{ marginRight: 4 }} />}
-            Standby: {standby.text}
+        {replication && (
+          <Typography.Text type={REPLICATION_TEXT_TYPES[replication.health]} strong={needsAttention(replication)} ellipsis style={{ fontSize: 11 }}>
+            {needsAttention(replication) && <WarningFilled style={{ marginRight: 4 }} />}
+            Replication: {replication.text}
           </Typography.Text>
         )}
       </button>

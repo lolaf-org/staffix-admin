@@ -60,11 +60,11 @@ const LATENCY_CHARTS: ChartSpec[] = [
     request: meter('ha.follower.ack.latency', 'MEAN'), format: formatSeconds },
   {
     title: 'SYNC ack latency by mode (mean)',
-    description: 'How long SYNC sends waited for the follower, for those it acknowledged: SYNC_RECEIVED until it received them, SYNC_APPLIED until it applied them.',
+    description: 'How long SYNC sends waited for the follower, for those it acknowledged: SYNC_RECEIVED until it received them, SYNC_APPLIED until it applied them. Empty without a session in a SYNC mode.',
     request: meter('ha.sync.ack.latency', 'MEAN', ['mode']), format: formatSeconds },
   {
     title: 'Follower store write (mean)',
-    description: "On the follower: how long a read's events took to reach its store after being acknowledged as received, the window in which a SYNC_RECEIVED send is in its memory only.",
+    description: "On the follower: how long a read's events took to reach its store after being acknowledged as received, the window in which a SYNC_RECEIVED send is in its memory only. Only SYNC_RECEIVED sessions feed this chart.",
     request: meter('ha.replica.received.write.latency', 'MEAN'), format: formatSeconds },
 ]
 
@@ -90,9 +90,9 @@ const FLOW_CHARTS: ChartSpec[] = [
     description: 'Follower links dropped because a write waited logFullTimeout for them.',
     request: meter('ha.follower.too.slow', 'COUNTER_RATE'), format: formatRateValue },
   {
-    title: 'Send buffers exhausted',
-    description: 'Times the leader paused sending because every send buffer was waiting for the network. Growing steadily on a healthy network means sendBuffers is too small.',
-    request: meter('ha.follower.send.buffers.exhausted', 'COUNTER_RATE'), format: formatRateValue },
+    title: 'Send waits',
+    description: "Times per second the leader had writes for a follower and could not send them, every send buffer being in flight or the connection's write limit reached. Growing steadily on a healthy network, sendBuffers is too small.",
+    request: meter('ha.follower.send.waits', 'COUNTER_RATE'), format: formatRateValue },
   {
     title: 'Role',
     description: 'The role each node acts on. A change is a failover or a switchover.',

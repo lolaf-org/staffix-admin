@@ -21,7 +21,7 @@ import type { Schemas } from '../api/client'
 import { sessionRoute, useEngineAlerts, useEngines, useGroups, useHaPairs } from '../api/queries'
 import { useFolded } from '../layout/useFolded'
 import { NodeTag } from '../ha/NodeTag'
-import { leaderOf, pairOf, shownNode, standbyState, type HaPair } from '../ha/pairs'
+import { leaderOf, needsAttention, pairOf, replicationState, shownNode, type HaPair } from '../ha/pairs'
 import { STATUS_LABELS, STATUSES, type Status } from '../sessions/status'
 import { AddSessionModal } from '../sessions/AddSessionModal'
 import { StatusBadge } from '../sessions/StatusBadge'
@@ -117,8 +117,8 @@ function EngineCard({ engine, pair }: { engine: Schemas['Engine']; pair?: HaPair
     const key = `${alert.group}.${alert.sessionId}`
     alertsBySession.set(key, [...(alertsBySession.get(key) ?? []), alert])
   }
-  const standbys = pair?.name ? sessions.map((s) => standbyState(pair, s.group, s.id)) : []
-  const unprotected = standbys.filter((standby) => standby.health !== 'ok')
+  const replications = pair?.name ? sessions.map((s) => replicationState(pair, s.group, s.id)) : []
+  const notReplicating = replications.filter(needsAttention)
   const alertCounts = ALERT_LEVELS.map((level) => ({
     level,
     count: sessions.filter((s) => s.alertLevel === level).length,
@@ -156,9 +156,9 @@ function EngineCard({ engine, pair }: { engine: Schemas['Engine']; pair?: HaPair
             </>
           )}
           {pair?.nodes.map((node) => <NodeTag key={node.engineId} node={node} leads={node === leader} />)}
-          {unprotected.length > 0 && (
-            <Tag color={unprotected.some((standby) => standby.health === 'error') ? 'error' : 'warning'}>
-              {unprotected.length} session{unprotected.length > 1 ? 's' : ''} not protected by the standby
+          {notReplicating.length > 0 && (
+            <Tag color={notReplicating.some((replication) => replication.health === 'error') ? 'error' : 'warning'}>
+              {notReplicating.length} session{notReplicating.length > 1 ? 's' : ''} not replicating
             </Tag>
           )}
         </Space>
@@ -212,7 +212,7 @@ interface GroupBoxProps {
    */
   stale: boolean
   /**
-   * Named pairs only: an unnamed node's standby is unknown.
+   * Named pairs only: an unnamed node's follower is unknown.
    */
   pair?: HaPair
 }
@@ -253,7 +253,7 @@ function GroupBox({ engineId, group, alertsBySession, stale, pair }: GroupBoxPro
               session={session}
               alerts={alertsBySession.get(`${group.group}.${session.id}`) ?? []}
               stale={stale}
-              standby={pair && standbyState(pair, group.group, session.id)}
+              replication={pair && replicationState(pair, group.group, session.id)}
               selected={selected.engineId === engineId && selected.group === group.group && selected.sessionId === session.id}
               onClick={() => navigate({ pathname: sessionRoute(ref), search: location.search })}
             />

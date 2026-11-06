@@ -37,38 +37,45 @@ function sessionOn(node: HaNode | undefined, group: string, sessionId: string) {
   return node?.sessions.find((session) => session.group === group && session.name === sessionId)
 }
 
-export interface StandbyState {
+export interface ReplicationState {
   text: string
   /**
-   * What a failover would cost: nothing, or a session the operator should look at.
+   * What a failover would cost: nothing, or a session the operator should look at. `none` is a session configured not to
+   * replicate: the follower does not protect it, by choice.
    */
-  health: 'ok' | 'warning' | 'error'
+  health: 'none' | 'ok' | 'warning' | 'error'
+}
+
+export function needsAttention(replication: ReplicationState): boolean {
+  return replication.health === 'warning' || replication.health === 'error'
 }
 
 /**
- * Where the standby stands for a session of the node the overview shows.
+ * How a session of the node the overview shows replicates to the follower.
  */
-export function standbyState(pair: HaPair, group: string, sessionId: string): StandbyState {
+export function replicationState(pair: HaPair, group: string, sessionId: string): ReplicationState {
   const shown = shownNode(pair)
-  const standby = pair.nodes.find((node) => node !== shown)
+  const follower = pair.nodes.find((node) => node !== shown)
   const onShown = sessionOn(shown, group, sessionId)
-  if (!onShown) return { text: 'not replicated', health: 'warning' }
-  if (!standby?.status) return { text: 'unavailable', health: 'error' }
-  const onStandby = sessionOn(standby, group, sessionId)
-  const refusal = onStandby?.notReplicatedReason ?? onShown.notReplicatedReason
+  if (!shown.status) return { text: 'unavailable', health: 'error' }
+  // a node lists every session but those configured with replication mode NONE, even one a follower refuses
+  if (!onShown) return { text: 'off', health: 'none' }
+  if (!follower?.status) return { text: 'follower down', health: 'error' }
+  const onFollower = sessionOn(follower, group, sessionId)
+  const refusal = onFollower?.notReplicatedReason ?? onShown.notReplicatedReason
   if (refusal) return { text: `refused (${refusal})`, health: 'error' }
-  if (!onStandby) return { text: 'not held yet', health: 'error' }
-  if (onStandby.handedOver) return { text: 'would take over cleanly', health: 'ok' }
-  return onStandby.inSync ? { text: 'holds it in full', health: 'ok' } : { text: 'catching up', health: 'warning' }
+  if (!onFollower) return { text: 'not started', health: 'error' }
+  if (onFollower.handedOver) return { text: 'handed over', health: 'ok' }
+  return onFollower.inSync ? { text: 'in sync', health: 'ok' } : { text: 'catching up', health: 'warning' }
 }
 
 /**
  * Why a session action cannot run on this engine; undefined when it leads or has no high availability.
  */
-export function standbyReason(pairs: HaPair[], engineId: string): string | undefined {
+export function notLeadingReason(pairs: HaPair[], engineId: string): string | undefined {
   const pair = pairOf(pairs, engineId)
   if (!pair) return undefined
   const leader = leaderOf(pair)
   if (leader?.engineId === engineId) return undefined
-  return leader ? `${engineId} is a standby: use the leader, ${leader.engineId}` : `${engineId} does not lead, and its pair has no leader`
+  return leader ? `${engineId} is a follower: use the leader, ${leader.engineId}` : `${engineId} does not lead, and its pair has no leader`
 }

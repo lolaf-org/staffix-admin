@@ -19,7 +19,7 @@ import type { ReactNode } from 'react'
 import { useCanWrite } from '../api/queries'
 
 /**
- * Why the actions below it cannot run, whatever the operator's role, such as a session on a standby.
+ * Why the actions below it cannot run, whatever the operator's role, such as a session on a follower.
  */
 export const WriteBlock = createContext<string | undefined>(undefined)
 

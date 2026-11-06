@@ -22,7 +22,7 @@ import { useFolded } from '../layout/useFolded'
 import { WriteButton } from '../sessions/WriteButton'
 import { HaCharts } from './HaCharts'
 import { NodeTag } from './NodeTag'
-import { leaderOf, shownNode, standbyState, type HaNode, type HaPair, type StandbyState } from './pairs'
+import { leaderOf, needsAttention, replicationState, shownNode, type HaNode, type HaPair, type ReplicationState } from './pairs'
 
 /**
  * Past this a follower reads as stalled, whatever its last acknowledgement says: `inSync` is as of that acknowledgement.
@@ -215,7 +215,7 @@ function NodeActions({ node, leads }: { node: HaNode; leads: boolean }) {
           icon={<ReloadOutlined />}
           loading={resync.isPending}
           onConfirm={() => resync.mutate(undefined)}
-          confirm="Re-sync every session? Each goes through a snapshot, so the standby is not protected meanwhile."
+          confirm="Re-sync every session? Each goes through a snapshot, so the sessions are not protected meanwhile."
         >
           Re-sync all
         </WriteButton>
@@ -234,7 +234,7 @@ function PairSessions({ pair }: { pair: HaPair }) {
       group: session.group,
       id: session.id,
       replicated,
-      standby: standbyState(pair, session.group, session.id),
+      replication: replicationState(pair, session.group, session.id),
     }
   })
   return (
@@ -245,7 +245,7 @@ function PairSessions({ pair }: { pair: HaPair }) {
       columns={[
         { title: 'Session', key: 'session', render: (_, row) => row.key },
         { title: 'Mode', key: 'mode', render: (_, row) => row.replicated?.replicationMode ?? 'NONE' },
-        { title: 'Standby', key: 'standby', render: (_, row) => <StandbyTag standby={row.standby} /> },
+        { title: 'Replication', key: 'replication', render: (_, row) => <ReplicationTag replication={row.replication} /> },
         {
           title: 'Unacknowledged sends',
           key: 'unacknowledged',
@@ -262,12 +262,12 @@ function PairSessions({ pair }: { pair: HaPair }) {
   )
 }
 
-const STANDBY_TAG_COLORS = { ok: 'success', warning: 'warning', error: 'error' } as const
+const REPLICATION_TAG_COLORS = { none: 'default', ok: 'success', warning: 'warning', error: 'error' } as const
 
-function StandbyTag({ standby }: { standby: StandbyState }) {
+function ReplicationTag({ replication }: { replication: ReplicationState }) {
   return (
-    <Tag color={STANDBY_TAG_COLORS[standby.health]} icon={standby.health === 'ok' ? undefined : <WarningFilled />}>
-      {standby.text}
+    <Tag color={REPLICATION_TAG_COLORS[replication.health]} icon={needsAttention(replication) ? <WarningFilled /> : undefined}>
+      {replication.text}
     </Tag>
   )
 }

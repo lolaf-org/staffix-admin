@@ -20,5 +20,5 @@ export function NodeTag({ node, leads }: { node: HaNode; leads: boolean }) {
   if (!node.status) return <Tag color="error">{node.engineId}: unreachable</Tag>
   if (leads) return <Tag color="success">{node.engineId}: leader</Tag>
   if (node.status.role === 'UNKNOWN') return <Tag color="warning">{node.engineId}: no role</Tag>
-  return <Tag>{node.engineId}: standby</Tag>
+  return <Tag>{node.engineId}: follower</Tag>
 }
