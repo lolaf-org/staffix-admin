@@ -22,6 +22,7 @@ import org.lolaf.primos.Peer;
 import org.lolaf.staffix.admin.sandbox.SandboxEngine.Session;
 import org.lolaf.staffix.admin.sandbox.Traffic.Publisher;
 import org.lolaf.staffix.admin.sandbox.Traffic.Quoter;
+import org.lolaf.staffix.api.InstanceProvider;
 import org.lolaf.staffix.api.session.FixSessionSettings.HaSessionSettings.ReplicationMode;
 import org.lolaf.staffix.ha.ReplicationHaSettings;
 import org.lolaf.staffix.ha.primos.PrimosLeaderElectionSettings;
@@ -101,6 +102,7 @@ public class SandboxHaNode {
                 .peer("1", replicationAddress(1))
                 .peer("2", replicationAddress(2))
                 .monitoringInstanceId(SandboxEngine.METRICS)
+                .alertsPublisherInstanceId(InstanceProvider.DEFAULT_INSTANCE_ID)
                 .leaderElection(PrimosLeaderElectionSettings.builder()
                         .cluster(ClusterConfig.builder()
                                 .applicationName(PAIR)
