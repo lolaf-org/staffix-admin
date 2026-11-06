@@ -113,7 +113,9 @@ class HttpEngineGatewayTest {
              {"group":"beta","name":"drop-copy","selectedConfig":"drop-copy","probe":"queue","level":"CRITICAL",
               "message":"5000 queued","since":"2026-10-10T09:00:00Z"},
              {"component":"ha","probe":"ha-followers","level":"MAJOR","message":"No follower connected",
-              "since":"2026-10-10T09:30:00Z"}]}
+              "since":"2026-10-10T09:30:00Z"},
+             {"group":"gamma","name":"replica","selectedConfig":"replica","probe":"async-store-resource","level":"MAJOR",
+              "message":"down","since":"2026-10-10T09:40:00Z"}]}
             """;
     private static final String PROBES = """
             [{"name":"session-down","description":"Down inside session time","evaluationInterval":"PT1S",
@@ -485,7 +487,17 @@ class HttpEngineGatewayTest {
                         : alert.getGroup() + "." + alert.getSessionId() + "/" + alert.getConfigId()) + " " + alert.getProbe() + " "
                         + alert.getLevel())
                 .containsExactly("beta.drop-copy/drop-copy queue CRITICAL", "alpha.trading/trading-drp session-down CRITICAL",
-                        "ha ha-followers MAJOR", "alpha.trading/trading-drp queue WARNING");
+                        "ha ha-followers MAJOR", "gamma.replica/replica async-store-resource MAJOR",
+                        "alpha.trading/trading-drp queue WARNING");
+    }
+
+    @Test
+    void anAlertOfASessionTheEngineDoesNotRunIsKeptAndSaysSo() {
+        alertsVersion = 5L;
+
+        assertThat(gateway.listAlerts("alpha-engine")).filteredOn(alert -> alert.getComponent() == null)
+                .extracting(ActiveAlert::getSessionId, ActiveAlert::isSessionListed)
+                .containsExactly(tuple("drop-copy", true), tuple("trading", true), tuple("replica", false), tuple("trading", true));
     }
 
     @Test
@@ -494,7 +506,7 @@ class HttpEngineGatewayTest {
 
         assertThat(gateway.listAlerts("alpha-engine")).extracting(ActiveAlert::getProbe, ActiveAlert::getRunbookUrl)
                 .containsExactly(tuple("queue", null), tuple("session-down", null), tuple("ha-followers", null),
-                        tuple("queue", URI.create("https://wiki.example.com/queue")));
+                        tuple("async-store-resource", null), tuple("queue", URI.create("https://wiki.example.com/queue")));
     }
 
     @Test

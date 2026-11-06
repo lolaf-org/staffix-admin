@@ -55,6 +55,11 @@ public class ActiveAlert {
      */
     @Nullable
     String configId;
+    /**
+     * False for a session the engine stores but does not run, as a follower does, so it has no page and its alert cannot
+     * be cleared from here.
+     */
+    boolean sessionListed;
     String probe;
     AlertLevel level;
     String message;

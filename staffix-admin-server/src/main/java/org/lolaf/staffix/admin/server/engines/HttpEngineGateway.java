@@ -266,18 +266,27 @@ class HttpEngineGateway implements EngineGateway {
 
     @Override
     public List<ActiveAlert> listAlerts(String engineId) {
+        List<EngineSession> sessions = sessions(engineId);
+        Set<List<String>> listed = sessions.stream()
+                .map(session -> List.of(session.status().getGroup(), session.status().getName()))
+                .collect(Collectors.toSet());
         return Stream.concat(
-                        sessions(engineId).stream().flatMap(session -> session.alerts().stream()),
-                        componentAlerts(engineId).stream())
-                .map(alert -> activeAlert(engineId, alert))
+                        sessions.stream().flatMap(session -> session.alerts().stream()).map(alert -> activeAlert(engineId, alert, true)),
+                        otherAlerts(engineId, listed))
                 .sorted(ActiveAlert.WORST_FIRST)
                 .toList();
     }
 
-    private List<ConnectorAlerts.Alert> componentAlerts(String engineId) {
+    /**
+     * Those of its components, and of the sessions it stores without running them, as a follower does.
+     */
+    private Stream<ActiveAlert> otherAlerts(String engineId, Set<List<String>> listed) {
         CachedStatus cached = statuses.get(engineId);
         synchronized (cached) {
-            return cached.alerts.stream().filter(alert -> alert.getComponent() != null).toList();
+            return cached.alerts.stream()
+                    .filter(alert -> alert.getComponent() != null || !listed.contains(List.of(alert.getGroup(), alert.getName())))
+                    .map(alert -> activeAlert(engineId, alert, false))
+                    .toList().stream();
         }
     }
 
@@ -415,13 +424,14 @@ class HttpEngineGateway implements EngineGateway {
         return last != null && now.isBefore(last.at().plus(STATUS_FRESH)) ? last : new FreshRead<>(read.get(), now);
     }
 
-    private static ActiveAlert activeAlert(String engineId, ConnectorAlerts.Alert alert) {
+    private static ActiveAlert activeAlert(String engineId, ConnectorAlerts.Alert alert, boolean sessionListed) {
         return ActiveAlert.builder()
                 .engineId(engineId)
                 .component(alert.getComponent())
                 .group(alert.getGroup())
                 .sessionId(alert.getName())
                 .configId(alert.getSelectedConfig())
+                .sessionListed(sessionListed)
                 .probe(alert.getProbe())
                 .level(AlertLevel.valueOf(alert.getLevel()))
                 .message(alert.getMessage())

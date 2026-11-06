@@ -15,7 +15,7 @@
  */
 import { CaretDownOutlined, CaretRightOutlined, CheckCircleFilled, CloseCircleFilled, ReloadOutlined, SwapOutlined, ToolOutlined, WarningFilled } from '@ant-design/icons'
 import { Alert, Card, Collapse, Descriptions, Empty, Flex, Skeleton, Space, Table, Tag, theme, Tooltip, Typography } from 'antd'
-import { useComponentProbes, useGroups, useHaPairs, useResync, useResyncSession, useSetCandidate, useSwitchover } from '../api/queries'
+import { useComponentProbes, useEngineAlerts, useGroups, useHaPairs, useResync, useResyncSession, useSetCandidate, useSwitchover } from '../api/queries'
 import { AlertLevelTag } from '../alerts/AlertLevelTag'
 import { ClearComponentAlertButton } from '../alerts/ClearAlertButton'
 import { useFolded } from '../layout/useFolded'
@@ -128,6 +128,7 @@ function NodeCard({ pair, node, leads }: { pair: HaPair; node: HaNode; leads: bo
             />
           ))}
           <NodeProbes engineId={node.engineId} />
+          <NodeStoreAlerts engineId={node.engineId} />
           {status.leader && (
             <Tooltip title={status.leader.address}>
               <Typography.Text>
@@ -155,6 +156,26 @@ function NodeProbes({ engineId }: { engineId: string }) {
           {probe.level ? <AlertLevelTag level={probe.level} /> : <Typography.Text type="secondary">normal</Typography.Text>}
           {probe.message && <Typography.Text>{probe.message}</Typography.Text>}
           {probe.level && <ClearComponentAlertButton engineId={engineId} component={HA_COMPONENT} probe={probe.name} />}
+        </Flex>
+      ))}
+    </Flex>
+  )
+}
+
+/**
+ * A follower runs no session, so this is the only place its stores' alerts have.
+ */
+function NodeStoreAlerts({ engineId }: { engineId: string }) {
+  const alerts = useEngineAlerts(engineId, true)
+  const stored = alerts.data?.filter((alert) => alert.component == null && !alert.sessionListed) ?? []
+  if (stored.length === 0) return null
+  return (
+    <Flex vertical gap={4}>
+      {stored.map((alert) => (
+        <Flex key={`${alert.group}/${alert.sessionId}/${alert.probe}`} gap={6} align="center" wrap>
+          <Typography.Text code>{alert.probe}</Typography.Text>
+          <AlertLevelTag level={alert.level} />
+          <Typography.Text>{alert.group}.{alert.sessionId}: {alert.message}</Typography.Text>
         </Flex>
       ))}
     </Flex>

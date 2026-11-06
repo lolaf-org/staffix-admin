@@ -28,7 +28,7 @@ type ActiveAlert = Schemas['ActiveAlert']
  * Null for an alert of an engine component, such as its high availability, which belongs to no session.
  */
 function sessionRefOf(alert: ActiveAlert) {
-  return alert.group != null && alert.sessionId != null
+  return alert.sessionListed && alert.group != null && alert.sessionId != null
     ? { engineId: alert.engineId, group: alert.group, sessionId: alert.sessionId }
     : null
 }
@@ -64,7 +64,7 @@ export function AlertsPage() {
           if (sessionRef) {
             return { onClick: () => navigate({ pathname: sessionRoute(sessionRef), search: '?tab=alerts' }), style: { cursor: 'pointer' } }
           }
-          return alert.component === 'ha' ? { onClick: () => navigate('/ha'), style: { cursor: 'pointer' } } : {}
+          return alert.component === 'ha' || alert.component == null ? { onClick: () => navigate('/ha'), style: { cursor: 'pointer' } } : {}
         }}
         columns={[
           { title: 'Level', dataIndex: 'level', width: 100, render: (level: ActiveAlert['level']) => <AlertLevelTag level={level} /> },
@@ -79,6 +79,7 @@ export function AlertsPage() {
               <Typography.Text style={{ whiteSpace: 'nowrap' }}>
                 {alert.group}.{alert.sessionId}
                 {alert.configId !== alert.sessionId && <Typography.Text type="secondary"> on {alert.configId}</Typography.Text>}
+                {!alert.sessionListed && <Typography.Text type="secondary"> stored on {alert.engineId}</Typography.Text>}
               </Typography.Text>
             ),
           },
