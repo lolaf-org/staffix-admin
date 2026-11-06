@@ -152,7 +152,7 @@ final class SimulatedEngine implements AdminApi {
 
     private void requireLeading() {
         if (standby) {
-            throw new IllegalStateException("Engine " + engineId + " is a standby: session actions run on the leader");
+            throw new IllegalStateException("Engine " + engineId + " does not lead: session actions run on the leader");
         }
     }
 
