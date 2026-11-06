@@ -333,7 +333,7 @@ class HttpEngineGateway implements EngineGateway {
         synchronized (cached) {
             FreshRead<List<SessionProbe>> probes = refreshed(cached.componentProbes.get(component), () -> readComponentProbes(engineId, component));
             cached.componentProbes.put(component, probes);
-            return probes.value();
+            return probes.get();
         }
     }
 
@@ -358,7 +358,7 @@ class HttpEngineGateway implements EngineGateway {
         CachedStatus cached = cached(engineId);
         synchronized (cached) {
             cached.ha = refreshed(cached.ha, () -> readHa(engineId));
-            return cached.ha.value();
+            return cached.ha.get();
         }
     }
 
@@ -381,7 +381,7 @@ class HttpEngineGateway implements EngineGateway {
         synchronized (cached) {
             cached.haSessions = refreshed(cached.haSessions,
                     () -> List.of(call(engineId, HttpMethod.GET, List.of("ha", "sessions"), null, HaSession[].class)));
-            return cached.haSessions.value();
+            return cached.haSessions.get();
         }
     }
 
@@ -420,8 +420,19 @@ class HttpEngineGateway implements EngineGateway {
     }
 
     private <T> FreshRead<T> refreshed(@Nullable FreshRead<T> last, Supplier<T> read) {
-        Instant now = clock.instant();
-        return last != null && now.isBefore(last.at().plus(STATUS_FRESH)) ? last : new FreshRead<>(read.get(), now);
+        if (last != null && clock.instant().isBefore(last.freshUntil())) {
+            return last;
+        }
+        try {
+            T value = read.get();
+            return new FreshRead<>(value, null, clock.instant().plus(STATUS_FRESH));
+        } catch (GatewayException e) {
+            return new FreshRead<>(null, e, failureFreshUntil());
+        }
+    }
+
+    private Instant failureFreshUntil() {
+        return clock.instant().plus(properties.getEngineRequestTimeout());
     }
 
     private static ActiveAlert activeAlert(String engineId, ConnectorAlerts.Alert alert, boolean sessionListed) {
@@ -477,10 +488,8 @@ class HttpEngineGateway implements EngineGateway {
         RegisteredEngine engine = registry.get(engineId);
         CachedStatus cached = statuses.computeIfAbsent(engineId, id -> new CachedStatus());
         synchronized (cached) {
-            Instant now = clock.instant();
-            if (!cached.isFresh(engine, now)) {
+            if (!cached.isFresh(engine, clock.instant())) {
                 cached.engine = engine;
-                cached.at = now;
                 try {
                     ConnectorStatus status = call(engineId, HttpMethod.GET, List.of("status"), null, ConnectorStatus.class);
                     if (cached.described == null || !cached.described.getVersion().equals(status.getSessionsVersion())) {
@@ -489,8 +498,10 @@ class HttpEngineGateway implements EngineGateway {
                     readAlertsIfChanged(engineId, cached, status);
                     cached.sessions = join(cached.described, status, cached.alerts);
                     cached.failure = null;
+                    cached.freshUntil = clock.instant().plus(STATUS_FRESH);
                 } catch (GatewayException e) {
                     cached.failure = e;
+                    cached.freshUntil = failureFreshUntil();
                 }
             }
             if (cached.failure != null) {
@@ -551,7 +562,7 @@ class HttpEngineGateway implements EngineGateway {
         CachedStatus cached = statuses.get(engineId);
         if (cached != null) {
             synchronized (cached) {
-                cached.at = null;
+                cached.freshUntil = null;
                 cached.ha = null;
                 cached.haSessions = null;
                 cached.componentProbes.clear();
@@ -682,20 +693,27 @@ class HttpEngineGateway implements EngineGateway {
     private record CachedProbes(String version, List<ConnectorProbes.Probe> definitions) {
     }
 
-    private record FreshRead<T>(T value, Instant at) {
+    private record FreshRead<T>(@Nullable T value, @Nullable GatewayException failure, Instant freshUntil) {
+
+        T get() {
+            if (failure != null) {
+                throw failure;
+            }
+            return value;
+        }
     }
 
     record ConnectorSwitchover(SwitchoverOutcome outcome) {
     }
 
     /**
-     * Also holds a failed call, so the viewers waiting on an engine that does not answer do not each wait out the
-     * request timeout in turn. The description, the alerts and each session's probes are kept until the status
-     * reports another version of them.
+     * Also holds a failed call, for as long as the request timeout: the viewers waiting on an engine that does not
+     * answer do not each wait it out in turn, and a poll does not spend all its time waiting. The description, the
+     * alerts and each session's probes are kept until the status reports another version of them.
      */
     private static final class CachedStatus {
         @Nullable RegisteredEngine engine;
-        @Nullable Instant at;
+        @Nullable Instant freshUntil;
         @Nullable ConnectorSessions described;
         @Nullable List<EngineSession> sessions;
         @Nullable GatewayException failure;
@@ -707,7 +725,7 @@ class HttpEngineGateway implements EngineGateway {
         final Map<String, FreshRead<List<SessionProbe>>> componentProbes = new HashMap<>();
 
         boolean isFresh(RegisteredEngine current, Instant now) {
-            return engine != null && at != null && now.isBefore(at.plus(STATUS_FRESH))
+            return engine != null && freshUntil != null && now.isBefore(freshUntil)
                     && engine.getBaseUrl().equals(current.getBaseUrl()) && engine.getToken().equals(current.getToken());
         }
     }

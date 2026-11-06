@@ -22,7 +22,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 
 public final class SteppingClock extends Clock {
-    private Instant now = Instant.parse("2026-10-03T08:00:00Z");
+    private volatile Instant now = Instant.parse("2026-10-03T08:00:00Z");
 
     public void step(Duration duration) {
         now = now.plus(duration);

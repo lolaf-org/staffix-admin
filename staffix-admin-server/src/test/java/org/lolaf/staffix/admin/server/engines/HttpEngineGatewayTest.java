@@ -72,6 +72,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class HttpEngineGatewayTest {
 
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(2);
+
     private static final String SESSION_COMPONENTS = """
             {"applicationFactories":[{"instanceId":"default","applicationIds":["orders"]}],"messagesStores":["default"],
              "messagesLoggers":["otlp"],
@@ -162,6 +164,7 @@ class HttpEngineGatewayTest {
     private final List<String> requests = new CopyOnWriteArrayList<>();
     private final Map<String, String> bodies = new ConcurrentHashMap<>();
     private final Map<String, Integer> statuses = new ConcurrentHashMap<>();
+    private final Map<String, Duration> takes = new ConcurrentHashMap<>();
     private final SteppingClock clock = new SteppingClock();
     private HttpServer connector;
     /**
@@ -200,6 +203,7 @@ class HttpEngineGatewayTest {
         String path = versionedPath.substring("v1/".length());
         String request = exchange.getRequestMethod() + " " + path;
         requests.add(request);
+        clock.step(takes.getOrDefault(request, Duration.ZERO));
         bodies.put(request, new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
         if (path.equals("ha/switchover") || path.equals("ha/candidacy")) {
             sleep(switchoverTakes);
@@ -240,7 +244,7 @@ class HttpEngineGatewayTest {
     }
 
     private static AdminProperties properties(String engineSslBundle) {
-        return new AdminProperties(Duration.ofSeconds(90), Duration.ofSeconds(2), Path.of("data"), engineSslBundle, false);
+        return new AdminProperties(Duration.ofSeconds(90), REQUEST_TIMEOUT, Path.of("data"), engineSslBundle, false);
     }
 
     private HttpEngineGateway gateway(String engineSslBundle) {
@@ -405,6 +409,122 @@ class HttpEngineGatewayTest {
         clock.step(HttpEngineGateway.STATUS_FRESH);
         gateway.getHa("alpha-engine");
         assertThat(requests).endsWith("GET ha", "GET ha");
+    }
+
+    @Test
+    void viewersQueuedBehindAHighAvailabilityReadThatTimedOutShareItsFailure() {
+        failsAfterTheRequestTimeout("GET ha");
+
+        assertThatThrownBy(() -> gateway.getHa("alpha-engine")).isInstanceOf(GatewayException.class);
+        assertThatThrownBy(() -> gateway.getHa("alpha-engine")).isInstanceOf(GatewayException.class);
+
+        assertThat(requests).containsExactly("GET ha");
+    }
+
+    @Test
+    void viewersQueuedBehindAHighAvailabilitySessionsReadThatTimedOutShareItsFailure() {
+        failsAfterTheRequestTimeout("GET ha/sessions");
+
+        assertThatThrownBy(() -> gateway.getHaSessions("alpha-engine")).isInstanceOf(GatewayException.class);
+        assertThatThrownBy(() -> gateway.getHaSessions("alpha-engine")).isInstanceOf(GatewayException.class);
+
+        assertThat(requests).containsExactly("GET ha/sessions");
+    }
+
+    @Test
+    void viewersQueuedBehindAComponentProbesReadThatTimedOutShareItsFailure() {
+        failsAfterTheRequestTimeout("GET engine/ha/probes/states");
+
+        assertThatThrownBy(() -> gateway.getComponentProbes("alpha-engine", "ha")).isInstanceOf(GatewayException.class);
+        assertThatThrownBy(() -> gateway.getComponentProbes("alpha-engine", "ha")).isInstanceOf(GatewayException.class);
+
+        assertThat(requests).containsExactly("GET engine/ha/probes/states");
+    }
+
+    @Test
+    void viewersQueuedBehindAStatusReadThatTimedOutShareItsFailure() {
+        failsAfterTheRequestTimeout("GET status");
+
+        assertThatThrownBy(() -> gateway.listGroups("alpha-engine")).isInstanceOf(GatewayException.class);
+        assertThatThrownBy(() -> gateway.listGroups("alpha-engine")).isInstanceOf(GatewayException.class);
+
+        assertThat(requests).containsExactly("GET status");
+    }
+
+    @Test
+    void aFailedHighAvailabilityReadOutlastsTheFreshnessWindowSoTheNextPollDoesNotWaitAgain() {
+        failsAfterTheRequestTimeout("GET ha");
+        assertThatThrownBy(() -> gateway.getHa("alpha-engine")).isInstanceOf(GatewayException.class);
+
+        clock.step(HttpEngineGateway.STATUS_FRESH);
+
+        assertThatThrownBy(() -> gateway.getHa("alpha-engine")).isInstanceOf(GatewayException.class);
+        assertThat(requests).containsExactly("GET ha");
+    }
+
+    @Test
+    void aFailedStatusReadOutlastsTheFreshnessWindowSoTheNextPollDoesNotWaitAgain() {
+        failsAfterTheRequestTimeout("GET status");
+        assertThatThrownBy(() -> gateway.listGroups("alpha-engine")).isInstanceOf(GatewayException.class);
+
+        clock.step(HttpEngineGateway.STATUS_FRESH);
+
+        assertThatThrownBy(() -> gateway.listGroups("alpha-engine")).isInstanceOf(GatewayException.class);
+        assertThat(requests).containsExactly("GET status");
+    }
+
+    @Test
+    void aHighAvailabilityReadIsTriedAgainARequestTimeoutAfterItFailed() {
+        failsAfterTheRequestTimeout("GET ha");
+        assertThatThrownBy(() -> gateway.getHa("alpha-engine")).isInstanceOf(GatewayException.class);
+        statuses.clear();
+        takes.clear();
+
+        clock.step(REQUEST_TIMEOUT);
+
+        assertThat(gateway.getHa("alpha-engine")).isPresent();
+    }
+
+    @Test
+    void aStatusReadIsTriedAgainARequestTimeoutAfterItFailed() {
+        failsAfterTheRequestTimeout("GET status");
+        assertThatThrownBy(() -> gateway.listGroups("alpha-engine")).isInstanceOf(GatewayException.class);
+        statuses.clear();
+        takes.clear();
+
+        clock.step(REQUEST_TIMEOUT);
+
+        assertThat(gateway.listGroups("alpha-engine")).isNotEmpty();
+    }
+
+    @Test
+    void anActionForgetsAFailure() {
+        failsAfterTheRequestTimeout("GET ha");
+        assertThatThrownBy(() -> gateway.getHa("alpha-engine")).isInstanceOf(GatewayException.class);
+        statuses.clear();
+        takes.clear();
+
+        gateway.resync("alpha-engine");
+
+        assertThat(gateway.getHa("alpha-engine")).isPresent();
+    }
+
+    @Test
+    void aSlowAnswerStaysFreshForTheWholeWindow() {
+        takes.put("GET ha", REQUEST_TIMEOUT);
+        takes.put("GET status", REQUEST_TIMEOUT);
+
+        gateway.getHa("alpha-engine");
+        gateway.getHa("alpha-engine");
+        gateway.listGroups("alpha-engine");
+        gateway.listGroups("alpha-engine");
+
+        assertThat(requests).containsExactly("GET ha", "GET status", "GET sessions");
+    }
+
+    private void failsAfterTheRequestTimeout(String request) {
+        statuses.put(request, 500);
+        takes.put(request, REQUEST_TIMEOUT);
     }
 
     @Test
