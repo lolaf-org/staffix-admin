@@ -22,7 +22,7 @@ import { useFolded } from '../layout/useFolded'
 import { WriteButton } from '../sessions/WriteButton'
 import { HaCharts } from './HaCharts'
 import { NodeTag } from './NodeTag'
-import { leaderOf, needsAttention, replicationState, shownNode, type HaNode, type HaPair, type ReplicationState } from './pairs'
+import { leaderOf, needsAttention, nodeName, replicationState, shownNode, type HaNode, type HaPair, type ReplicationState } from './pairs'
 
 /**
  * Past this a follower reads as stalled, whatever its last acknowledgement says: `inSync` is as of that acknowledgement.
@@ -74,7 +74,7 @@ function PairCard({ pair }: { pair: HaPair }) {
         {!pair.name && <Alert type="info" title="High availability without a pair name: set pairName to group this node with its pair" />}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: 12 }}>
           {pair.nodes.map((node) => (
-            <NodeCard key={node.engineId} node={node} leads={node === leader} />
+            <NodeCard key={node.engineId} pair={pair} node={node} leads={node === leader} />
           ))}
         </div>
         <Collapse
@@ -89,8 +89,10 @@ function PairCard({ pair }: { pair: HaPair }) {
   )
 }
 
-function NodeCard({ node, leads }: { node: HaNode; leads: boolean }) {
+function NodeCard({ pair, node, leads }: { pair: HaPair; node: HaNode; leads: boolean }) {
   const status = node.status
+  const links = new Set([...(status?.followers ?? []), ...(status?.droppedFollowers ?? [])].map((follower) => follower.link))
+  const linkOf = (link: number) => (links.size > 1 ? `, link ${link}` : '')
   return (
     <Card size="small" type="inner" title={<NodeTag node={node} leads={leads} />} extra={status && <NodeActions node={node} leads={leads} />}>
       {!status && <Typography.Text type="secondary">This engine does not answer</Typography.Text>}
@@ -104,26 +106,35 @@ function NodeCard({ node, leads }: { node: HaNode; leads: boolean }) {
               { key: 'epoch', label: 'Epoch', children: status.epoch < 0 ? 'unknown' : status.epoch },
               { key: 'valid', label: 'Leadership', children: leads ? (status.leadershipValid ? 'proven' : 'cannot be proven') : 'n/a' },
               { key: 'since', label: 'Role since', children: status.roleSince ? new Date(status.roleSince).toLocaleTimeString() : 'none yet' },
-              { key: 'candidate', label: 'Elections', children: status.candidate ? 'stands' : <Tag color="warning">in maintenance</Tag> },
-              { key: 'election', label: 'Election', children: status.leaderElection },
+              {
+                key: 'candidate',
+                label: 'Can lead',
+                children: (
+                  <Tooltip title={`Leader chosen by ${status.leaderElection}`}>
+                    {status.candidate ? <span>yes</span> : <Tag color="warning">no, in maintenance</Tag>}
+                  </Tooltip>
+                ),
+              },
             ]}
           />
           {status.followers.map((follower) => (
-            <FollowerLine key={`${follower.nodeId}-${follower.link}`} follower={follower} />
+            <FollowerLine key={`${follower.nodeId}-${follower.link}`} follower={follower} name={`${nodeName(pair, follower.nodeId)}${linkOf(follower.link)}`} />
           ))}
           {status.droppedFollowers.map((dropped) => (
             <Alert
               key={`${dropped.nodeId}-${dropped.link}`}
               type="error"
-              title={`Follower ${dropped.nodeId} dropped as too slow at ${new Date(dropped.droppedAt).toLocaleTimeString()}${dropped.heldOffUntil ? `, held off until ${new Date(dropped.heldOffUntil).toLocaleTimeString()}` : ''}`}
+              title={`${nodeName(pair, dropped.nodeId)}${linkOf(dropped.link)} dropped as too slow at ${new Date(dropped.droppedAt).toLocaleTimeString()}${dropped.heldOffUntil ? `, held off until ${new Date(dropped.heldOffUntil).toLocaleTimeString()}` : ''}`}
             />
           ))}
           <NodeProbes engineId={node.engineId} />
           {status.leader && (
-            <Typography.Text>
-              <Health ok={status.leader.connected && status.leader.inSync} />
-              Leader link {status.leader.address}: {!status.leader.connected ? 'not connected' : status.leader.inSync ? 'holds every session in full' : 'catching up'}
-            </Typography.Text>
+            <Tooltip title={status.leader.address}>
+              <Typography.Text>
+                <Health ok={status.leader.connected && status.leader.inSync} />
+                Replicating from {nodeName(pair, status.leaderId)}: {!status.leader.connected ? 'not connected' : status.leader.inSync ? 'in sync' : 'catching up'}
+              </Typography.Text>
+            </Tooltip>
           )}
         </Flex>
       )}
@@ -152,7 +163,7 @@ function NodeProbes({ engineId }: { engineId: string }) {
 
 type Follower = NonNullable<HaNode['status']>['followers'][number]
 
-function FollowerLine({ follower }: { follower: Follower }) {
+function FollowerLine({ follower, name }: { follower: Follower; name: string }) {
   const stalled = follower.lagMillis > STALLED_LAG_MILLIS
   const state = !follower.connected ? 'not connected'
     : follower.snapshotInProgress ? 'catching up by snapshot'
@@ -161,7 +172,7 @@ function FollowerLine({ follower }: { follower: Follower }) {
   return (
     <Typography.Text type={stalled ? 'danger' : undefined} strong={stalled}>
       <Health ok={follower.connected && follower.inSync && !stalled} />
-      Follower {follower.nodeId ?? '?'}, link {follower.link}: {state}
+      Replicating to {name}: {state}
       {follower.unsentBytes > 0 && `, ${Math.round(follower.unsentBytes / 1024)} KiB unsent`}
     </Typography.Text>
   )

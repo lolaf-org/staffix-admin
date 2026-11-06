@@ -29,6 +29,13 @@ export function shownNode(pair: HaPair): HaNode {
   return leaderOf(pair) ?? pair.nodes.find((node) => node.status) ?? pair.nodes[0]!
 }
 
+/**
+ * A node that stops answering loses its status, and the id with it.
+ */
+export function nodeName(pair: HaPair, nodeId: string | null | undefined): string {
+  return pair.nodes.find((node) => node.status?.nodeId === nodeId)?.engineId ?? `node ${nodeId ?? '?'}`
+}
+
 export function pairOf(pairs: HaPair[], engineId: string): HaPair | undefined {
   return pairs.find((pair) => pair.nodes.some((node) => node.engineId === engineId))
 }
