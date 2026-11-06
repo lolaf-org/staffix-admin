@@ -32,8 +32,9 @@ import java.util.stream.Collectors;
 /**
  * One engine's schema in the sandbox's Postgres, which its JDBC stores write to. The messages tables are dropped and
  * created again at start from the DDL the build generated, so they always match the store; the sessions reset their
- * sequence numbers on logon, so nothing worth keeping is lost. The sessions settings table is kept, so a session edited
- * from the console survives a restart.
+ * sequence numbers on logon, so nothing worth keeping is lost. A pair's node restarting keeps them, its replicated
+ * sessions carrying their sequence numbers on. The sessions settings table is kept, so a session edited from the console
+ * survives a restart.
  */
 final class SandboxDatabase implements AutoCloseable {
 
@@ -45,6 +46,10 @@ final class SandboxDatabase implements AutoCloseable {
     private final HikariDataSource dataSource;
 
     SandboxDatabase(SandboxSettings settings, String schema) {
+        this(settings, schema, true);
+    }
+
+    SandboxDatabase(SandboxSettings settings, String schema, boolean recreateMessagesTables) {
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl(settings.jdbcUrl());
         config.setUsername(settings.jdbcUsername());
@@ -58,8 +63,10 @@ final class SandboxDatabase implements AutoCloseable {
              Statement statement = connection.createStatement()) {
             statement.execute("create schema if not exists " + schema);
             statement.execute("set search_path to " + schema);
-            for (String sql : ddl("postgres.sql")) {
-                statement.execute(sql);
+            if (recreateMessagesTables) {
+                for (String sql : ddl("postgres.sql")) {
+                    statement.execute(sql);
+                }
             }
             createSessionsSettingsTable(statement);
         } catch (SQLException e) {

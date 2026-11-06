@@ -26,11 +26,14 @@ import org.lolaf.staffix.api.FixInitiatorBuilder;
 import org.lolaf.staffix.api.FixInitiatorTarget;
 import org.lolaf.staffix.api.alerting.FixAlertsPublisherSettings;
 import org.lolaf.staffix.api.application.FixApplication;
+import org.lolaf.staffix.api.ha.HaSettings;
 import org.lolaf.staffix.api.monitoring.FixMonitoringConstants;
 import org.lolaf.staffix.api.monitoring.FixSessionsMonitoringManager;
 import org.lolaf.staffix.api.session.FixSession.FixSessionType;
 import org.lolaf.staffix.api.session.FixSessionId;
 import org.lolaf.staffix.api.session.FixSessionSettings;
+import org.lolaf.staffix.api.session.FixSessionSettings.HaSessionSettings;
+import org.lolaf.staffix.api.session.FixSessionSettings.HaSessionSettings.ReplicationMode;
 import org.lolaf.staffix.api.session.FixSessionSettings.SessionScheduleSettings;
 import org.lolaf.staffix.api.session.FixSessionsSettingsStore;
 import org.lolaf.staffix.api.session.FixSessionsSettingsStoreSettings;
@@ -66,6 +69,7 @@ import java.util.concurrent.TimeUnit;
 final class SandboxEngine {
 
     static final String METRICS = "metrics";
+    private static final Duration CONNECTION_RETRY = Duration.ofSeconds(1);
 
     private final String engineId;
     private final SandboxSettings settings;
@@ -74,25 +78,45 @@ final class SandboxEngine {
     private FixMessagesStoreSettings messagesStore = MemoryMessageStoreSettings.builder().build();
     private FixAlertsPublisherSettings alertsPublisher = Slf4jAlertsPublisherSettings.builder().build();
     private DataSource acceptorsSessionsDatabase;
+    private HaSettings highAvailability;
     private FixEngine engine;
 
-    record Session(FixSessionId fixSessionId, FixApplication application, boolean windowClosed) {
+    record Session(FixSessionId fixSessionId, FixApplication application, boolean windowClosed,
+                   ReplicationMode replicationMode, boolean resetSeqNumOnLogon) {
 
         static Session of(String group, String name, String sender, String target, FixApplication application) {
-            return new Session(id(group, name, sender, target), application, false);
+            return of(id(group, name, sender, target), application);
         }
 
         static Session fixt(String group, String name, String sender, String target, FixApplication application) {
-            return new Session(FixSessionId.ofFIXT11(FixApplVerID.FIX50SP2, FixSessionId.FixSessionIdBuilder.builder()
-                    .group(group).name(name).senderCompID(sender).targetCompID(target).build()), application, false);
+            return of(FixSessionId.ofFIXT11(FixApplVerID.FIX50SP2, FixSessionId.FixSessionIdBuilder.builder()
+                    .group(group).name(name).senderCompID(sender).targetCompID(target).build()), application);
         }
 
         static Session backup(String group, String name, String sender, String target) {
-            return new Session(id(group, name, sender, target), null, false);
+            return of(id(group, name, sender, target), null);
         }
 
         Session withWindowClosed() {
-            return new Session(fixSessionId, application, true);
+            return new Session(fixSessionId, application, true, replicationMode, resetSeqNumOnLogon);
+        }
+
+        /**
+         * Resetting on logon would hide the sequence numbers a failover must carry on.
+         */
+        Session replicated(ReplicationMode mode) {
+            return new Session(fixSessionId, application, windowClosed, mode, false);
+        }
+
+        /**
+         * The counterparty of a {@link #replicated} session.
+         */
+        Session keepingSeqNums() {
+            return new Session(fixSessionId, application, windowClosed, replicationMode, false);
+        }
+
+        private static Session of(FixSessionId id, FixApplication application) {
+            return new Session(id, application, false, ReplicationMode.NONE, true);
         }
 
         private static FixSessionId id(String group, String name, String sender, String target) {
@@ -102,9 +126,14 @@ final class SandboxEngine {
     }
 
     /**
-     * A backup's session only gives its id: it runs on its main target's settings and application.
+     * A backup's session only gives its id: it runs on its main target's settings and application. Several ports are
+     * endpoints of the same session, tried in turn: both nodes of a pair, only its leader listening.
      */
-    record Target(Session session, int port) {
+    record Target(Session session, List<Integer> ports) {
+
+        Target(Session session, Integer... ports) {
+            this(session, List.of(ports));
+        }
     }
 
     private record Acceptor(int port, List<Session> sessions) {
@@ -138,6 +167,11 @@ final class SandboxEngine {
         return this;
     }
 
+    SandboxEngine highAvailability(HaSettings ha) {
+        highAvailability = ha;
+        return this;
+    }
+
     /**
      * Keeps the acceptors' sessions in the database's {@code fix_sessions_settings} table instead of in memory, seeded
      * with the sessions declared here only while the engine has none there yet.
@@ -160,6 +194,7 @@ final class SandboxEngine {
                                 .interval(Duration.ofSeconds(10))
                                 .build())
                         .build())
+                .highAvailability(highAvailability)
                 .fixMessagesStore(messagesStore)
                 .fixAlertsPublisher(alertsPublisher)
                 .fixMessagesLogger(OtlpMessagesLoggerSettings.builder()
@@ -212,6 +247,7 @@ final class SandboxEngine {
         initiators.forEach(initiator -> {
             FixInitiatorBuilder.FixInitiatorBuilderBuilder<?, ?> fixInitiator = FixInitiatorBuilder.builder()
                     .instanceId(initiator.instanceId())
+                    .connectionRetry(CONNECTION_RETRY)
                     .mainTarget(target(initiator.main()));
             initiator.backups().forEach(backup -> fixInitiator.backupTarget(target(backup)));
             engine.newInitiator(fixInitiator.build()).start();
@@ -246,10 +282,10 @@ final class SandboxEngine {
     }
 
     private static FixInitiatorTarget target(Target target) {
-        return FixInitiatorTarget.builder()
-                .fixSessionId(target.session().fixSessionId())
-                .connectAddress(new InetSocketAddress("localhost", target.port()))
-                .build();
+        FixInitiatorTarget.FixInitiatorTargetBuilder fixTarget = FixInitiatorTarget.builder()
+                .fixSessionId(target.session().fixSessionId());
+        target.ports().forEach(port -> fixTarget.connectAddress(new InetSocketAddress("localhost", port)));
+        return fixTarget.build();
     }
 
     private static FixSessionSettings settings(Session session, FixSessionType type) {
@@ -261,7 +297,11 @@ final class SandboxEngine {
                 .rttMeasurementSettings(FixSessionSettings.RttMeasurementSettings.builder()
                         .probeInterval(Duration.ofSeconds(2))
                         .build())
-                .resetSeqNumOnLogon(true);
+                .haSessionSettings(HaSessionSettings.builder()
+                        .replicationMode(session.replicationMode())
+                        .syncAckLatencyEnabled(true)
+                        .build())
+                .resetSeqNumOnLogon(session.resetSeqNumOnLogon());
         if (session.windowClosed()) {
             settings.sessionScheduleSettings(openOnlyTheFirstMinuteOfToday());
         }
