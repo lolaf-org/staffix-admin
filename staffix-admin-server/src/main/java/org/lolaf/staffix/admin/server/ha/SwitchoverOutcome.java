@@ -18,6 +18,7 @@ package org.lolaf.staffix.admin.server.ha;
 public enum SwitchoverOutcome {
     TRANSFERRED,
     NO_FOLLOWER_IN_SYNC,
+    FOLLOWER_STORE_BEHIND,
     NOT_HANDED_OVER,
     NOT_TRANSFERRED
 }

@@ -54,6 +54,7 @@ const HA_ENGINE = '/api/ha/engines/{engineId}'
 const SWITCHOVER_MESSAGES: Record<Schemas['SwitchoverResult']['outcome'], string> = {
   TRANSFERRED: 'Leadership switched over',
   NO_FOLLOWER_IN_SYNC: 'Not switched over: no follower is in sync',
+  FOLLOWER_STORE_BEHIND: 'Not switched over: the follower has too much left to store, the sessions stayed here',
   NOT_HANDED_OVER: 'Not switched over: the follower did not take every write, the sessions resumed here',
   NOT_TRANSFERRED: 'Not switched over: the election did not move leadership, the sessions resumed here',
 }

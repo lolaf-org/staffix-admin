@@ -23,14 +23,20 @@ import org.springframework.boot.http.client.HttpRedirects;
 import org.springframework.boot.ssl.SslBundles;
 import org.springframework.http.client.ClientHttpRequestFactory;
 
+import java.time.Duration;
+
 @UtilityClass
 class EngineRequestFactory {
 
     ClientHttpRequestFactory create(AdminProperties properties, SslBundles sslBundles) {
+        return create(properties, sslBundles, properties.getEngineRequestTimeout());
+    }
+
+    ClientHttpRequestFactory create(AdminProperties properties, SslBundles sslBundles, Duration readTimeout) {
         HttpClientSettings settings = properties.getEngineSslBundle() == null ? HttpClientSettings.defaults()
                 : HttpClientSettings.ofSslBundle(sslBundles.getBundle(properties.getEngineSslBundle()));
         return ClientHttpRequestFactoryBuilder.jdk().build(settings
-                .withTimeouts(properties.getEngineRequestTimeout(), properties.getEngineRequestTimeout())
+                .withTimeouts(properties.getEngineRequestTimeout(), readTimeout)
                 .withRedirects(HttpRedirects.DONT_FOLLOW));
     }
 }

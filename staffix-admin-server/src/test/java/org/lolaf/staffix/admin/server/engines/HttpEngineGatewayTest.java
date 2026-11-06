@@ -140,6 +140,7 @@ class HttpEngineGatewayTest {
              "candidacySupported":true,"candidate":true,
              "followers":[{"nodeId":"2","link":1,"address":"/10.0.0.2:40000","connected":true,"inSync":true,
                "snapshotInProgress":false,"unsentBytes":0,"lagMillis":3}],
+             "switchoverMaxDuration":"PT4S",
              "droppedFollowers":[{"nodeId":"3","link":1,"droppedAt":"2026-10-10T10:05:00Z","heldOffUntil":"2026-10-10T10:05:02Z"}]}
             """;
 
@@ -150,6 +151,7 @@ class HttpEngineGatewayTest {
             """;
 
     private volatile String sessionsVersion = "v1";
+    private volatile Duration switchoverTakes = Duration.ZERO;
     /**
      * Null serves the status of an engine older than alerting, without its versions.
      */
@@ -177,6 +179,14 @@ class HttpEngineGatewayTest {
         gateway = gateway(null);
     }
 
+    private static void sleep(Duration duration) {
+        try {
+            Thread.sleep(duration);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     private void serve(HttpExchange exchange) throws IOException {
         String versionedPath = exchange.getRequestURI().getRawPath().substring("/engines/alpha-engine/".length());
         if (!"Bearer alpha-token".equals(exchange.getRequestHeaders().getFirst("Authorization"))
@@ -189,6 +199,9 @@ class HttpEngineGatewayTest {
         String request = exchange.getRequestMethod() + " " + path;
         requests.add(request);
         bodies.put(request, new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+        if (path.equals("ha/switchover") || path.equals("ha/candidacy")) {
+            sleep(switchoverTakes);
+        }
         byte[] body = switch (path) {
             case "status" -> STATUS.formatted(sessionsVersion,
                     alertsVersion == null ? "" : "\"alertsVersion\":" + alertsVersion + ",",
@@ -339,6 +352,22 @@ class HttpEngineGatewayTest {
     }
 
     @Test
+    void aSwitchoverMayTakeWhatTheEngineAllowsItBeyondTheRequestTimeout() {
+        switchoverTakes = Duration.ofMillis(2500);
+
+        assertThat(gateway.switchover("alpha-engine")).isEqualTo(SwitchoverOutcome.NO_FOLLOWER_IN_SYNC);
+    }
+
+    @Test
+    void aLeaderWithdrawingItsCandidacyMayTakeAsLongAsASwitchover() {
+        switchoverTakes = Duration.ofMillis(2500);
+
+        gateway.setCandidate("alpha-engine", false);
+
+        assertThat(requests).contains("POST ha/candidacy");
+    }
+
+    @Test
     void anEngineAnsweringNotFoundHasNoHighAvailability() {
         statuses.put("GET ha", 404);
 
@@ -380,7 +409,7 @@ class HttpEngineGatewayTest {
         gateway.setCandidate("alpha-engine", false);
         gateway.resyncSession(trading());
 
-        assertThat(requests).containsExactly("POST ha/switchover", "POST ha/candidacy", "POST ha/sessions/alpha/trading/resync");
+        assertThat(requests).containsExactly("GET ha", "POST ha/switchover", "GET ha", "POST ha/candidacy", "POST ha/sessions/alpha/trading/resync");
         assertThat(bodies.get("POST ha/candidacy")).isEqualTo("{\"candidate\":false}");
     }
 

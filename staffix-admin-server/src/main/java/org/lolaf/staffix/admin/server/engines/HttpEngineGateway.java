@@ -88,7 +88,11 @@ class HttpEngineGateway implements EngineGateway {
     private static final Set<String> KNOWN_METER_TYPES = Arrays.stream(Meter.Type.values()).map(Enum::name).collect(Collectors.toSet());
 
     private final EngineRegistry registry;
+    private final AdminProperties properties;
+    private final SslBundles sslBundles;
+    private final RestClient.Builder clientBuilder;
     private final RestClient client;
+    private final Map<Duration, RestClient> clientsByReadTimeout = new ConcurrentHashMap<>();
     private final JsonMapper jsonMapper;
     private final Clock clock;
     private final Map<String, CachedStatus> statuses = new ConcurrentHashMap<>();
@@ -98,7 +102,10 @@ class HttpEngineGateway implements EngineGateway {
         this.registry = registry;
         this.jsonMapper = jsonMapper;
         this.clock = clock;
-        this.client = builder.requestFactory(EngineRequestFactory.create(properties, sslBundles)).build();
+        this.properties = properties;
+        this.sslBundles = sslBundles;
+        this.clientBuilder = builder;
+        this.client = builder.clone().requestFactory(EngineRequestFactory.create(properties, sslBundles)).build();
     }
 
     @Override
@@ -372,7 +379,8 @@ class HttpEngineGateway implements EngineGateway {
     @Override
     public SwitchoverOutcome switchover(String engineId) {
         try {
-            return call(engineId, HttpMethod.POST, List.of("ha", "switchover"), null, ConnectorSwitchover.class).outcome();
+            return call(clientForSwitchover(engineId), engineId, HttpMethod.POST, List.of("ha", "switchover"), null,
+                    ConnectorSwitchover.class).outcome();
         } finally {
             markStale(engineId);
         }
@@ -380,7 +388,12 @@ class HttpEngineGateway implements EngineGateway {
 
     @Override
     public void setCandidate(String engineId, boolean candidate) {
-        operate(engineId, HttpMethod.POST, List.of("ha", "candidacy"), Map.of("candidate", candidate));
+        try {
+            call(clientForSwitchover(engineId), engineId, HttpMethod.POST, List.of("ha", "candidacy"),
+                    Map.of("candidate", candidate), Void.class);
+        } finally {
+            markStale(engineId);
+        }
     }
 
     @Override
@@ -549,9 +562,27 @@ class HttpEngineGateway implements EngineGateway {
         return path;
     }
 
+    /**
+     * An answer given up on before the engine's limit would report a failure for a switchover still going ahead.
+     */
+    private RestClient clientForSwitchover(String engineId) {
+        Duration switchoverMaxDuration = getHa(engineId).map(HaStatus::getSwitchoverMaxDuration).orElse(null);
+        if (switchoverMaxDuration == null) {
+            return client;
+        }
+        return clientsByReadTimeout.computeIfAbsent(switchoverMaxDuration.plus(properties.getEngineRequestTimeout()),
+                readTimeout -> clientBuilder.clone()
+                        .requestFactory(EngineRequestFactory.create(properties, sslBundles, readTimeout)).build());
+    }
+
     private <T> T call(String engineId, HttpMethod method, List<String> path, @Nullable Object body, Class<T> responseType) {
+        return call(client, engineId, method, path, body, responseType);
+    }
+
+    private <T> T call(RestClient engineClient, String engineId, HttpMethod method, List<String> path, @Nullable Object body,
+                       Class<T> responseType) {
         RegisteredEngine engine = registry.get(engineId);
-        RestClient.RequestBodySpec request = client.method(method)
+        RestClient.RequestBodySpec request = engineClient.method(method)
                 .uri(uri(engine.getBaseUrl(), path))
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + engine.getToken());
         if (body != null) {

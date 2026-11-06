@@ -20,6 +20,7 @@ import lombok.Value;
 import lombok.extern.jackson.Jacksonized;
 import org.jspecify.annotations.Nullable;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
@@ -50,6 +51,11 @@ public class HaStatus {
     boolean transferLeadershipSupported;
     boolean candidacySupported;
     boolean candidate;
+    /**
+     * The longest a switchover can take on this engine.
+     */
+    @Nullable
+    Duration switchoverMaxDuration;
     /**
      * One entry per follower and replication link, while this node leads.
      */
