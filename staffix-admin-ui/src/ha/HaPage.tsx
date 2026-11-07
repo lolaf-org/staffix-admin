@@ -91,8 +91,8 @@ function PairCard({ pair }: { pair: HaPair }) {
 
 function NodeCard({ pair, node, leads }: { pair: HaPair; node: HaNode; leads: boolean }) {
   const status = node.status
-  const links = new Set([...(status?.followers ?? []), ...(status?.droppedFollowers ?? [])].map((follower) => follower.link))
-  const linkOf = (link: number) => (links.size > 1 ? `, link ${link}` : '')
+  const lanes = new Set([...(status?.followerConnections ?? []), ...(status?.droppedFollowers ?? [])].map((follower) => follower.lane))
+  const laneOf = (lane: number) => (lanes.size > 1 ? `, lane ${lane}` : '')
   return (
     <Card size="small" type="inner" title={<NodeTag node={node} leads={leads} />} extra={status && <NodeActions node={node} leads={leads} />}>
       {!status && <Typography.Text type="secondary">This engine does not answer</Typography.Text>}
@@ -110,21 +110,21 @@ function NodeCard({ pair, node, leads }: { pair: HaPair; node: HaNode; leads: bo
                 key: 'candidate',
                 label: 'Can lead',
                 children: (
-                  <Tooltip title={`Leader chosen by ${status.leaderElection}`}>
+                  <Tooltip title={`Leader chosen by ${status.leaderElectionType}`}>
                     {status.candidate ? <span>yes</span> : <Tag color="warning">no, in maintenance</Tag>}
                   </Tooltip>
                 ),
               },
             ]}
           />
-          {status.followers.map((follower) => (
-            <FollowerLine key={`${follower.nodeId}-${follower.link}`} follower={follower} name={`${nodeName(pair, follower.nodeId)}${linkOf(follower.link)}`} />
+          {status.followerConnections.map((follower) => (
+            <FollowerLine key={`${follower.nodeId}-${follower.lane}`} follower={follower} name={`${nodeName(pair, follower.nodeId)}${laneOf(follower.lane)}`} />
           ))}
           {status.droppedFollowers.map((dropped) => (
             <Alert
-              key={`${dropped.nodeId}-${dropped.link}`}
+              key={`${dropped.nodeId}-${dropped.lane}`}
               type="error"
-              title={`${nodeName(pair, dropped.nodeId)}${linkOf(dropped.link)} dropped as too slow at ${new Date(dropped.droppedAt).toLocaleTimeString()}${dropped.heldOffUntil ? `, held off until ${new Date(dropped.heldOffUntil).toLocaleTimeString()}` : ''}`}
+              title={`${nodeName(pair, dropped.nodeId)}${laneOf(dropped.lane)} dropped as too slow at ${new Date(dropped.droppedAt).toLocaleTimeString()}${dropped.heldOffUntil ? `, held off until ${new Date(dropped.heldOffUntil).toLocaleTimeString()}` : ''}`}
             />
           ))}
           <NodeProbes engineId={node.engineId} />
@@ -182,7 +182,7 @@ function NodeStoreAlerts({ engineId }: { engineId: string }) {
   )
 }
 
-type Follower = NonNullable<HaNode['status']>['followers'][number]
+type Follower = NonNullable<HaNode['status']>['followerConnections'][number]
 
 function FollowerLine({ follower, name }: { follower: Follower; name: string }) {
   const stalled = follower.lagMillis > STALLED_LAG_MILLIS
@@ -211,7 +211,7 @@ function NodeActions({ node, leads }: { node: HaNode; leads: boolean }) {
   const candidacy = useSetCandidate(node.engineId)
   const resync = useResync(node.engineId)
   const status = node.status!
-  const followerInSync = status.followers.some((follower) => follower.inSync)
+  const followerInSync = status.followerConnections.some((follower) => follower.inSync)
   return (
     <Flex gap={6}>
       {leads && (
@@ -281,7 +281,7 @@ function PairSessions({ pair }: { pair: HaPair }) {
         {
           title: 'Unacknowledged sends',
           key: 'unacknowledged',
-          render: (_, row) => row.replicated && (row.replicated.unprotected ? <Tag color="error">{row.replicated.unacknowledgedSends}</Tag> : row.replicated.unacknowledgedSends),
+          render: (_, row) => row.replicated && (row.replicated.lastSendUnacknowledged ? <Tag color="error">{row.replicated.unacknowledgedSends}</Tag> : row.replicated.unacknowledgedSends),
         },
         {
           title: '',

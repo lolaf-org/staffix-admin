@@ -43,7 +43,7 @@ public class HaSession {
      */
     @Nullable
     String notReplicatedReason;
-    boolean unprotected;
+    boolean lastSendUnacknowledged;
     long unacknowledgedSends;
     /**
      * -1 on a leader, or on a follower holding none.

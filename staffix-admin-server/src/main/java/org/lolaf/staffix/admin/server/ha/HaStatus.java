@@ -45,7 +45,7 @@ public class HaStatus {
     @Nullable
     String leaderId;
     boolean leadershipValid;
-    String leaderElection;
+    String leaderElectionType;
     @Nullable
     Instant roleSince;
     boolean transferLeadershipSupported;
@@ -62,12 +62,12 @@ public class HaStatus {
     @Nullable
     String monitoringInstanceId;
     /**
-     * One entry per follower and replication link, while this node leads.
+     * One entry per follower and lane, while this node leads.
      */
-    List<Follower> followers;
+    List<FollowerConnection> followerConnections;
     List<DroppedFollower> droppedFollowers;
     /**
-     * This node's link to its leader, while it follows one.
+     * This node's connection to its leader, while it follows one.
      */
     @Nullable
     Leader leader;
@@ -75,10 +75,10 @@ public class HaStatus {
     @Value
     @Builder
     @Jacksonized
-    public static class Follower {
+    public static class FollowerConnection {
         @Nullable
         String nodeId;
-        int link;
+        int lane;
         String address;
         boolean connected;
         /**
@@ -98,7 +98,7 @@ public class HaStatus {
     @Jacksonized
     public static class DroppedFollower {
         String nodeId;
-        int link;
+        int lane;
         Instant droppedAt;
         /**
          * Null once it may connect.

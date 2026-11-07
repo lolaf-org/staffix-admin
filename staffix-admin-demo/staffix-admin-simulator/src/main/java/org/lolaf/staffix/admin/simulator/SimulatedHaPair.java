@@ -197,7 +197,7 @@ final class SimulatedHaPair {
         private @Nullable Alert alert(String probe) {
             return switch (probe) {
                 case SimulatedHaProbes.FOLLOWERS -> leader == this ? followersAlert() : null;
-                case SimulatedHaProbes.LEADER_LINK -> leader != null && leader != this && snapshotting()
+                case SimulatedHaProbes.LEADER_CONNECTION -> leader != null && leader != this && snapshotting()
                         ? Alert.warning("Connected to the leader, not holding every session in full") : null;
                 default -> leader == null ? Alert.critical("This node has no role") : null;
             };
@@ -223,13 +223,13 @@ final class SimulatedHaPair {
                         .epoch(leader == null ? -1 : epoch)
                         .leaderId(leader == null ? null : leader.nodeId)
                         .leadershipValid(leads)
-                        .leaderElection("SimulatedLeaderElection")
+                        .leaderElectionType("SimulatedLeaderElection")
                         .roleSince(roleSince)
                         .transferLeadershipSupported(true)
                         .candidacySupported(true)
                         .candidate(candidate);
                 if (leads) {
-                    status.follower(follower());
+                    status.followerConnection(followerConnection());
                 } else if (leader != null) {
                     status.leader(HaStatus.Leader.builder().leaderId(leader.nodeId).address("/10.0.0." + leader.nodeId + ":17101")
                             .connected(true).inSync(!snapshotting()).build());
@@ -238,10 +238,10 @@ final class SimulatedHaPair {
             }
         }
 
-        private HaStatus.Follower follower() {
+        private HaStatus.FollowerConnection followerConnection() {
             int stalledTicks = stalled() ? tick - STALL_TICK + 1 : 0;
             Node follower = other(this);
-            return HaStatus.Follower.builder()
+            return HaStatus.FollowerConnection.builder()
                     .nodeId(follower.nodeId)
                     .address("/10.0.0." + follower.nodeId + ":40000")
                     .connected(true)
@@ -253,7 +253,7 @@ final class SimulatedHaPair {
         }
 
         @Override
-        public List<HaSessionStatus> getSessionsStatus() {
+        public List<HaSessionStatus> getSessionStatuses() {
             synchronized (SimulatedHaPair.this) {
                 return engine.runningConfigs().stream()
                         .filter(session -> mode(session.name()) != ReplicationMode.NONE)

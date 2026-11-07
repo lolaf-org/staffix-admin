@@ -98,7 +98,7 @@ const FLOW_CHARTS: ChartSpec[] = [
     request: meter('ha.snapshots', 'COUNTER_RATE'), format: formatRateValue },
   {
     title: 'Followers dropped as too slow',
-    description: 'Follower links dropped because a write waited logFullTimeout for them.',
+    description: 'Follower connections dropped because a write waited logFullTimeout for them.',
     request: meter('ha.follower.too.slow', 'COUNTER_RATE'), format: formatRateValue },
   {
     title: 'Send waits',

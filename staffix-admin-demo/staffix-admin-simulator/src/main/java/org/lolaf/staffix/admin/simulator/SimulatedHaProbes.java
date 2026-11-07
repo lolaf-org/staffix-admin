@@ -32,12 +32,12 @@ import java.util.function.Function;
 final class SimulatedHaProbes {
 
     static final String FOLLOWERS = "ha-followers";
-    static final String LEADER_LINK = "ha-leader-link";
+    static final String LEADER_CONNECTION = "ha-leader-connection";
     static final String LEADERSHIP = "ha-leadership";
 
     private final List<SimulatedProbes.Probe> probes = List.of(
             probe(FOLLOWERS, "While leading: the followers connected, in sync and applying the writes, without which a failover loses the sessions' latest writes."),
-            probe(LEADER_LINK, "While following: the connection to the leader and whether this node holds every replicated session in full, as a failover to it needs."),
+            probe(LEADER_CONNECTION, "While following: the connection to the leader and whether this node holds every replicated session in full, as a failover to it needs."),
             probe(LEADERSHIP, "Whether this node knows its role: without one it neither runs the sessions nor replicates them."));
 
     private static SimulatedProbes.Probe probe(String name, String description) {

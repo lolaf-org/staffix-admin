@@ -54,7 +54,7 @@ class HaPairsTest {
     }
 
     private static HaStatus status(String pairName) {
-        return HaStatus.builder().nodeId("1").pairName(pairName).role(HaRole.LEADER).followers(List.of()).droppedFollowers(List.of()).build();
+        return HaStatus.builder().nodeId("1").pairName(pairName).role(HaRole.LEADER).followerConnections(List.of()).droppedFollowers(List.of()).build();
     }
 
     private static List<String> engineIds(HaPair pair) {

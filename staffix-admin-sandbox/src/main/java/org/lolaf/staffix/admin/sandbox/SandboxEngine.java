@@ -297,7 +297,7 @@ final class SandboxEngine {
                 .rttMeasurementSettings(FixSessionSettings.RttMeasurementSettings.builder()
                         .probeInterval(Duration.ofSeconds(2))
                         .build())
-                .haSessionSettings(HaSessionSettings.builder()
+                .highAvailability(HaSessionSettings.builder()
                         .replicationMode(session.replicationMode())
                         .syncAckLatencyEnabled(true)
                         .build())

@@ -73,7 +73,7 @@ class SimulatedHaPairTest {
     void aStalledFollowerStaysInSyncWhileItsLagGrows() {
         ticksUntil(SimulatedHaPair.STALL_TICK + 5);
 
-        assertThat(a.getStatus().getFollowers()).singleElement().satisfies(follower -> {
+        assertThat(a.getStatus().getFollowerConnections()).singleElement().satisfies(follower -> {
             assertThat(follower.isInSync()).isTrue();
             assertThat(follower.getLagMillis()).isEqualTo(6_000);
         });
@@ -132,7 +132,7 @@ class SimulatedHaPairTest {
         assertThat(haAlerts(second)).isEmpty();
 
         ticksUntil(SimulatedHaPair.SNAPSHOT_TICK - SimulatedHaPair.STALL_TICK - 7 + 1);
-        assertThat(haAlerts(second)).containsExactly("ha-leader-link");
+        assertThat(haAlerts(second)).containsExactly("ha-leader-connection");
 
         ticksUntil(SimulatedHaPair.FAILOVER_TICK - SimulatedHaPair.SNAPSHOT_TICK - 1);
         assertThat(haAlerts(first)).containsExactly("ha-leadership");
@@ -148,13 +148,13 @@ class SimulatedHaPairTest {
 
     @Test
     void sessionsShowEveryStandbyState() {
-        List<HaSessionStatus> onFollower = b.getSessionsStatus();
+        List<HaSessionStatus> onFollower = b.getSessionStatuses();
 
         assertThat(onFollower).noneMatch(session -> session.getFixSessionId().getName().equals("market-data"));
         assertThat(onFollower).filteredOn(session -> session.getNotReplicatedReason() != null).singleElement()
                 .satisfies(session -> assertThat(session.getFixSessionId().getGroup()).isEqualTo("globex"));
 
         ticksUntil(SimulatedHaPair.HANDING_OVER_TICK);
-        assertThat(b.getSessionsStatus()).anyMatch(HaSessionStatus::isHandedOver);
+        assertThat(b.getSessionStatuses()).anyMatch(HaSessionStatus::isHandedOver);
     }
 }
