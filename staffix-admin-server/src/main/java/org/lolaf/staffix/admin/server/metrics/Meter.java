@@ -27,7 +27,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
- * A meter an engine's sessions publish, as the engine describes it.
+ * A meter an engine or its sessions publish, as the engine describes it.
  */
 @Value
 @Builder(toBuilder = true)

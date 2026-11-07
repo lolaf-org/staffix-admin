@@ -133,6 +133,11 @@ class HttpEngineGatewayTest {
               {"name":"orders.received","type":"COUNTER","description":"NewOrderSingle received","tagKeys":[],"percentiles":false,"custom":true},
               {"name":"orders.size","type":"DISTRIBUTION_SUMMARY","description":"A type from a newer engine","tagKeys":[],"percentiles":false,"custom":true}]}]
             """;
+    private static final String ENGINE_METERS = """
+            [{"name":"ha.follower.lag","type":"TIMER","description":"Lag","tagKeys":["follower"],"percentiles":true,"custom":false},
+             {"name":"ha.follower.ack.latency","type":"TIMER","description":"Ack","tagKeys":["follower"],"percentiles":false,"custom":false},
+             {"name":"ha.batch.size","type":"DISTRIBUTION_SUMMARY","description":"A type from a newer engine","tagKeys":[],"percentiles":false,"custom":false}]
+            """;
     private static final String PROBE_STATES = """
             [{"probe":"session-down","level":"CRITICAL","message":"down","since":"2026-10-10T10:05:00Z",
               "lastEvaluation":"2026-10-10T10:06:00Z"},
@@ -227,6 +232,7 @@ class HttpEngineGatewayTest {
             case "engine/ha/probes" -> PROBES.getBytes(StandardCharsets.UTF_8);
             case "engine/ha/probes/states" -> PROBE_STATES.getBytes(StandardCharsets.UTF_8);
             case "sessions/meters" -> METERS.getBytes(StandardCharsets.UTF_8);
+            case "engine/meters" -> ENGINE_METERS.getBytes(StandardCharsets.UTF_8);
             case "dictionaries/default-FIX.4.4" -> "<fix/>".getBytes(StandardCharsets.UTF_8);
             case "session-settings-stores" -> "[{\"instanceId\":\"main\",\"persistent\":true}]".getBytes(StandardCharsets.UTF_8);
             case "session-components" -> SESSION_COMPONENTS.getBytes(StandardCharsets.UTF_8);
@@ -698,6 +704,12 @@ class HttpEngineGatewayTest {
         assertThat(gateway.getMeters("alpha-engine")).singleElement().satisfies(session -> assertThat(session.getMeters())
                 .extracting(Meter::getName, Meter::getType, Meter::isCustom)
                 .containsExactly(tuple("messages.read.latency", Meter.Type.TIMER, false), tuple("orders.received", Meter.Type.COUNTER, true)));
+    }
+
+    @Test
+    void anEngineMeterSaysWhetherItHasPercentilesAndAMeterOfAnUnknownTypeIsLeftOut() {
+        assertThat(gateway.getEngineMeters("alpha-engine")).extracting(Meter::getName, Meter::isPercentiles)
+                .containsExactly(tuple("ha.follower.lag", true), tuple("ha.follower.ack.latency", false));
     }
 
     @Test

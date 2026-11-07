@@ -14,14 +14,15 @@
  * limitations under the License.
  */
 import { Collapse, Flex, Tooltip, Typography } from 'antd'
+import { useQueries } from '@tanstack/react-query'
 import { useState } from 'react'
-import { useMetrics, type MetricRequest } from '../api/queries'
+import { engineMetersQuery, useMetrics, type MetricRequest } from '../api/queries'
 import { MetricChart, SeriesLegend, type ChartSeries } from '../telemetry/MetricChart'
 import { formatRateValue, formatSeconds } from '../telemetry/format'
 import { seriesColors } from '../telemetry/series'
 import { TimeRangeSelector, type Period } from '../telemetry/TimeRangeSelector'
 import { useThemeMode } from '../theme/ThemeMode'
-import { shownNode, type HaNode, type HaPair } from './pairs'
+import { readsP99, shownNode, type HaNode, type HaPair } from './pairs'
 
 const ROLE_NAMES: Record<number, string> = { 2: 'leader', 1: 'follower', 0: 'unknown' }
 
@@ -40,18 +41,24 @@ interface ChartSpec {
   description: string
   request: Extract<MetricRequest, { kind: 'meter' }>
   format: (value: number) => string
+  /**
+   * Read in p99 or as a mean, as the nodes publish it; the title says which.
+   */
+  timer?: boolean
 }
+
+/**
+ * Undefined while the nodes' meters are loading, so a chart does not read the mean first and p99 a moment later.
+ */
+type TimerStatistic = 'p99' | 'mean' | undefined
 
 function meter(name: string, statistic: ChartSpec['request']['statistic'], splitBy: string[] = [], gaugeUnit?: ChartSpec['request']['gaugeUnit']): ChartSpec['request'] {
   return { kind: 'meter', meter: name, statistic, splitBy, gaugeUnit }
 }
 
-/**
- * Means, not percentiles: staffix's high availability timers publish a percentile histogram only when asked to.
- */
 const LATENCY_CHARTS: ChartSpec[] = [
   {
-    title: 'Follower lag (mean)',
+    title: 'Follower lag', timer: true,
     description: 'How far the follower is behind: from a write to the replication log to the follower applying it, sampled once per round trip. A stalled follower records nothing here until it recovers: Current lag shows the stall.',
     request: meter('ha.follower.lag', 'MEAN'), format: formatSeconds },
   {
@@ -59,15 +66,15 @@ const LATENCY_CHARTS: ChartSpec[] = [
     description: 'How long the most behind follower has not applied a write, 0 when caught up. It keeps growing while a follower is stalled.',
     request: meter('ha.follower.lag.pending', 'VALUE', [], 'MILLISECONDS'), format: formatSeconds },
   {
-    title: 'Follower ack latency (mean)',
+    title: 'Follower ack latency', timer: true,
     description: "A follower's round trip, from a batch of writes sent to its acknowledgement. Covers ASYNC sessions too.",
     request: meter('ha.follower.ack.latency', 'MEAN'), format: formatSeconds },
   {
-    title: 'SYNC ack latency by mode (mean)',
+    title: 'SYNC ack latency by mode', timer: true,
     description: 'How long SYNC sends waited for the follower, for those it acknowledged: SYNC_RECEIVED until it received them, SYNC_APPLIED until it applied them. Empty without a session in a SYNC mode.',
     request: meter('ha.sync.ack.latency', 'MEAN', ['mode']), format: formatSeconds },
   {
-    title: 'Follower store write (mean)',
+    title: 'Follower store write', timer: true,
     description: "On the follower: how long a read's events took to reach its store after being acknowledged as received, the window in which a SYNC_RECEIVED send is in its memory only. Only SYNC_RECEIVED sessions feed this chart.",
     request: meter('ha.replica.received.write.latency', 'MEAN'), format: formatSeconds },
 ]
@@ -118,7 +125,12 @@ const CHART_GRID = {
 export function HaCharts({ pair }: { pair: HaPair }) {
   const [period, setPeriod] = useState<Period>(15)
   const [live, setLive] = useState(true)
-  const charts = (specs: ChartSpec[]) => specs.map((spec) => <PairChart key={spec.title} pair={pair} spec={spec} period={period} live={live} />)
+  const nodesMeters = useQueries({ queries: pair.nodes.map((node) => engineMetersQuery(node.engineId)) })
+  const loading = nodesMeters.some((meters) => meters.isPending)
+  const statistic = (spec: ChartSpec): TimerStatistic => !spec.timer || loading ? undefined
+    : readsP99(spec.request.meter, nodesMeters.map((meters) => meters.data)) ? 'p99' : 'mean'
+  const charts = (specs: ChartSpec[]) => specs.map((spec) =>
+    <PairChart key={spec.title} pair={pair} spec={spec} statistic={statistic(spec)} period={period} live={live} />)
   return (
     <Collapse
       size="small"
@@ -141,6 +153,7 @@ export function HaCharts({ pair }: { pair: HaPair }) {
 interface PairChartProps {
   pair: HaPair
   spec: ChartSpec
+  statistic: TimerStatistic
   period: Period
   live: boolean
 }
@@ -149,14 +162,18 @@ interface PairChartProps {
  * One series per node, so a chart reads on across a failover; a split chart shows the split on the shown node alone,
  * the two together being more series than a chart can plot.
  */
-function PairChart({ pair, spec, period, live }: PairChartProps) {
+function PairChart({ pair, spec, statistic, period, live }: PairChartProps) {
   const { dark } = useThemeMode()
   const colors = seriesColors(dark)
   const split = spec.request.splitBy[0]
   const first = split ? shownNode(pair) : pair.nodes[0]!
   const second = split ? undefined : pair.nodes[1]
-  const firstMetrics = useMetrics(engineScope(first), spec.request, period, undefined, live)
-  const secondMetrics = useMetrics(engineScope(second ?? first), second ? spec.request : undefined, period, undefined, live)
+  const request = !spec.timer ? spec.request
+    : statistic === 'p99' ? { ...spec.request, statistic: 'QUANTILE' as const, quantile: 0.99 }
+    : statistic === 'mean' ? spec.request : undefined
+  const title = spec.timer ? `${spec.title} (${statistic ?? 'mean'})` : spec.title
+  const firstMetrics = useMetrics(engineScope(first), request, period, undefined, live)
+  const secondMetrics = useMetrics(engineScope(second ?? first), second ? request : undefined, period, undefined, live)
 
   const named = (engineId: string, metrics: typeof firstMetrics) =>
     (metrics.data?.series ?? []).map((s) => ({ name: split ? s.labels[split] ?? engineId : engineId, points: s.points }))
@@ -168,9 +185,9 @@ function PairChart({ pair, spec, period, live }: PairChartProps) {
   return (
     <div style={{ minWidth: 0 }}>
       {series.length === 0
-        ? <Tooltip title={spec.description}><Typography.Text type="secondary">{spec.title}: no data</Typography.Text></Tooltip>
+        ? <Tooltip title={spec.description}><Typography.Text type="secondary">{title}: no data</Typography.Text></Tooltip>
         : <>
-            <MetricChart title={spec.title} description={spec.description} series={series} format={spec.format} height={160} />
+            <MetricChart title={title} description={spec.description} series={series} format={spec.format} height={160} />
             <SeriesLegend series={series} />
           </>}
     </div>

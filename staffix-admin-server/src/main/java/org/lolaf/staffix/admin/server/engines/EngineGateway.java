@@ -26,6 +26,7 @@ import org.lolaf.staffix.admin.server.sessions.ApplicationSetting;
 import org.lolaf.staffix.admin.server.sessions.ResetMode;
 import org.lolaf.staffix.admin.server.sessions.SessionDetail;
 import org.lolaf.staffix.admin.server.sessions.SessionGroup;
+import org.lolaf.staffix.admin.server.metrics.Meter;
 import org.lolaf.staffix.admin.server.metrics.SessionMeters;
 import org.lolaf.staffix.admin.server.sessions.SessionComponents;
 import org.lolaf.staffix.admin.server.sessions.SessionSettingsStore;
@@ -80,6 +81,11 @@ public interface EngineGateway {
      * Every running session's meters, by the name of the config it runs.
      */
     List<SessionMeters> getMeters(String engineId);
+
+    /**
+     * The meters the engine itself publishes, such as its high availability ones; a meter is listed once registered.
+     */
+    List<Meter> getEngineMeters(String engineId);
 
     List<ApplicationSetting> getApplicationSettings(SessionRef session);
 

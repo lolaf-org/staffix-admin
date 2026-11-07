@@ -376,8 +376,8 @@ final class SimulatedEngine implements AdminApi {
     }
 
     @Override
-    public List<FixMeterDescriptor> getEngineMeters() {
-        return List.of();
+    public synchronized List<FixMeterDescriptor> getEngineMeters() {
+        return ha == null ? List.of() : DemoHaTelemetry.TIMERS;
     }
 
     @Override

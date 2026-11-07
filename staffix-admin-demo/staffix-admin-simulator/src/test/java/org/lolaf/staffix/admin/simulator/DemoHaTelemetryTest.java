@@ -36,7 +36,7 @@ class DemoHaTelemetryTest {
     }
 
     private List<DemoTelemetry.Series> read(SimulatedHaPair.Node node, String meter, List<String> splitBy) {
-        return DemoHaTelemetry.metrics(node, meter, splitBy, from, to, Duration.ofSeconds(1));
+        return DemoHaTelemetry.metrics(node, meter, splitBy, null, from, to, Duration.ofSeconds(1));
     }
 
     @Test
@@ -59,6 +59,18 @@ class DemoHaTelemetryTest {
 
         assertThat(lag.size()).isLessThan(241 - 15);
         assertThat(lag).anyMatch(point -> point.value() > 1);
+    }
+
+    @Test
+    void aQuantileReadsAboveTheMeanAndIsEmptyForATimerWithoutPercentiles() {
+        double mean = DemoHaTelemetry.metrics(leader, "ha.sync.ack.latency", List.of(), null, from, to, Duration.ofSeconds(1))
+                .getFirst().points().getFirst().value();
+        double p99 = DemoHaTelemetry.metrics(leader, "ha.sync.ack.latency", List.of(), 0.99, from, to, Duration.ofSeconds(1))
+                .getFirst().points().getFirst().value();
+
+        assertThat(p99).isGreaterThan(mean);
+        assertThat(DemoHaTelemetry.metrics(follower, "ha.replica.received.write.latency", List.of(), 0.99, from, to, Duration.ofSeconds(1))
+                .getFirst().points()).isEmpty();
     }
 
     @Test

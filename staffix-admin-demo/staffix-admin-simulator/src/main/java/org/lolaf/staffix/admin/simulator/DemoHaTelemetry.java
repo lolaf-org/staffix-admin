@@ -17,6 +17,8 @@ package org.lolaf.staffix.admin.simulator;
 
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
+import org.lolaf.staffix.api.monitoring.FixMeterDescriptor;
+
 
 import java.time.Duration;
 import java.time.Instant;
@@ -37,8 +39,20 @@ class DemoHaTelemetry {
             "mode", List.of("sync_received", "sync_applied"),
             "reason", List.of("timed_out", "no_follower"),
             "follower", List.of("1", "2"));
+    /**
+     * The store write timer without percentiles, as a node configured to skip its histogram lists it.
+     */
+    static final List<FixMeterDescriptor> TIMERS = List.of(
+            timer("ha.follower.lag", "follower", true),
+            timer("ha.follower.ack.latency", "follower", true),
+            timer("ha.sync.ack.latency", "mode", true),
+            timer("ha.replica.received.write.latency", null, false));
 
-    List<DemoTelemetry.Series> metrics(SimulatedHaPair.Node node, String meter, List<String> splitBy, Instant from, Instant to, Duration step) {
+    /**
+     * A quantile of a timer without percentiles has no points, as a backend holds no histogram for it.
+     */
+    List<DemoTelemetry.Series> metrics(SimulatedHaPair.Node node, String meter, List<String> splitBy, @Nullable Double quantile,
+                                       Instant from, Instant to, Duration step) {
         List<String> values = splitBy.isEmpty() ? List.of("") : SPLIT_VALUES.getOrDefault(splitBy.getFirst(), List.of("default"));
         List<DemoTelemetry.Series> series = new ArrayList<>();
         for (String value : values) {
@@ -47,20 +61,39 @@ class DemoHaTelemetry {
                 labels.put(splitBy.getFirst(), value);
             }
             if (splitBy.isEmpty() || !splitBy.getFirst().equals("follower") || !value.equals(node.nodeId())) {
-                series.add(new DemoTelemetry.Series(labels, points(node, meter, value, from, to, step), null));
+                series.add(new DemoTelemetry.Series(labels, quantile != null && !hasPercentiles(meter) ? List.of()
+                        : points(node, meter, value, tail(meter, quantile), from, to, step), null));
             }
         }
         return series;
     }
 
-    private static List<DemoTelemetry.Point> points(SimulatedHaPair.Node node, String meter, String split, Instant from, Instant to, Duration step) {
+    private static FixMeterDescriptor timer(String name, @Nullable String tagKey, boolean percentiles) {
+        FixMeterDescriptor.FixMeterDescriptorBuilder timer = FixMeterDescriptor.builder().name(name).type(FixMeterDescriptor.Type.TIMER)
+                .description(name).percentiles(percentiles);
+        if (tagKey != null) {
+            timer.tagKey(tagKey);
+        }
+        return timer.build();
+    }
+
+    private static boolean hasPercentiles(String meter) {
+        return TIMERS.stream().anyMatch(timer -> timer.getName().equals(meter) && timer.isPercentiles());
+    }
+
+    private static double tail(String meter, @Nullable Double quantile) {
+        return quantile == null || !hasPercentiles(meter) ? 1 : 0.5 + 2.5 * quantile * quantile;
+    }
+
+    private static List<DemoTelemetry.Point> points(SimulatedHaPair.Node node, String meter, String split, double tail,
+                                                    Instant from, Instant to, Duration step) {
         List<DemoTelemetry.Point> points = new ArrayList<>();
         long seconds = step.toSeconds();
         for (long second = from.getEpochSecond() / seconds * seconds; second <= to.getEpochSecond(); second += seconds) {
             Instant t = Instant.ofEpochSecond(second);
             Double value = value(node, meter, split, t);
             if (value != null) {
-                points.add(new DemoTelemetry.Point(t, value));
+                points.add(new DemoTelemetry.Point(t, value * tail));
             }
         }
         return points;

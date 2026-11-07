@@ -90,6 +90,11 @@ public class MetricsController {
         return List.copyOf(byName.values());
     }
 
+    @GetMapping("/api/metrics/engine-meters")
+    public List<Meter> getEngineMeters(@RequestParam String engineId) {
+        return gateway.getEngineMeters(engineId);
+    }
+
     /**
      * One series per combination of the {@code splitBy} tags' values. A rate is averaged over {@code rateWindow},
      * else the step, widened to hold two of the engines' exports and to the backend's own minimum; the result says to

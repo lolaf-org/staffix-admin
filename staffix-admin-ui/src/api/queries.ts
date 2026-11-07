@@ -492,6 +492,17 @@ export function useMeters(scope: MetricScope) {
   })
 }
 
+/**
+ * Refreshed, as an engine lists a meter only once registered, such as a follower's lag once a follower connected.
+ */
+export function engineMetersQuery(engineId: string) {
+  return {
+    queryKey: ['engine-meters', engineId],
+    queryFn: () => call(api.GET('/api/metrics/engine-meters', { params: { query: { engineId } } })),
+    refetchInterval: 60_000,
+  }
+}
+
 export interface LogSearch {
   engineId: string
   group?: string

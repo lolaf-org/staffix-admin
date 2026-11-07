@@ -102,3 +102,12 @@ export function notLeadingReason(pairs: HaPair[], engineId: string): string | un
   if (leader?.engineId === engineId) return undefined
   return leader ? `${engineId} is a follower: use the leader, ${leader.engineId}` : `${engineId} does not lead, and its pair has no leader`
 }
+
+/**
+ * p99 only when every node listing the timer publishes its histogram, as one chart mixing p99 and means would mislead.
+ * A node that does not list it (down, or the timer not registered yet) does not decide.
+ */
+export function readsP99(timer: string, nodesMeters: (Schemas['Meter'][] | undefined)[]): boolean {
+  const listed = nodesMeters.flatMap((meters) => meters?.filter((meter) => meter.name === timer) ?? [])
+  return listed.length > 0 && listed.every((meter) => meter.percentiles)
+}

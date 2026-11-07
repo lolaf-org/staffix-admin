@@ -166,7 +166,7 @@ class HttpEngineGateway implements EngineGateway {
 
     /**
      * A meter of a type this console does not know, from a newer engine, is left out rather than failing the whole
-     * listing, which would hide every meter of the engine.
+     * listing, which would hide every meter of the engine; the same for {@link #getEngineMeters}.
      */
     @Override
     public List<SessionMeters> getMeters(String engineId) {
@@ -177,6 +177,15 @@ class HttpEngineGateway implements EngineGateway {
             }
         }
         return List.of(jsonMapper.treeToValue(sessions, SessionMeters[].class));
+    }
+
+    @Override
+    public List<Meter> getEngineMeters(String engineId) {
+        JsonNode meters = call(engineId, HttpMethod.GET, List.of("engine", "meters"), null, JsonNode.class);
+        if (meters instanceof ArrayNode known) {
+            removeUnknownTypes(known);
+        }
+        return List.of(jsonMapper.treeToValue(meters, Meter[].class));
     }
 
     private static void removeUnknownTypes(ArrayNode meters) {

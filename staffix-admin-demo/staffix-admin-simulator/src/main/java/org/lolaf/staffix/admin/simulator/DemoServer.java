@@ -98,7 +98,8 @@ final class DemoServer {
         if (engine == null || engine.haNode().isEmpty()) {
             return List.of();
         }
-        return DemoHaTelemetry.metrics(engine.haNode().get(), query.get("meter"), List.copyOf(values(query.get("splitBy"))),
+        Double quantile = query.get("statistic").equals("QUANTILE") ? Double.valueOf(query.get("quantile")) : null;
+        return DemoHaTelemetry.metrics(engine.haNode().get(), query.get("meter"), List.copyOf(values(query.get("splitBy"))), quantile,
                 Instant.parse(query.get("from")), Instant.parse(query.get("to")), Duration.ofSeconds(Long.parseLong(query.get("step"))));
     }
 
