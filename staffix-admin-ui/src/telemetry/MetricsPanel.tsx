@@ -75,6 +75,10 @@ interface Facet {
 
 interface Props {
   scope: MetricScope
+  /**
+   * Where the meters are listed, when the scope runs no session itself, such as a config that is not selected.
+   */
+  metersScope?: MetricScope
   chartHeight?: number
   /**
    * Replaces the time range selector, e.g. around a logged message.
@@ -86,8 +90,8 @@ interface Props {
   marker?: number
 }
 
-export function MetricsPanel({ scope, chartHeight, period, marker }: Props) {
-  const meters = useMeters(scope).data
+export function MetricsPanel({ scope, metersScope, chartHeight, period, marker }: Props) {
+  const meters = useMeters(metersScope ?? scope).data
   const [selected, setSelected] = useState(MESSAGES)
   const [statistic, setStatistic] = useState(String(0.99))
   const [selectedPeriod, setSelectedPeriod] = useState<Period>(60)
