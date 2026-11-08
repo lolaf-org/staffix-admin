@@ -16,6 +16,18 @@ The counts per status filter the page, as do a search on group, session, instanc
 the URL keeps the filters, to share them. A session box opens the session's panel; an engine silent for longer than
 `staffix.admin.engine-heartbeat-timeout` shows unreachable.
 
+### High availability pairs
+
+A [high availability](high-availability.md) pair with a name is one card, headed by its name and its nodes' roles,
+showing the leader's sessions. Without a leader it shows what a node last knew, with a warning. The engine picker shows
+the whole pair when either node is picked, and "Acceptor session" adds to the leader.
+
+Each session box has a `Replication:` line. A session logged in whose follower would not protect it (refused, catching
+up, follower down, writes pending or lost) turns purple, and the card's header counts them; a session that is down
+keeps its status colour. A session configured not to replicate reads `off` and is no problem.
+
+A follower runs no session: the Status and Send message tabs are disabled on a node that does not lead, and say why.
+
 ## Status tab
 
 The session's identity, desired state and sequence numbers, and its controls (writers only):

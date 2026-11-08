@@ -26,6 +26,21 @@ A rate is averaged over a window, the step by default. A rate needs two samples 
 go under twice the engine's export step, nor under the connector's `minRateWindow`; the chart says the window it used.
 See [Backends](backends.md) for what sets those floors.
 
+## High availability
+
+The [High availability](high-availability.md) page charts each pair over its own period, one series per node so a
+chart reads across a failover. A chart split by `mode` or `reason` shows one node only. These are engine meters, read
+through the node's monitoring plugin (`monitoringInstanceId` when the engine sets one, else through its sessions).
+
+- Latency: follower lag, current lag, follower acknowledgement latency, `SYNC` acknowledgement latency by mode, follower
+  store write (only `SYNC_RECEIVED` sessions feed it). A timer reads as p99 when every node listing it publishes its
+  percentile histogram, else as a mean; the title says which.
+- Flow: replication throughput, bytes unsent to the follower, unacknowledged `SYNC` sends by reason, snapshots,
+  followers dropped as too slow, send waits, and each node's role.
+
+Each chart's tooltip says what it measures. A stalled follower records no follower lag until it recovers: current lag
+shows the stall.
+
 ## Around a logged message
 
 A decoded message (from the Logs tab or the Trace page) has a Metrics view: the session's charts a minute either side

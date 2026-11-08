@@ -10,6 +10,7 @@ command. Then come back here.
 | [Connectors](connectors.md) | How does the console find each session's metrics and logs, and where do I keep the backends' credentials? |
 | [Backends](backends.md) | What do Prometheus, Loki, Elasticsearch, ClickHouse and the OpenTelemetry collector need so the console can read what staffix exports? |
 | [Sessions](sessions.md) | What do the colours mean, and how do I log a session on, reset its numbers, edit its settings, send messages or see its availability? |
+| [High availability](high-availability.md) | How do I see a pair of nodes, tell whether a session is protected, and switch over or take a node into maintenance? |
 | [Metrics](metrics.md) | Which meters can I chart, and what sets the finest rate a chart can show? |
 | [Logs and trace](logs-and-trace.md) | How do I search FIX logs, decode a message, follow an order across engines, and what does a search cost the backend? |
 | [Security](security.md) | How do operators and engines log in, what does each role allow, what is audited, and how do I turn on TLS? |

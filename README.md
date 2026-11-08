@@ -29,6 +29,8 @@ engine at a glance, control and configure them, and read their metrics and FIX l
   acceptor sessions.
 - **Send messages**: inject application messages into a session, one per line.
 - **Availability**: a session's status over time and its availability within session time.
+- **High availability**: a pair of nodes as one card, each session's replication state, followers and their lag,
+  replication charts, switchover, maintenance and re-sync.
 - **Metrics**: message rates and latencies, round-trip time, clock offset, and the application's own timers and
   gauges.
 - **Logs**: search FIX messages by text, type and direction, decode them with the session's dictionary, export them
@@ -80,6 +82,7 @@ or ClickHouse, see the [sandbox](staffix-admin-sandbox/README.md).
 | [Connectors](docs/connectors.md) | Metrics and logs backends, `console.yaml`, credentials |
 | [Backends](docs/backends.md) | Prometheus, Loki, Elasticsearch, ClickHouse and OpenTelemetry collector setup |
 | [Sessions](docs/sessions.md) | Statuses, control, settings, sending, availability |
+| [High availability](docs/high-availability.md) | Pairs, replication state, switchover, maintenance, re-sync |
 | [Metrics](docs/metrics.md) | Meters, statistics, rate windows |
 | [Logs and trace](docs/logs-and-trace.md) | Log search, decoding, CSV, order trace |
 | [Security](docs/security.md) | Logins, roles, engine announcements, audit, TLS |

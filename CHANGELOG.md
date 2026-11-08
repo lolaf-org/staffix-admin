@@ -28,7 +28,16 @@ could mean.
   0.9.2 lets an application publish counters; the ClickHouse connector reads them from a new `sumTable` setting,
   `otel_metrics_sum` by default.
 - **Alerts of an engine's own components, such as its high availability, are listed** on the alerts page and counted
-  in the alert bell, named after the component instead of a session. They cannot be cleared from the console yet.
+  in the alert bell, named after the component instead of a session.
+- **High availability.** Engines running as a staffix 0.9.2 leader and follower pair show as one card on the Sessions
+  page, with the leader's sessions and a replication line on each. A session a failover would not protect turns purple.
+- **A High availability page**: each pair's nodes, their followers and lag, every session's replication state,
+  including writes pending or lost on a node, and the alerts of a follower's stores. It charts replication per node,
+  across failovers.
+- **High availability actions** for writers, confirmed and audited: switch over, take a node into maintenance, and
+  re-sync one session or all of them.
+- **The demo and the sandbox have a pair of nodes**, the demo's playing a stalled follower, a snapshot, a clean handover
+  and a failover.
 
 ### Changed
 
