@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 import { Alert, Button, Flex, Skeleton, Typography } from 'antd'
-import { useState } from 'react'
+import { useContext, useState } from 'react'
 import { ApiError, type Schemas } from '../api/client'
 import {
   useApplicationSettings,
   useCanWrite,
+  useHaPairs,
   useSessionComponents,
   useSessionSettings,
   useSessionSettingsSchema,
@@ -26,8 +27,10 @@ import {
   useUpdateSessionSettings,
   type SessionRef,
 } from '../api/queries'
+import { pairOf, REPLICATED_CHANGE_HINT } from '../ha/pairs'
 import { ApplicationSettingsEditor } from '../settings/ApplicationSettingsEditor'
 import { SchemaForm } from '../settings/SchemaForm'
+import { WriteBlock } from './WriteButton'
 import { problems, withConstants, type JsonObject, type JsonSchema } from '../settings/schema'
 import { sessionComponentOverrides } from './sessionComponentFields'
 
@@ -44,6 +47,8 @@ export function SessionSettingsTab({ sessionRef, detail }: Props) {
   const components = useSessionComponents(sessionRef.engineId)
   const update = useUpdateSessionSettings(sessionRef)
   const canWrite = useCanWrite()
+  const blocked = useContext(WriteBlock)
+  const pairs = useHaPairs()
   const [draft, setDraft] = useState<JsonObject>()
   const [invalid, setInvalid] = useState<string[]>([])
 
@@ -55,7 +60,7 @@ export function SessionSettingsTab({ sessionRef, detail }: Props) {
   const current = draft ?? stored
   const changed = draft !== undefined && JSON.stringify(draft) !== JSON.stringify(stored)
   const store = stores.data?.find((s) => s.instanceId === detail.sessionSettingsStore)
-  const editable = canWrite && detail.sessionSettingsStore !== undefined
+  const editable = canWrite && !blocked && detail.sessionSettingsStore !== undefined
   const acceptor = detail.summary.type === 'ACCEPTOR'
   const error = update.error
 
@@ -78,6 +83,7 @@ export function SessionSettingsTab({ sessionRef, detail }: Props) {
           title={`Store ${store.instanceId} keeps changes in memory: the engine forgets them when it restarts.`}
         />
       ) : null}
+      {editable && pairOf(pairs.data ?? [], sessionRef.engineId) && <Alert type="info" title={REPLICATED_CHANGE_HINT} />}
       {editable && (
         <Flex gap={8} wrap>
           <Button type="primary" disabled={!changed} loading={update.isPending} onClick={save}>

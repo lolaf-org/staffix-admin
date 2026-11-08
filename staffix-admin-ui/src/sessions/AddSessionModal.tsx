@@ -20,11 +20,13 @@ import {
   fetchSessionSettings,
   useAddSession,
   useApplicationSettings,
+  useHaPairs,
   useSessionComponents,
   useSessionSettingsSchema,
   useSessionSettingsStores,
   type SessionRef,
 } from '../api/queries'
+import { pairOf, REPLICATED_CHANGE_HINT } from '../ha/pairs'
 import { ApplicationSettingsEditor } from '../settings/ApplicationSettingsEditor'
 import { SchemaForm } from '../settings/SchemaForm'
 import { problems, SECRET_MASK, withConstants, type JsonObject, type JsonSchema } from '../settings/schema'
@@ -49,6 +51,7 @@ export function AddSessionModal({ engineId, open, onClose, groups }: Props) {
   const schema = useSessionSettingsSchema(engineId)
   const stores = useSessionSettingsStores(engineId)
   const add = useAddSession(engineId)
+  const pairs = useHaPairs()
   const [store, setStore] = useState<string>()
   const [source, setSource] = useState<SessionRef>()
   const declared = useApplicationSettings(source)
@@ -133,6 +136,7 @@ export function AddSessionModal({ engineId, open, onClose, groups }: Props) {
               />
             </Form.Item>
           </Form>
+          {pairOf(pairs.data ?? [], engineId) && <Alert type="info" title={REPLICATED_CHANGE_HINT} style={{ marginBottom: 12 }} />}
           {secretsDropped && <Alert type="info" title="Secret application settings are not copied: type them again." style={{ marginBottom: 12 }} />}
           {invalid.length > 0 && <Alert type="error" title="Fix these fields first" description={invalid.join(', ')} style={{ marginBottom: 12 }} />}
           {add.error && (

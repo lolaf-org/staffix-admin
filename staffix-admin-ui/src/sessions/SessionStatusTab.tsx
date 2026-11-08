@@ -17,7 +17,8 @@ import { useState } from 'react'
 import { App, Descriptions, Divider, Flex, InputNumber, Modal, Select, Table, Tag, Typography } from 'antd'
 import { useLocation, useNavigate } from 'react-router'
 import { type Schemas } from '../api/client'
-import { useActivateConfig, useLogon, useLogout, useRemoveSession, useResetSession, useSetSeqNums, type SessionRef } from '../api/queries'
+import { useActivateConfig, useHaPairs, useLogon, useLogout, useRemoveSession, useResetSession, useSetSeqNums, type SessionRef } from '../api/queries'
+import { pairOf, REPLICATED_CHANGE_HINT } from '../ha/pairs'
 import { STATUS_LABELS } from './status'
 import { StatusBadge } from './StatusBadge'
 import { formatCompIds } from './identity'
@@ -112,6 +113,8 @@ function ResetSection({ sessionRef, summary }: { sessionRef: SessionRef; summary
  */
 function RemoveSessionButton({ sessionRef, detail }: Props) {
   const remove = useRemoveSession(sessionRef)
+  const pairs = useHaPairs()
+  const paired = pairOf(pairs.data ?? [], sessionRef.engineId) !== undefined
   const navigate = useNavigate()
   const location = useLocation()
   const { message } = App.useApp()
@@ -120,7 +123,7 @@ function RemoveSessionButton({ sessionRef, detail }: Props) {
       danger
       style={{ marginLeft: 'auto' }}
       loading={remove.isPending}
-      confirm={`Remove ${sessionRef.group}.${sessionRef.sessionId} from store ${detail.sessionSettingsStore}? The live session is disconnected unless its "Disconnect on remove" setting is off.`}
+      confirm={`Remove ${sessionRef.group}.${sessionRef.sessionId} from store ${detail.sessionSettingsStore}? The live session is disconnected unless its "Disconnect on remove" setting is off.${paired ? ` ${REPLICATED_CHANGE_HINT}` : ''}`}
       onConfirm={() =>
         remove.mutate(undefined, {
           onSuccess: () => navigate({ pathname: '/', search: location.search }),

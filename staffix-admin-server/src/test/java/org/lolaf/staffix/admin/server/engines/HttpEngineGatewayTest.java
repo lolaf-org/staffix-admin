@@ -151,7 +151,8 @@ class HttpEngineGatewayTest {
              "followerConnections":[{"nodeId":"2","lane":1,"address":"/10.0.0.2:40000","connected":true,"inSync":true,
                "snapshotInProgress":false,"unsentBytes":0,"lagMillis":3}],
              "switchoverMaxDuration":"PT4S","monitoringInstanceId":"metrics",
-             "droppedFollowers":[{"nodeId":"3","lane":1,"droppedAt":"2026-10-10T10:05:00Z","heldOffUntil":"2026-10-10T10:05:02Z"}]}
+             "droppedFollowers":[{"nodeId":"3","lane":1,"droppedAt":"2026-10-10T10:05:00Z","heldOffUntil":"2026-10-10T10:05:02Z"}],
+             "sessionSettingsDifferences":[{"store":"files","fixSessionType":"ACCEPTOR","fixSessionId":"acme.added:VERSION_44:A->B","kind":"MISSING_HERE"}]}
             """;
 
     private static final String HA_SESSIONS = """
@@ -361,6 +362,10 @@ class HttpEngineGatewayTest {
         });
         assertThat(ha.getDroppedFollowers()).singleElement()
                 .satisfies(dropped -> assertThat(dropped.getHeldOffUntil()).isEqualTo(Instant.parse("2026-10-10T10:05:02Z")));
+        assertThat(ha.getSessionSettingsDifferences()).singleElement().satisfies(difference -> {
+            assertThat(difference.getFixSessionId()).isEqualTo("acme.added:VERSION_44:A->B");
+            assertThat(difference.getKind()).isEqualTo(HaStatus.SessionSettingsDifference.Kind.MISSING_HERE);
+        });
         assertThat(gateway.getHaSessions("alpha-engine")).singleElement().satisfies(session -> {
             assertThat(session.getReplicationMode()).isEqualTo("SYNC_RECEIVED");
             assertThat(session.getReplicationAckTimeout()).isEqualTo(Duration.ofSeconds(1));

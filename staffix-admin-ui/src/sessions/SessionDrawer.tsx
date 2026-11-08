@@ -65,7 +65,7 @@ export function SessionDrawer() {
             {
               key: 'settings',
               label: 'Settings',
-              children: <SessionSettingsTab sessionRef={ref} detail={session.data} />,
+              children: <WriteBlock value={notLeading}><SessionSettingsTab sessionRef={ref} detail={session.data} /></WriteBlock>,
             },
             {
               key: 'alerts',

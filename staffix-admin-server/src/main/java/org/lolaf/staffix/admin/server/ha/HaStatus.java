@@ -71,6 +71,11 @@ public class HaStatus {
      */
     @Nullable
     Leader leader;
+    /**
+     * While this node follows: how its session settings differ from the leader's, as a failover runs its own.
+     */
+    @Builder.Default
+    List<SessionSettingsDifference> sessionSettingsDifferences = List.of();
 
     @Value
     @Builder
@@ -116,5 +121,22 @@ public class HaStatus {
         String address;
         boolean connected;
         boolean inSync;
+    }
+
+    @Value
+    @Builder
+    @Jacksonized
+    public static class SessionSettingsDifference {
+        String store;
+        String fixSessionType;
+        /**
+         * The session's full form, {@code group.name:VERSION:SENDER->TARGET}.
+         */
+        String fixSessionId;
+        Kind kind;
+
+        public enum Kind {
+            MISSING_HERE, EXTRA_HERE, DIFFERENT
+        }
     }
 }

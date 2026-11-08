@@ -36,6 +36,9 @@ could mean.
   across failovers.
 - **High availability actions** for writers, confirmed and audited: switch over, take a node into maintenance, and
   re-sync one session or all of them.
+- **Session changes on a high availability pair** are made on the leader and reach the follower with staffix 0.9.2. Settings
+  not on the follower yet, or differing, show on the session and on the High availability page, and a follower's settings
+  cannot be edited.
 - **The demo and the sandbox have a pair of nodes**, the demo's playing a stalled follower, a snapshot, a clean handover
   and a failover.
 

@@ -23,6 +23,17 @@ export type HaNode = Schemas['Node']
  */
 const MAX_PENDING_WRITES = 1_000
 
+export type SettingsDifference = NonNullable<HaNode['status']>['sessionSettingsDifferences'][number]
+
+export const SETTINGS_DIFFERENCE_TEXT: Record<SettingsDifference['kind'], string> = {
+  MISSING_HERE: 'settings not on the follower yet',
+  DIFFERENT: 'settings differ on the follower',
+  EXTRA_HERE: 'only on the follower',
+}
+
+export const REPLICATED_CHANGE_HINT =
+  'Made on the leader, which passes it to the follower when this store is replicated. The HA page shows settings that still differ.'
+
 export function leaderOf(pair: HaPair): HaNode | undefined {
   return pair.nodes.find((node) => node.status?.role === 'LEADER')
 }
@@ -66,6 +77,21 @@ export function needsAttention(replication: ReplicationState): boolean {
  * How a session of the node the overview shows replicates to the follower.
  */
 export function replicationState(pair: HaPair, group: string, sessionId: string): ReplicationState {
+  const link = linkState(pair, group, sessionId)
+  const difference = followerSettingsDifference(pair, group, sessionId)
+  if (!difference) return link
+  return { text: `${link.text}, ${SETTINGS_DIFFERENCE_TEXT[difference.kind]}`, health: link.health === 'error' ? 'error' : 'warning' }
+}
+
+function followerSettingsDifference(pair: HaPair, group: string, sessionId: string): SettingsDifference | undefined {
+  const qualifiedName = `${group}.${sessionId}:`
+  return pair.nodes
+    .filter((node) => node.status?.role === 'FOLLOWER')
+    .flatMap((node) => node.status!.sessionSettingsDifferences)
+    .find((difference) => difference.fixSessionId.startsWith(qualifiedName))
+}
+
+function linkState(pair: HaPair, group: string, sessionId: string): ReplicationState {
   const shown = shownNode(pair)
   const follower = pair.nodes.find((node) => node !== shown)
   const onShown = sessionOn(shown, group, sessionId)

@@ -39,6 +39,8 @@ import java.util.TreeMap;
  */
 final class SimulatedHaPair {
 
+    static final int SETTINGS_DIFFER_TICK = 20;
+    static final int SETTINGS_ALIGNED_TICK = 40;
     static final int STALL_TICK = 60;
     static final int SNAPSHOT_TICK = 75;
     static final int STEADY_AGAIN_TICK = 85;
@@ -233,6 +235,15 @@ final class SimulatedHaPair {
                 } else if (leader != null) {
                     status.leader(HaStatus.Leader.builder().leaderId(leader.nodeId).address("/10.0.0." + leader.nodeId + ":17101")
                             .connected(true).inSync(!snapshotting()).build());
+                    if (tick >= SETTINGS_DIFFER_TICK && tick < SETTINGS_ALIGNED_TICK) {
+                        engine.runningConfigs().stream()
+                                .filter(session -> session.group().equals("acme") && session.name().equals("drop-copy"))
+                                .map(session -> HaStatus.SessionSettingsDifference.builder().store("simulated")
+                                        .fixSessionType(session.settings.getFixSessionType())
+                                        .fixSessionId(session.fixSessionId().toString())
+                                        .kind(HaStatus.SessionSettingsDifference.Kind.DIFFERENT).build())
+                                .forEach(status::sessionSettingsDifference);
+                    }
                 }
                 return status.build();
             }

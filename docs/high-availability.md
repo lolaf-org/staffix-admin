@@ -49,6 +49,16 @@ an async store: a takeover has to wait for them. `N writes lost on <node>` is ad
 write some messages: a lost message costs a gap fill if it is asked for again. Clearing the `messages-lost` alert
 acknowledges the count.
 
+`settings not on the follower yet` or `settings differ on the follower` is added when the follower reports a difference
+with the leader's session settings. The follower's card lists them, sessions only it has included, as a failover runs
+that node's own settings.
+
+### Changing sessions
+
+Add, change and remove sessions on the leader: the console disables these on a follower and says why. A store that is
+replicated passes the change to the follower, without the console waiting for it; a memory store is only compared, so
+its differences stay listed.
+
 ### Actions
 
 Writers only, each confirmed and [audited](security.md):

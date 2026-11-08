@@ -59,6 +59,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 /**
  * One sandbox engine: its acceptors and initiators, exporting metrics and FIX logs over OTLP and announcing itself
@@ -78,6 +79,7 @@ final class SandboxEngine {
     private FixMessagesStoreSettings messagesStore = MemoryMessageStoreSettings.builder().build();
     private FixAlertsPublisherSettings alertsPublisher = Slf4jAlertsPublisherSettings.builder().build();
     private DataSource acceptorsSessionsDatabase;
+    private Predicate<Session> sessionsInDatabase = session -> true;
     private HaSettings highAvailability;
     private FixEngine engine;
 
@@ -181,6 +183,14 @@ final class SandboxEngine {
         return this;
     }
 
+    /**
+     * Keeps only the matching sessions there, the others staying in memory, in a store of their own.
+     */
+    SandboxEngine acceptorsSessionsIn(DataSource database, Predicate<Session> sessions) {
+        sessionsInDatabase = sessions;
+        return acceptorsSessionsIn(database);
+    }
+
     void start() {
         SimpleApplicationFactorySettings.SimpleApplicationFactorySettingsBuilder applications = SimpleApplicationFactorySettings.builder();
         FixEngineBuilder.FixEngineBuilderBuilder<?, ?> builder = FixEngineBuilder.builder()
@@ -215,18 +225,29 @@ final class SandboxEngine {
                         .rttLatencyEnabled(true)
                         .clockOffsetEnabled(true)
                         .build());
+        Map<String, List<String>> acceptorsStores = new LinkedHashMap<>();
         acceptors.forEach((instanceId, acceptor) -> {
-            List<FixSessionSettings> sessions = new ArrayList<>();
+            List<FixSessionSettings> inDatabase = new ArrayList<>();
+            List<FixSessionSettings> inMemory = new ArrayList<>();
             acceptor.sessions().forEach(session -> {
                 applications.application(session.fixSessionId().getQualifiedName(), session.application());
-                sessions.add(settings(session, FixSessionType.ACCEPTOR));
+                boolean stored = acceptorsSessionsDatabase != null && sessionsInDatabase.test(session);
+                (stored ? inDatabase : inMemory).add(settings(session, FixSessionType.ACCEPTOR));
             });
-            builder.fixSessionsSettingsStore(acceptorsSessionsDatabase == null
-                    ? MemorySessionsSettingsStoreSettings.builder().instanceId(instanceId).fixSessionSettings(sessions).build()
-                    : seeded(JdbcSessionsSettingsStoreSettings.builder()
-                    .instanceId(instanceId)
-                    .dataSource(acceptorsSessionsDatabase)
-                    .build(), sessions));
+            List<String> stores = new ArrayList<>();
+            if (acceptorsSessionsDatabase != null) {
+                builder.fixSessionsSettingsStore(seeded(JdbcSessionsSettingsStoreSettings.builder()
+                        .instanceId(instanceId)
+                        .dataSource(acceptorsSessionsDatabase)
+                        .build(), inDatabase));
+                stores.add(instanceId);
+            }
+            if (!inMemory.isEmpty()) {
+                String memoryStore = acceptorsSessionsDatabase == null ? instanceId : instanceId + "-memory";
+                builder.fixSessionsSettingsStore(MemorySessionsSettingsStoreSettings.builder().instanceId(memoryStore).fixSessionSettings(inMemory).build());
+                stores.add(memoryStore);
+            }
+            acceptorsStores.put(instanceId, stores);
         });
         MemorySessionsSettingsStoreSettings.MemorySessionsSettingsStoreSettingsBuilder initiatorsStore =
                 MemorySessionsSettingsStoreSettings.builder().instanceId("initiators");
@@ -242,7 +263,7 @@ final class SandboxEngine {
         acceptors.forEach((instanceId, acceptor) -> engine.newAcceptor(FixAcceptorBuilder.builder()
                 .instanceId(instanceId)
                 .bindAddress(new InetSocketAddress("localhost", acceptor.port()))
-                .targetFixSessionsSettingsStoreInstancesIds(List.of(instanceId))
+                .targetFixSessionsSettingsStoreInstancesIds(acceptorsStores.get(instanceId))
                 .build()).start());
         initiators.forEach(initiator -> {
             FixInitiatorBuilder.FixInitiatorBuilderBuilder<?, ?> fixInitiator = FixInitiatorBuilder.builder()

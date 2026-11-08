@@ -35,6 +35,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -54,6 +55,7 @@ public class SandboxHaNode {
     private static final int WITNESS_PORT = 7340;
     private static final Duration NEWS_INTERVAL = Duration.ofMillis(500);
     private static final int EVENTS_BATCHING = 1000;
+    private static final Set<String> SESSIONS_IN_DATABASE = Set.of("fixt-trading", "trading-2");
 
     static int fixPort(int nodeId) {
         return 7300 + nodeId;
@@ -79,6 +81,7 @@ public class SandboxHaNode {
                         .build())
                 .alertsPublisher(SandboxApplication.alertmanager(settings))
                 .highAvailability(highAvailability(nodeId, directory))
+                .acceptorsSessionsIn(database.dataSource(), session -> SESSIONS_IN_DATABASE.contains(session.fixSessionId().getName()))
                 .acceptor("venue-y-gateway", fixPort(nodeId),
                         Session.of("alpha-bank", "trading", "VENY", "ALPHA", new Quoter()).replicated(ReplicationMode.SYNC_APPLIED),
                         Session.of("alpha-bank", "trading-2", "VENY_2", "ALPHA", new Quoter()).replicated(ReplicationMode.SYNC_RECEIVED),

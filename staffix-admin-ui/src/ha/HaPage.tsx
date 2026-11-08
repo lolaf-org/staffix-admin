@@ -22,7 +22,7 @@ import { useFolded } from '../layout/useFolded'
 import { WriteButton } from '../sessions/WriteButton'
 import { HaCharts } from './HaCharts'
 import { NodeTag } from './NodeTag'
-import { leaderOf, needsAttention, nodeName, replicationState, shownNode, type HaNode, type HaPair, type ReplicationState } from './pairs'
+import { leaderOf, needsAttention, nodeName, replicationState, SETTINGS_DIFFERENCE_TEXT, shownNode, type HaNode, type HaPair, type ReplicationState, type SettingsDifference } from './pairs'
 
 /**
  * Past this a follower reads as stalled, whatever its last acknowledgement says: `inSync` is as of that acknowledgement.
@@ -129,6 +129,7 @@ function NodeCard({ pair, node, leads }: { pair: HaPair; node: HaNode; leads: bo
           ))}
           <NodeProbes engineId={node.engineId} />
           <NodeStoreAlerts engineId={node.engineId} />
+          <SettingsDifferences differences={status.sessionSettingsDifferences} />
           {status.leader && (
             <Tooltip title={status.leader.address}>
               <Typography.Text>
@@ -179,6 +180,25 @@ function NodeStoreAlerts({ engineId }: { engineId: string }) {
         </Flex>
       ))}
     </Flex>
+  )
+}
+
+function SettingsDifferences({ differences }: { differences: SettingsDifference[] }) {
+  if (differences.length === 0) return null
+  return (
+    <Alert
+      type="warning"
+      title="Session settings that differ from the leader's: a failover runs this node's own"
+      description={
+        <ul style={{ margin: 0, paddingLeft: 20 }}>
+          {differences.map((difference) => (
+            <li key={`${difference.store}/${difference.fixSessionType}/${difference.fixSessionId}`}>
+              {difference.fixSessionId} (store {difference.store}): {SETTINGS_DIFFERENCE_TEXT[difference.kind]}
+            </li>
+          ))}
+        </ul>
+      }
+    />
   )
 }
 

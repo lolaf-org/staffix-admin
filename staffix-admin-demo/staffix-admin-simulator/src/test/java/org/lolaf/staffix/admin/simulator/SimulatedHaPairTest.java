@@ -70,6 +70,17 @@ class SimulatedHaPairTest {
     }
 
     @Test
+    void theFollowerReportsSettingsThatDifferForAPartOfTheScript() {
+        assertThat(b.getStatus().getSessionSettingsDifferences()).isEmpty();
+
+        ticksUntil(SimulatedHaPair.SETTINGS_DIFFER_TICK);
+
+        assertThat(a.getStatus().getSessionSettingsDifferences()).isEmpty();
+        assertThat(b.getStatus().getSessionSettingsDifferences()).singleElement()
+                .satisfies(difference -> assertThat(difference.getFixSessionId()).startsWith("acme.drop-copy:"));
+    }
+
+    @Test
     void aStalledFollowerStaysInSyncWhileItsLagGrows() {
         ticksUntil(SimulatedHaPair.STALL_TICK + 5);
 

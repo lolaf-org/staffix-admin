@@ -21,13 +21,13 @@ import type { Schemas } from '../api/client'
 import { sessionRoute, useEngineAlerts, useEngines, useGroups, useHaPairs } from '../api/queries'
 import { useFolded } from '../layout/useFolded'
 import { NodeTag } from '../ha/NodeTag'
-import { leaderOf, needsAttention, pairOf, replicationState, shownNode, type HaPair } from '../ha/pairs'
+import { leaderOf, needsAttention, notLeadingReason, pairOf, replicationState, shownNode, type HaPair } from '../ha/pairs'
 import { STATUS_LABELS, STATUSES, type Status } from '../sessions/status'
 import { AddSessionModal } from '../sessions/AddSessionModal'
 import { StatusBadge } from '../sessions/StatusBadge'
 import { SessionBox } from '../sessions/SessionBox'
 import { useSessionFilters } from '../sessions/filters'
-import { WriteButton } from '../sessions/WriteButton'
+import { WriteBlock, WriteButton } from '../sessions/WriteButton'
 import { AlertBell, UnknownAlertsPill } from '../alerts/AlertBell'
 import { useEnginesWithUnknownAlerts } from '../alerts/unknown'
 import { ALERT_LEVEL_LABELS, ALERT_LEVELS, worstLevel, type AlertLevel } from '../alerts/levels'
@@ -182,9 +182,11 @@ function EngineCard({ engine, pair }: { engine: Schemas['Engine']; pair?: HaPair
               />
             )
           })}
-          <WriteButton size="small" icon={<PlusOutlined />} onConfirm={() => setAdding(true)}>
-            Acceptor session
-          </WriteButton>
+          <WriteBlock value={pair && notLeadingReason([pair], engine.engineId)}>
+            <WriteButton size="small" icon={<PlusOutlined />} onConfirm={() => setAdding(true)}>
+              Acceptor session
+            </WriteButton>
+          </WriteBlock>
           <AddSessionModal engineId={engine.engineId} open={adding} onClose={() => setAdding(false)} groups={groups.data ?? []} />
         </Space>
       }
