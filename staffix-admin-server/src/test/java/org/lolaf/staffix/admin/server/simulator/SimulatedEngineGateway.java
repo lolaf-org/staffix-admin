@@ -257,7 +257,7 @@ class SimulatedEngineGateway implements EngineGateway {
     }
 
     @Override
-    public void setCandidate(String engineId, boolean candidate) {
+    public void setElectable(String engineId, boolean electable) {
         throw noHighAvailability(engineId);
     }
 

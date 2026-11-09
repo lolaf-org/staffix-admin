@@ -103,10 +103,10 @@ class SimulatedHaPairTest {
 
     @Test
     void aSwitchoverMovesLeadershipAtOnceUnlessTheFollowerCannotTakeIt() {
-        b.setCandidate(false);
+        b.setElectable(false);
         assertThat(a.switchover()).isEqualTo(SwitchoverOutcome.NOT_TRANSFERRED);
 
-        b.setCandidate(true);
+        b.setElectable(true);
         assertThat(a.switchover()).isEqualTo(SwitchoverOutcome.TRANSFERRED);
         assertThat(b.getStatus().getRole()).isEqualTo(Role.LEADER);
 

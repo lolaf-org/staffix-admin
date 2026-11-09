@@ -147,7 +147,7 @@ class HttpEngineGatewayTest {
     private static final String HA = """
             {"nodeId":"1","pairName":"gateway","role":"LEADER","epoch":7,"leaderId":"1","leadershipValid":true,
              "leaderElectionType":"PrimosLeaderElection","roleSince":"2026-10-10T10:00:00Z","transferLeadershipSupported":true,
-             "candidacySupported":true,"candidate":true,
+             "electableSupported":true,"electable":true,
              "followerConnections":[{"nodeId":"2","lane":1,"address":"/10.0.0.2:40000","connected":true,"inSync":true,
                "snapshotInProgress":false,"unsentBytes":0,"lagMillis":3}],
              "switchoverMaxDuration":"PT4S","monitoringInstanceId":"metrics",
@@ -216,7 +216,7 @@ class HttpEngineGatewayTest {
             sleep(REQUEST_TIMEOUT.plusMillis(200));
         }
         bodies.put(request, new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-        if (path.equals("ha/switchover") || path.equals("ha/candidacy")) {
+        if (path.equals("ha/switchover") || path.equals("ha/electable")) {
             sleep(switchoverTakes);
         }
         byte[] body = switch (path) {
@@ -383,12 +383,12 @@ class HttpEngineGatewayTest {
     }
 
     @Test
-    void aLeaderWithdrawingItsCandidacyMayTakeAsLongAsASwitchover() {
+    void aLeaderMadeUnelectableMayTakeAsLongAsASwitchover() {
         switchoverTakes = Duration.ofMillis(2500);
 
-        gateway.setCandidate("alpha-engine", false);
+        gateway.setElectable("alpha-engine", false);
 
-        assertThat(requests).contains("POST ha/candidacy");
+        assertThat(requests).contains("POST ha/electable");
     }
 
     @Test
@@ -605,11 +605,11 @@ class HttpEngineGatewayTest {
     @Test
     void highAvailabilityActionsAddressTheEngineAndTheSession() {
         assertThat(gateway.switchover("alpha-engine")).isEqualTo(SwitchoverOutcome.NO_FOLLOWER_IN_SYNC);
-        gateway.setCandidate("alpha-engine", false);
+        gateway.setElectable("alpha-engine", false);
         gateway.resyncSession(trading());
 
-        assertThat(requests).containsExactly("GET ha", "POST ha/switchover", "GET ha", "POST ha/candidacy", "POST ha/sessions/alpha/trading/resync");
-        assertThat(bodies.get("POST ha/candidacy")).isEqualTo("{\"candidate\":false}");
+        assertThat(requests).containsExactly("GET ha", "POST ha/switchover", "GET ha", "POST ha/electable", "POST ha/sessions/alpha/trading/resync");
+        assertThat(bodies.get("POST ha/electable")).isEqualTo("{\"electable\":false}");
     }
 
     @Test

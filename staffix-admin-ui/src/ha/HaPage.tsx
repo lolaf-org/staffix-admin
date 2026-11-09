@@ -15,7 +15,7 @@
  */
 import { CaretDownOutlined, CaretRightOutlined, CheckCircleFilled, CloseCircleFilled, ReloadOutlined, SwapOutlined, ToolOutlined, WarningFilled } from '@ant-design/icons'
 import { Alert, Card, Collapse, Descriptions, Empty, Flex, Skeleton, Space, Table, Tag, theme, Tooltip, Typography } from 'antd'
-import { useComponentProbes, useEngineAlerts, useGroups, useHaPairs, useResync, useResyncSession, useSetCandidate, useSwitchover } from '../api/queries'
+import { useComponentProbes, useEngineAlerts, useGroups, useHaPairs, useResync, useResyncSession, useSetElectable, useSwitchover } from '../api/queries'
 import { AlertLevelTag } from '../alerts/AlertLevelTag'
 import { ClearComponentAlertButton } from '../alerts/ClearAlertButton'
 import { useFolded } from '../layout/useFolded'
@@ -107,11 +107,11 @@ function NodeCard({ pair, node, leads }: { pair: HaPair; node: HaNode; leads: bo
               { key: 'valid', label: 'Leadership', children: leads ? (status.leadershipValid ? 'proven' : 'cannot be proven') : 'n/a' },
               { key: 'since', label: 'Role since', children: status.roleSince ? new Date(status.roleSince).toLocaleTimeString() : 'none yet' },
               {
-                key: 'candidate',
+                key: 'electable',
                 label: 'Can lead',
                 children: (
                   <Tooltip title={`Leader chosen by ${status.leaderElectionType}`}>
-                    {status.candidate ? <span>yes</span> : <Tag color="warning">no, in maintenance</Tag>}
+                    {status.electable ? <span>yes</span> : <Tag color="warning">no, in maintenance</Tag>}
                   </Tooltip>
                 ),
               },
@@ -228,7 +228,7 @@ function Health({ ok }: { ok: boolean }) {
 
 function NodeActions({ node, leads }: { node: HaNode; leads: boolean }) {
   const switchover = useSwitchover(node.engineId)
-  const candidacy = useSetCandidate(node.engineId)
+  const electable = useSetElectable(node.engineId)
   const resync = useResync(node.engineId)
   const status = node.status!
   const followerInSync = status.followerConnections.some((follower) => follower.inSync)
@@ -250,15 +250,15 @@ function NodeActions({ node, leads }: { node: HaNode; leads: boolean }) {
           </span>
         </Tooltip>
       )}
-      {status.candidacySupported && (
+      {status.electableSupported && (
         <WriteButton
           size="small"
           icon={<ToolOutlined />}
-          loading={candidacy.isPending}
-          onConfirm={() => candidacy.mutate(!status.candidate)}
-          confirm={status.candidate ? `Put ${node.engineId} in maintenance? It stops standing for election.` : `End maintenance on ${node.engineId}?`}
+          loading={electable.isPending}
+          onConfirm={() => electable.mutate(!status.electable)}
+          confirm={status.electable ? `Put ${node.engineId} in maintenance? It stops standing for election.` : `End maintenance on ${node.engineId}?`}
         >
-          {status.candidate ? 'Maintenance' : 'End maintenance'}
+          {status.electable ? 'Maintenance' : 'End maintenance'}
         </WriteButton>
       )}
       {leads && (

@@ -155,6 +155,6 @@ cd staffix-admin-sandbox
 ./ha.sh stop witness        # nothing changes until a node is lost as well: the leader then drops its sessions
 ```
 
-Switchover, maintenance mode (candidacy) and re-sync are on the console's HA page. `ha.sh start` alone forgets the
+Switchover, maintenance mode (not electable) and re-sync are on the console's HA page. `ha.sh start` alone forgets the
 stores and elections under `target/ha`: `alpha-bank` keeps its sequence numbers in memory, so restart it with the pair,
 as they would no longer agree. Logs and JVM crash reports are in `target/ha/logs`.

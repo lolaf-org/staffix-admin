@@ -80,16 +80,16 @@ class HaControllerTest {
 
     @Test
     void maintenanceAndResyncReachTheEngineAndAreAudited() throws Exception {
-        doNothing().when(gateway).setCandidate("geneva-a", false);
+        doNothing().when(gateway).setElectable("geneva-a", false);
         doNothing().when(gateway).resync("geneva-a");
         doNothing().when(gateway).resyncSession(SessionRef.of("geneva-a", "acme", "trading"));
 
-        mockMvc.perform(post(ENGINE + "/candidacy").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"candidate\":false}"))
+        mockMvc.perform(post(ENGINE + "/electable").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"electable\":false}"))
                 .andExpect(status().isNoContent());
         mockMvc.perform(post(ENGINE + "/resync").with(csrf())).andExpect(status().isNoContent());
         mockMvc.perform(post(ENGINE + "/groups/acme/sessions/trading/resync").with(csrf())).andExpect(status().isNoContent());
 
-        verify(gateway).setCandidate("geneva-a", false);
+        verify(gateway).setElectable("geneva-a", false);
         verify(gateway).resync("geneva-a");
         verify(gateway).resyncSession(SessionRef.of("geneva-a", "acme", "trading"));
         verify(auditSink).record(argThat(entry -> entry.getOperation().equals("start maintenance")));

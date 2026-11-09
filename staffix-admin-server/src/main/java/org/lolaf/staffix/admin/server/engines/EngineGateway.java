@@ -167,7 +167,7 @@ public interface EngineGateway {
     /**
      * False takes the node out of elections for maintenance.
      */
-    void setCandidate(String engineId, boolean candidate);
+    void setElectable(String engineId, boolean electable);
 
     void resync(String engineId);
 

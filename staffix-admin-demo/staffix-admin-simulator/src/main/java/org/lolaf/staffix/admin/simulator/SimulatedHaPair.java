@@ -148,7 +148,7 @@ final class SimulatedHaPair {
         private final String nodeId;
         private final SimulatedEngine engine;
         private final SimulatedHaProbes probes = new SimulatedHaProbes();
-        private boolean candidate = true;
+        private boolean electable = true;
 
         void tick() {
             if (this == nodes[0]) {
@@ -228,8 +228,8 @@ final class SimulatedHaPair {
                         .leaderElectionType("SimulatedLeaderElection")
                         .roleSince(roleSince)
                         .transferLeadershipSupported(true)
-                        .candidacySupported(true)
-                        .candidate(candidate);
+                        .electableSupported(true)
+                        .electable(electable);
                 if (leads) {
                     status.followerConnection(followerConnection());
                 } else if (leader != null) {
@@ -290,9 +290,9 @@ final class SimulatedHaPair {
         }
 
         @Override
-        public void setCandidate(boolean standing) {
+        public void setElectable(boolean standing) {
             synchronized (SimulatedHaPair.this) {
-                candidate = standing;
+                electable = standing;
             }
         }
 
@@ -317,7 +317,7 @@ final class SimulatedHaPair {
                 if (snapshotting()) {
                     return SwitchoverOutcome.NO_FOLLOWER_IN_SYNC;
                 }
-                if (!other(this).candidate) {
+                if (!other(this).electable) {
                     return SwitchoverOutcome.NOT_TRANSFERRED;
                 }
                 lead(other(this));

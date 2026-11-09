@@ -46,7 +46,7 @@ public class HaController {
     public record SwitchoverResult(SwitchoverOutcome outcome) {
     }
 
-    public record CandidacyRequest(boolean candidate) {
+    public record ElectableRequest(boolean electable) {
     }
 
     @GetMapping("/pairs")
@@ -65,12 +65,12 @@ public class HaController {
     }
 
     @PreAuthorize(WRITER)
-    @PostMapping(ENGINE + "/candidacy")
+    @PostMapping(ENGINE + "/electable")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void setCandidate(@PathVariable String engineId, @RequestBody CandidacyRequest request) {
-        String operation = request.candidate() ? "end maintenance" : "start maintenance";
+    public void setElectable(@PathVariable String engineId, @RequestBody ElectableRequest request) {
+        String operation = request.electable() ? "end maintenance" : "start maintenance";
         auditLog.record(engineId, operation, () -> {
-            gateway.setCandidate(engineId, request.candidate());
+            gateway.setElectable(engineId, request.electable());
             return operation;
         }, done -> done);
     }

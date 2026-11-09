@@ -397,10 +397,10 @@ class HttpEngineGateway implements EngineGateway {
     }
 
     @Override
-    public void setCandidate(String engineId, boolean candidate) {
+    public void setElectable(String engineId, boolean electable) {
         try {
-            call(clientForSwitchover(engineId), engineId, HttpMethod.POST, List.of("ha", "candidacy"),
-                    Map.of("candidate", candidate), Void.class);
+            call(clientForSwitchover(engineId), engineId, HttpMethod.POST, List.of("ha", "electable"),
+                    Map.of("electable", electable), Void.class);
         } finally {
             markStale(engineId);
         }

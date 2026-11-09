@@ -82,10 +82,10 @@ export function useSwitchover(engineId: string) {
   )
 }
 
-export function useSetCandidate(engineId: string) {
+export function useSetElectable(engineId: string) {
   return useHaMutation(
-    (candidate: boolean) => call(api.POST(`${HA_ENGINE}/candidacy`, { params: { path: { engineId } }, body: { candidate } })),
-    (_, message) => message.success(`Candidacy of ${engineId} changed`),
+    (electable: boolean) => call(api.POST(`${HA_ENGINE}/electable`, { params: { path: { engineId } }, body: { electable } })),
+    (_, message) => message.success(`Electability of ${engineId} changed`),
   )
 }
 

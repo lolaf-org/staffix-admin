@@ -49,8 +49,8 @@ public class HaStatus {
     @Nullable
     Instant roleSince;
     boolean transferLeadershipSupported;
-    boolean candidacySupported;
-    boolean candidate;
+    boolean electableSupported;
+    boolean electable;
     /**
      * The longest a switchover can take on this engine.
      */
