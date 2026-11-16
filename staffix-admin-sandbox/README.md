@@ -132,6 +132,7 @@ it red, and logging a session out on one side shows the other side lose it.
 ## High availability
 
 `venue-y` is a real pair: two engines elected by primos with a witness, each process on its own so it can be killed.
+The witness runs in Docker, the `ghcr.io/lolaf-org/primos-witness` image, configured from [`witness/`](witness).
 `alpha-bank`'s initiators list both nodes' addresses (`:7301`, `:7302`) for the same session, and only the leader
 listens, so they log on to whichever leads.
 

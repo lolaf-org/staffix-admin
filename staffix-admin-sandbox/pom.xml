@@ -12,10 +12,6 @@
     <name>Staffix Admin Sandbox</name>
     <description>Staffix engines trading with each other, announced to the console, exporting metrics and logs over OTLP</description>
 
-    <properties>
-        <primos.version>0.1.0-SNAPSHOT</primos.version>
-    </properties>
-
     <dependencies>
         <dependency>
             <groupId>org.lolaf.staffix</groupId>
@@ -36,12 +32,6 @@
             <groupId>org.lolaf.staffix</groupId>
             <artifactId>staffix-ha-primos</artifactId>
             <version>${staffix.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.lolaf.primos</groupId>
-            <artifactId>primos-witness-cli</artifactId>
-            <version>${primos.version}</version>
-            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>org.lolaf.staffix</groupId>
