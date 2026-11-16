@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import { useEffect, useState } from 'react'
-import { Alert, Empty, Flex, Segmented, Select, Skeleton, Typography } from 'antd'
+import { Alert, Empty, Flex, Segmented, Select, Skeleton, Tag, Typography } from 'antd'
 import { AreaChartOutlined, TableOutlined } from '@ant-design/icons'
 import {
   useMessageTypes,
@@ -135,17 +135,21 @@ export function MetricsPanel({ scope, metersScope, chartHeight, period, marker }
 
   return (
     <Flex vertical gap={16}>
-      <Segmented<string>
+      <Tag.CheckableTagGroup<string>
         options={[
-          ...(hasMessageRate ? [{ value: MESSAGES, label: 'Rate', title: MESSAGE_RATE_DESCRIPTION }] : []),
+          ...(hasMessageRate ? [{ value: MESSAGES, label: <span title={MESSAGE_RATE_DESCRIPTION}>Rate</span> }] : []),
           ...ordered.map((m) => ({
             value: m.name,
-            label: BUILT_IN[m.name]?.label ?? readableName(m.name),
-            title: BUILT_IN[m.name] ? m.description : `${m.name}: ${m.description}`,
+            label: (
+              <span title={BUILT_IN[m.name] ? m.description : `${m.name}: ${m.description}`}>
+                {BUILT_IN[m.name]?.label ?? readableName(m.name)}
+              </span>
+            ),
           })),
         ]}
         value={selected}
-        onChange={choose}
+        onChange={(name) => name !== null && choose(name)}
+        aria-label="Meter"
       />
       <Flex wrap gap={8}>
         {meter?.type === 'TIMER' && (
