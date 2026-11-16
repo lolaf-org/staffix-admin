@@ -65,7 +65,7 @@ class TraceControllerTest {
         mockMvc.perform(get("/api/trace/settings"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.linkingTags", contains(11, 41, 37, 131, 117)))
-                .andExpect(jsonPath("$.keyFields", hasSize(13)))
+                .andExpect(jsonPath("$.keyFields", hasSize(14)))
                 .andExpect(jsonPath("$.keyFields[0].name", is("ClOrdID")));
     }
 

@@ -37,6 +37,7 @@ public class TraceSettings {
             field(11, "ClOrdID"),
             field(41, "OrigClOrdID"),
             field(37, "OrderID"),
+            field(17, "ExecID"),
             field(131, "QuoteReqID"),
             field(117, "QuoteID"),
             field(150, "ExecType"),

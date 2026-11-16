@@ -68,7 +68,7 @@ export function TracePage() {
         <Flex wrap gap={8} align="center">
           <Input.Search
             key={id}
-            placeholder="ClOrdID, OrderID, QuoteReqID..."
+            placeholder="ClOrdID, OrderID, ExecID, QuoteReqID..."
             defaultValue={id}
             allowClear
             enterButton="Trace"

@@ -49,6 +49,7 @@ could mean.
   engine on 0.9.1 no longer shows its application meters.
 - **The sandbox's Alertmanager groups alerts by `source`**, the label staffix 0.9.2 puts the engine's id in (it was
   `engine`).
+- **The order trace shows each message's ExecID** among its key fields, unless `console.yaml` sets its own.
 
 ### Fixed
 
