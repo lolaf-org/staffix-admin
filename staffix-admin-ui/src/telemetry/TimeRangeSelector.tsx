@@ -15,6 +15,7 @@
  */
 import { Badge, DatePicker, Flex, Segmented } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
+import { useMemo } from 'react'
 import { lastMinutes, type FixedPeriod } from '../api/queries'
 import { LIVE_WINDOW, TIME_WINDOWS } from './timeWindows'
 
@@ -39,6 +40,10 @@ interface Props {
 
 export function TimeRangeSelector({ value, onChange, live = false, onLiveChange }: Props) {
   const custom = typeof value !== 'number'
+  const from = custom ? value.from : undefined
+  const to = custom ? value.to : undefined
+  // the picker resets a range being picked whenever its value changes identity, as on every poll's re-render
+  const range = useMemo<[Dayjs, Dayjs] | undefined>(() => (from && to ? [dayjs(from), dayjs(to)] : undefined), [from, to])
 
   return (
     <Flex wrap gap={8} align="center">
@@ -59,7 +64,7 @@ export function TimeRangeSelector({ value, onChange, live = false, onLiveChange 
           showTime
           format="YYYY-MM-DD HH:mm:ss"
           allowClear={false}
-          value={[dayjs(value.from), dayjs(value.to)]}
+          value={range}
           onChange={(range) => range?.[0] && range[1] && onChange({ from: range[0].toISOString(), to: range[1].toISOString() })}
           disabledDate={(day, info) => day.isAfter(dayjs().endOf('day')) || tooFarFrom(day, info.from)}
           aria-label="Period"

@@ -63,6 +63,8 @@ could mean.
 - **An engine whose application publishes a counter no longer loses all its metrics in the console.** The console
   failed to read the engine's meters as soon as one was a counter; it now charts counters, and leaves out a kind
   of meter it does not know instead of failing.
+- **A custom date range no longer resets while you pick it.** On metrics, logs and the other pages with a Custom
+  period, a range being chosen was thrown away every few seconds, each time the page refreshed its data.
 
 ## [0.9.0] - 2026-10-15
 
