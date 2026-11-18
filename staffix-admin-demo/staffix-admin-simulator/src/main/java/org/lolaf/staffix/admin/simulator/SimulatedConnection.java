@@ -54,9 +54,9 @@ final class SimulatedConnection {
     /**
      * A backup runs on its main config's settings under its own id.
      */
-    void restartOn(FixSessionSettings settings) {
-        main().restartOn(settings);
-        backups().forEach(backup -> backup.restartOn(settings.toBuilder().fixSessionId(backup.fixSessionId()).build()));
+    void update(FixSessionSettings settings, boolean restart) {
+        main().update(settings, restart);
+        backups().forEach(backup -> backup.update(settings.toBuilder().fixSessionId(backup.fixSessionId()).build(), restart));
     }
 
     boolean hasConfig(FixSessionId fixSessionId) {

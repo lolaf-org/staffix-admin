@@ -27,6 +27,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.startsWith;
@@ -170,12 +171,53 @@ class SessionsControllerTest {
     void updatesASessionsSettings() throws Exception {
         String fundBeta = "/api/engines/london-prod/groups/fund-beta/sessions/trading/settings";
 
-        mockMvc.perform(put(fundBeta).with(csrf())
+        mockMvc.perform(put(fundBeta).with(csrf()).param("restart", "false")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"desiredSessionState\": \"LOGGED_OUT\"}"))
                 .andExpect(status().isNoContent());
 
         mockMvc.perform(get(fundBeta)).andExpect(jsonPath("$.desiredSessionState").value("LOGGED_OUT"));
+    }
+
+    @Test
+    void aLiveSessionShowsItsSettingsPendingUntilAnUpdateRestartsIt() throws Exception {
+        String uatClient2 = "/api/engines/nyc-uat/groups/uat-client-2/sessions/trading";
+        mockMvc.perform(get(uatClient2)).andExpect(jsonPath("$.summary.status").value("LOGGED_IN"));
+
+        updateSettings(uatClient2, false);
+        mockMvc.perform(get(uatClient2)).andExpect(jsonPath("$.summary.pendingSettingsUpdate").value(true));
+
+        updateSettings(uatClient2, true);
+        mockMvc.perform(get(uatClient2)).andExpect(jsonPath("$.summary.pendingSettingsUpdate").value(false));
+    }
+
+    @Test
+    void aSessionNotLoggedOnHasNoSettingsPending() throws Exception {
+        String fundBeta = "/api/engines/london-prod/groups/fund-beta/sessions/trading";
+
+        updateSettings(fundBeta, false);
+
+        mockMvc.perform(get(fundBeta)).andExpect(jsonPath("$.summary.pendingSettingsUpdate").value(false));
+    }
+
+    private void updateSettings(String session, boolean restart) throws Exception {
+        mockMvc.perform(put(session + "/settings").with(csrf()).param("restart", String.valueOf(restart))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"testingMode\": true}"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void anUpdateMustSayWhetherToRestartTheLiveSession() throws Exception {
+        String fundBeta = "/api/engines/london-prod/groups/fund-beta/sessions/trading/settings";
+        String before = mockMvc.perform(get(fundBeta)).andReturn().getResponse().getContentAsString();
+
+        mockMvc.perform(put(fundBeta).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"desiredSessionState\": \"LOGGED_OUT\"}"))
+                .andExpect(status().isBadRequest());
+
+        assertThat(mockMvc.perform(get(fundBeta)).andReturn().getResponse().getContentAsString()).isEqualTo(before);
     }
 
     @Test

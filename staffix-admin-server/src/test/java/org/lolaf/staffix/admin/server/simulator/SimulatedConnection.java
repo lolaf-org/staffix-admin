@@ -71,10 +71,16 @@ class SimulatedConnection {
     }
 
     /**
-     * Every config runs on the session's settings.
+     * Every config runs on the session's settings; a logged-on one keeps its old ones until it next connects, unless
+     * restarted.
      */
-    void replaceSettings(JsonNode settings) {
+    void updateSettings(JsonNode settings, boolean restart) {
         configs.forEach(config -> config.settings = settings);
+        if (restart) {
+            running.restart();
+        } else if (running.loggedIn) {
+            running.pendingSettingsUpdate = true;
+        }
     }
 
     boolean hasConfig(String configId) {
@@ -92,6 +98,7 @@ class SimulatedConnection {
                 .identity(running.identity)
                 .status(running.status())
                 .desiredState(running.desiredState)
+                .pendingSettingsUpdate(running.pendingSettingsUpdate)
                 .messagesLoggerInstanceId(emitters.messagesLogger())
                 .monitoringInstanceId(emitters.monitoring())
                 .build();

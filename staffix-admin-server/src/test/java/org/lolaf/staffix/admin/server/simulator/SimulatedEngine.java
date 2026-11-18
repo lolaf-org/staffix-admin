@@ -96,8 +96,8 @@ class SimulatedEngine {
         return connection(ref).running().settings;
     }
 
-    synchronized void updateSessionSettings(SessionRef ref, JsonNode settings) {
-        connection(ref).replaceSettings(settings);
+    synchronized void updateSessionSettings(SessionRef ref, JsonNode settings, boolean restart) {
+        connection(ref).updateSettings(settings, restart);
     }
 
     synchronized void removeSession(SessionRef ref) {

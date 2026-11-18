@@ -31,6 +31,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
@@ -89,15 +90,18 @@ public class SessionsController {
 
     /**
      * A value sent back masked keeps the session's. Audited by the names of the fields that changed, never values.
+     *
+     * @param restart required, so that no update interrupts a live session unasked
      */
     @PreAuthorize(WRITER)
     @PutMapping(SESSION + "/settings")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateSessionSettings(@PathVariable String engineId, @PathVariable String group, @PathVariable String sessionId,
-                                      @RequestBody JsonNode settings) {
+                                      @RequestParam boolean restart, @RequestBody JsonNode settings) {
         SessionRef session = SessionRef.of(engineId, group, sessionId);
         String changes = SettingsChanges.describe(gateway.getSessionSettings(session), settings);
-        auditLog.record(session, "update settings: " + changes, () -> gateway.updateSessionSettings(session, settings));
+        auditLog.record(session, (restart ? "update settings and restart: " : "update settings: ") + changes,
+                () -> gateway.updateSessionSettings(session, settings, restart));
     }
 
     /**

@@ -41,6 +41,8 @@ could mean.
   cannot be edited.
 - **The demo and the sandbox have a pair of nodes**, the demo's playing a stalled follower, a snapshot, a clean handover
   and a failover.
+- **Settings saved but not yet in use are marked** on the session's box, its status and its settings: a logged-on
+  session whose settings were saved without a restart runs on its previous ones until it next connects.
 
 ### Changed
 
@@ -50,6 +52,11 @@ could mean.
 - **The sandbox's Alertmanager groups alerts by `source`**, the label staffix 0.9.2 puts the engine's id in (it was
   `engine`).
 - **The order trace shows each message's ExecID** among its key fields, unless `console.yaml` sets its own.
+- **Saving a logged-on session's settings asks whether to restart it now** or to let it take them when it next
+  connects. Before, the session's own "Restart live session on update" setting decided, restarting it by default. A
+  session that is not logged on takes them at once, without the question.
+- **Removing a session always stops it**: if logged on, it is logged out and disconnected. The "Disconnect on remove"
+  and "Restart live session on update" settings are gone, as in staffix 0.9.2.
 
 ### Fixed
 

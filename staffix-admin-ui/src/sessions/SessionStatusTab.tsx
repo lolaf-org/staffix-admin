@@ -19,7 +19,7 @@ import { useLocation, useNavigate } from 'react-router'
 import { type Schemas } from '../api/client'
 import { useActivateConfig, useHaPairs, useLogon, useLogout, useRemoveSession, useResetSession, useSetSeqNums, type SessionRef } from '../api/queries'
 import { pairOf, REPLICATED_CHANGE_HINT } from '../ha/pairs'
-import { STATUS_LABELS } from './status'
+import { PENDING_SETTINGS_LABEL, STATUS_LABELS } from './status'
 import { StatusBadge } from './StatusBadge'
 import { formatCompIds } from './identity'
 import { RESET_MODES } from './resetModes'
@@ -56,6 +56,7 @@ export function SessionStatusTab({ sessionRef, detail }: Props) {
             label: 'Desired state',
             children: summary.desiredState === 'LOGGED_OUT' ? <Tag color="orange">logged out by an operator</Tag> : summary.desiredState.toLowerCase().replace('_', ' '),
           },
+          ...(summary.pendingSettingsUpdate ? [{ label: 'Settings', children: <Tag color="blue">{PENDING_SETTINGS_LABEL}</Tag> }] : []),
           { label: 'Next incoming seq num', children: detail.incomingSeqNum },
           { label: 'Next outgoing seq num', children: detail.outgoingSeqNum },
         ]}
@@ -123,7 +124,7 @@ function RemoveSessionButton({ sessionRef, detail }: Props) {
       danger
       style={{ marginLeft: 'auto' }}
       loading={remove.isPending}
-      confirm={`Remove ${sessionRef.group}.${sessionRef.sessionId} from store ${detail.sessionSettingsStore}? The live session is disconnected unless its "Disconnect on remove" setting is off.${paired ? ` ${REPLICATED_CHANGE_HINT}` : ''}`}
+      confirm={`Remove ${sessionRef.group}.${sessionRef.sessionId} from store ${detail.sessionSettingsStore}? This stops the session: if live, it is logged out and disconnected.${paired ? ` ${REPLICATED_CHANGE_HINT}` : ''}`}
       onConfirm={() =>
         remove.mutate(undefined, {
           onSuccess: () => navigate({ pathname: '/', search: location.search }),

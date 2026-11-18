@@ -41,6 +41,7 @@ class SimulatedSession {
     boolean loggedIn;
     boolean withinSessionTime;
     SessionDesiredState desiredState;
+    boolean pendingSettingsUpdate;
     long incomingSeqNum = 1;
     long outgoingSeqNum = 1;
 
@@ -72,7 +73,17 @@ class SimulatedSession {
      * Logs on again when it should be logged on, as after a reset or a switch to it.
      */
     void reconnect() {
+        boolean wasLoggedIn = loggedIn;
         loggedIn = withinSessionTime && desiredState.equals(SessionDesiredState.LOGGED_IN);
+        if (loggedIn && !wasLoggedIn) {
+            pendingSettingsUpdate = false;
+        }
+    }
+
+    void restart() {
+        pendingSettingsUpdate = false;
+        loggedIn = false;
+        reconnect();
     }
 
     SessionStatus status() {

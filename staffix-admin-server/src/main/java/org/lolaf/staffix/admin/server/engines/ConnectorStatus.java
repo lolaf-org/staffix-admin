@@ -50,6 +50,7 @@ class ConnectorStatus {
         String selectedConfig;
         String desiredState;
         String status;
+        boolean pendingSettingsUpdate;
         long incomingSeqNum;
         long outgoingSeqNum;
         @Nullable

@@ -54,9 +54,10 @@ public interface EngineGateway {
     JsonNode getSessionSettings(SessionRef session);
 
     /**
-     * Replaces the session's settings; a value sent back masked keeps the session's.
+     * Replaces the session's settings; a value sent back masked keeps the session's. A live session keeps running on
+     * its old settings until it next connects, unless {@code restart} restarts it on the new ones now.
      */
-    void updateSessionSettings(SessionRef session, JsonNode settings);
+    void updateSessionSettings(SessionRef session, JsonNode settings, boolean restart);
 
     /**
      * Removes the session from the store holding its settings, which stops it.

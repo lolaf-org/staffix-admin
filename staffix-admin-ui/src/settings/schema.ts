@@ -36,6 +36,18 @@ export interface JsonSchema {
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
 export type JsonObject = { [key: string]: JsonValue }
 
+/**
+ * Equal whatever the order of their keys, which an edited document need not keep.
+ */
+export function sameJson(a: JsonValue | undefined, b: JsonValue | undefined): boolean {
+  return JSON.stringify(a, sortedKeys) === JSON.stringify(b, sortedKeys)
+}
+
+function sortedKeys(_key: string, value: unknown) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return value
+  return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
+}
+
 export type FieldKind = 'object' | 'map' | 'objectList' | 'stringList' | 'enum' | 'boolean' | 'integer' | 'number' | 'duration' | 'string'
 
 export function resolve(node: JsonSchema, root: JsonSchema): JsonSchema {

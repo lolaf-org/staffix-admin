@@ -43,3 +43,5 @@ export const STATUS_COLORS: Record<Status, 'success' | 'warning' | 'orange' | 'e
   LOGGED_OUT_BY_OPERATOR: 'orange',
   LOGGED_OUT_INSIDE_SESSION_TIME: 'error',
 }
+
+export const PENDING_SETTINGS_LABEL = 'Runs on its previous settings: the saved ones apply when it next connects'

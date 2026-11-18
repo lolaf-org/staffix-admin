@@ -139,8 +139,8 @@ class HttpEngineGateway implements EngineGateway {
     }
 
     @Override
-    public void updateSessionSettings(SessionRef session, JsonNode settings) {
-        operate(session.getEngineId(), HttpMethod.PUT, sessionPath(session, "settings"), settings);
+    public void updateSessionSettings(SessionRef session, JsonNode settings, boolean restart) {
+        operate(session.getEngineId(), HttpMethod.PUT, sessionPath(session, "settings"), "restart=" + restart, settings);
     }
 
     @Override
@@ -390,7 +390,7 @@ class HttpEngineGateway implements EngineGateway {
     public SwitchoverOutcome switchover(String engineId) {
         try {
             return call(clientForSwitchover(engineId), engineId, HttpMethod.POST, List.of("ha", "switchover"), null,
-                    ConnectorSwitchover.class).outcome();
+                    null, ConnectorSwitchover.class).outcome();
         } finally {
             markStale(engineId);
         }
@@ -399,7 +399,7 @@ class HttpEngineGateway implements EngineGateway {
     @Override
     public void setElectable(String engineId, boolean electable) {
         try {
-            call(clientForSwitchover(engineId), engineId, HttpMethod.POST, List.of("ha", "electable"),
+            call(clientForSwitchover(engineId), engineId, HttpMethod.POST, List.of("ha", "electable"), null,
                     Map.of("electable", electable), Void.class);
         } finally {
             markStale(engineId);
@@ -510,8 +510,12 @@ class HttpEngineGateway implements EngineGateway {
      * Marks the status stale after, so the next poll shows the operation's effect.
      */
     private void operate(String engineId, HttpMethod method, List<String> path, @Nullable Object body) {
+        operate(engineId, method, path, null, body);
+    }
+
+    private void operate(String engineId, HttpMethod method, List<String> path, @Nullable String query, @Nullable Object body) {
         try {
-            call(engineId, method, path, body, Void.class);
+            call(client, engineId, method, path, query, body, Void.class);
         } finally {
             markStale(engineId);
         }
@@ -557,14 +561,14 @@ class HttpEngineGateway implements EngineGateway {
     }
 
     private <T> T call(String engineId, HttpMethod method, List<String> path, @Nullable Object body, Class<T> responseType) {
-        return call(client, engineId, method, path, body, responseType);
+        return call(client, engineId, method, path, null, body, responseType);
     }
 
-    private <T> T call(RestClient engineClient, String engineId, HttpMethod method, List<String> path, @Nullable Object body,
-                       Class<T> responseType) {
+    private <T> T call(RestClient engineClient, String engineId, HttpMethod method, List<String> path, @Nullable String query,
+                       @Nullable Object body, Class<T> responseType) {
         RegisteredEngine engine = registry.get(engineId);
         RestClient.RequestBodySpec request = engineClient.method(method)
-                .uri(uri(engine.getBaseUrl(), path))
+                .uri(uri(engine.getBaseUrl(), path, query))
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + engine.getToken());
         if (body != null) {
             request.body(body);
@@ -580,9 +584,12 @@ class HttpEngineGateway implements EngineGateway {
         }
     }
 
-    private static URI uri(URI baseUrl, List<String> path) {
+    private static URI uri(URI baseUrl, List<String> path, @Nullable String query) {
         StringBuilder uri = new StringBuilder(baseUrl.toString().replaceAll("/+$", "")).append('/').append(API_VERSION);
         path.forEach(segment -> uri.append('/').append(UriUtils.encodePathSegment(segment, StandardCharsets.UTF_8)));
+        if (query != null) {
+            uri.append('?').append(query);
+        }
         return URI.create(uri.toString());
     }
 
@@ -618,6 +625,7 @@ class HttpEngineGateway implements EngineGateway {
                 .identity(identity(session.selectedConfig().getIdentity()))
                 .status(SessionStatus.valueOf(status.getStatus()))
                 .desiredState(SessionDesiredState.valueOf(status.getDesiredState()))
+                .pendingSettingsUpdate(status.isPendingSettingsUpdate())
                 .messagesLoggerInstanceId(description.getMessagesLoggerInstanceId())
                 .monitoringInstanceId(description.getMonitoringInstanceId())
                 .alertLevel(session.alerts().stream().map(alert -> AlertLevel.valueOf(alert.getLevel())).max(Comparator.naturalOrder()).orElse(null))

@@ -32,6 +32,8 @@ final class SimulatedSession {
     private static final int RECONNECT_TICKS = 2;
 
     FixSessionSettings settings;
+    @Nullable
+    private FixSessionSettings pendingSettings;
     /**
      * {@code host:port} an initiator dials; null for an acceptor.
      */
@@ -77,12 +79,20 @@ final class SimulatedSession {
     }
 
     /**
-     * As an engine restarting the session on settings an operator changed.
+     * As staffix: a live session keeps its settings until it next connects unless restarted; a disconnected one is
+     * rebuilt at once.
      */
-    void restartOn(FixSessionSettings newSettings) {
-        settings = newSettings;
-        desiredState = newSettings.getDesiredSessionState();
-        drop(RECONNECT_TICKS);
+    void update(FixSessionSettings newSettings, boolean restart) {
+        if (loggedIn && !restart) {
+            pendingSettings = newSettings;
+        } else {
+            rebuildOn(newSettings);
+            drop(RECONNECT_TICKS);
+        }
+    }
+
+    boolean hasPendingSettingsUpdate() {
+        return pendingSettings != null;
     }
 
     void tick(Random random) {
@@ -96,8 +106,23 @@ final class SimulatedSession {
                 drop(2 + random.nextInt(6));
             }
         } else if (withinSessionTime && desiredState.equals(FixSessionDesiredState.LOGGED_IN) && --ticksToLogon <= 0) {
-            loggedIn = true;
+            logOn();
         }
+    }
+
+    private void logOn() {
+        if (pendingSettings != null) {
+            rebuildOn(pendingSettings);
+        }
+        loggedIn = desiredState.equals(FixSessionDesiredState.LOGGED_IN);
+    }
+
+    private void rebuildOn(FixSessionSettings newSettings) {
+        if (!newSettings.getDesiredSessionState().equals(settings.getDesiredSessionState())) {
+            desiredState = newSettings.getDesiredSessionState();
+        }
+        settings = newSettings;
+        pendingSettings = null;
     }
 
     void logon() {

@@ -100,8 +100,8 @@ class SimulatedEngineGateway implements EngineGateway {
     }
 
     @Override
-    public void updateSessionSettings(SessionRef session, JsonNode settings) {
-        engine(session.getEngineId()).updateSessionSettings(session, settings);
+    public void updateSessionSettings(SessionRef session, JsonNode settings, boolean restart) {
+        engine(session.getEngineId()).updateSessionSettings(session, settings, restart);
     }
 
     @Override

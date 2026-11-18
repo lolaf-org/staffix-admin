@@ -227,10 +227,17 @@ export function fetchSessionSettings(ref: SessionRef) {
   return call(api.GET('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/settings', sessionPath(ref)))
 }
 
+/**
+ * Without the restart, a live session keeps its current settings until it next connects.
+ */
 export function useUpdateSessionSettings(ref: SessionRef) {
-  return useEngineMutation(ref.engineId, (settings: Record<string, unknown>) =>
-    call(api.PUT('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/settings', { ...sessionPath(ref), body: settings })),
-  'Settings saved; the session restarts on them', SETTINGS_WRITE)
+  return useEngineMutation(ref.engineId, ({ settings, restart }: { settings: Record<string, unknown>; restart: boolean }) =>
+    call(api.PUT('/api/engines/{engineId}/groups/{group}/sessions/{sessionId}/settings', {
+      params: { path: ref, query: { restart } },
+      body: settings,
+    })),
+  ({ restart }) => restart ? 'Settings saved; the session restarts on them' : 'Settings saved; the session takes them when it next connects',
+  SETTINGS_WRITE)
 }
 
 export function useRemoveSession(ref: SessionRef) {

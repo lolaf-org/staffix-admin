@@ -102,7 +102,7 @@ class HttpEngineGatewayTest {
              {"group":"beta","name":"drop-copy","selectedConfig":"drop-copy",
               "desiredState":"LOGGED_OUT","status":"LOGGED_OUT_BY_OPERATOR","incomingSeqNum":1,"outgoingSeqNum":1},
              {"group":"alpha","name":"trading","selectedConfig":"trading-drp",
-              "desiredState":"LOGGED_IN","status":"LOGGED_IN","incomingSeqNum":12,"outgoingSeqNum":34%s},
+              "desiredState":"LOGGED_IN","status":"LOGGED_IN","pendingSettingsUpdate":true,"incomingSeqNum":12,"outgoingSeqNum":34%s},
              {"group":"alpha","name":"added-since","selectedConfig":"added-since",
               "desiredState":"LOGGED_IN","status":"LOGGED_IN","incomingSeqNum":1,"outgoingSeqNum":1}]}
             """;
@@ -209,7 +209,8 @@ class HttpEngineGatewayTest {
             return;
         }
         String path = versionedPath.substring("v1/".length());
-        String request = exchange.getRequestMethod() + " " + path;
+        String query = exchange.getRequestURI().getRawQuery();
+        String request = exchange.getRequestMethod() + " " + path + (query == null ? "" : "?" + query);
         requests.add(request);
         clock.step(takes.getOrDefault(request, Duration.ZERO));
         if (hanging.contains(request)) {
@@ -298,11 +299,13 @@ class HttpEngineGatewayTest {
         assertThat(trading.getConfigIds()).containsExactly("trading", "trading-drp");
         assertThat(trading.getRunningConfigId()).isEqualTo("trading-drp");
         assertThat(trading.getStatus()).isEqualTo(SessionStatus.LOGGED_IN);
+        assertThat(trading.isPendingSettingsUpdate()).isTrue();
         assertThat(trading.getIdentity().getSender().getSubId()).isEqualTo("DR");
         assertThat(trading.getIdentity().getDefaultApplVerId()).isNull();
         SessionSummary dropCopy = groups.get(1).getSessions().get(0);
         assertThat(dropCopy.getStatus()).isEqualTo(SessionStatus.LOGGED_OUT_BY_OPERATOR);
         assertThat(dropCopy.getDesiredState()).isEqualTo(SessionDesiredState.LOGGED_OUT);
+        assertThat(dropCopy.isPendingSettingsUpdate()).isFalse();
         assertThat(dropCopy.getIdentity().getTarget().getLocationId()).isEqualTo("LDN");
     }
 
@@ -862,11 +865,13 @@ class HttpEngineGatewayTest {
         JsonMapper json = JsonMapper.builder().build();
         JsonNode settings = json.readTree("{\"fixSessionType\":\"ACCEPTOR\"}");
 
-        gateway.updateSessionSettings(trading(), settings);
+        gateway.updateSessionSettings(trading(), settings, false);
+        gateway.updateSessionSettings(trading(), settings, true);
         gateway.removeSession(trading());
         gateway.addSession("alpha-engine", "main", settings);
 
-        assertThat(requests).contains("PUT sessions/alpha/trading/settings", "DELETE sessions/alpha/trading/settings",
+        assertThat(requests).contains("PUT sessions/alpha/trading/settings?restart=false",
+                "PUT sessions/alpha/trading/settings?restart=true", "DELETE sessions/alpha/trading/settings",
                 "POST session-settings-stores/main/sessions");
         assertThat(bodies.get("POST session-settings-stores/main/sessions")).isEqualTo("{\"fixSessionType\":\"ACCEPTOR\"}");
     }

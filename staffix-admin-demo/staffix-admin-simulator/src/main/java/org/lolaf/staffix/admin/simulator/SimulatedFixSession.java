@@ -58,6 +58,7 @@ class SimulatedFixSession {
                     case "isWithinSessionTime" -> session.withinSessionTime;
                     case "getDesiredState" -> session.desiredState;
                     case "getStatus" -> session.status();
+                    case "hasPendingSettingsUpdate" -> session.hasPendingSettingsUpdate();
                     case "equals" -> proxy == args[0];
                     case "hashCode" -> System.identityHashCode(proxy);
                     case "toString" -> "simulated " + session.fixSessionId();

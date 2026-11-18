@@ -278,16 +278,20 @@ final class SimulatedEngine implements AdminApi {
     }
 
     @Override
-    public void reloadFixSessionsSettingsStore(String instanceId) {
-        if (!SETTINGS_STORE.equals(instanceId)) {
-            throw new IllegalArgumentException("Unknown settings store '" + instanceId + "', known: " + SETTINGS_STORE);
-        }
+    public void reloadFixSessionsSettingsStore(String instanceId, boolean restartLiveSessions) {
+        requireKnownStore(instanceId);
     }
 
     @Override
     public boolean isFixSessionsSettingsStorePersistent(String instanceId) {
-        reloadFixSessionsSettingsStore(instanceId);
+        requireKnownStore(instanceId);
         return false;
+    }
+
+    private static void requireKnownStore(String instanceId) {
+        if (!SETTINGS_STORE.equals(instanceId)) {
+            throw new IllegalArgumentException("Unknown settings store '" + instanceId + "', known: " + SETTINGS_STORE);
+        }
     }
 
     @Override
@@ -297,7 +301,7 @@ final class SimulatedEngine implements AdminApi {
 
     @Override
     public synchronized void addFixSessionSettings(String storeInstanceId, FixSessionSettings settings) {
-        reloadFixSessionsSettingsStore(storeInstanceId);
+        requireKnownStore(storeInstanceId);
         requireUnusedName(settings.getFixSessionId(), null);
         String acceptor = connections.stream()
                 .filter(connection -> connection.type == FixSessionType.ACCEPTOR)
@@ -309,16 +313,20 @@ final class SimulatedEngine implements AdminApi {
     }
 
     @Override
-    public synchronized void updateFixSessionSettings(FixSessionId fixSessionId, FixSessionSettings settings) {
+    public synchronized void updateFixSessionSettings(FixSessionId fixSessionId, FixSessionSettings settings, boolean restartLiveSession) {
         SimulatedConnection connection = stored(fixSessionId, settings.getFixSessionType())
                 .orElseThrow(() -> noStoreHolds(fixSessionId));
         if (!settings.getFixSessionId().equals(fixSessionId)) {
             if (connection.type == FixSessionType.INITIATOR) {
                 throw new IllegalArgumentException("An initiator session's id is set by the initiator's targets");
             }
+            if (!restartLiveSession) {
+                throw new IllegalArgumentException("Changing session " + fixSessionId + " to " + settings.getFixSessionId()
+                        + " replaces it, which restarts it: ask for the restart");
+            }
             requireUnusedName(settings.getFixSessionId(), fixSessionId);
         }
-        connection.restartOn(settings);
+        connection.update(settings, restartLiveSession);
     }
 
     @Override

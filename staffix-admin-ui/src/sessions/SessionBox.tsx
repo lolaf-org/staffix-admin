@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 import { Flex, Tooltip, Typography, theme } from 'antd'
-import { PauseCircleOutlined, WarningFilled } from '@ant-design/icons'
+import { HistoryOutlined, PauseCircleOutlined, WarningFilled } from '@ant-design/icons'
 import type { Schemas } from '../api/client'
-import { STATUS_COLORS, STATUS_LABELS } from './status'
+import { PENDING_SETTINGS_LABEL, STATUS_COLORS, STATUS_LABELS } from './status'
 import { formatIdentity } from './identity'
 import { AlertBell } from '../alerts/AlertBell'
 import { ALERT_LEVEL_LABELS } from '../alerts/levels'
@@ -71,6 +71,7 @@ export function SessionBox({ session, alerts, selected, onClick, stale = false, 
           {stale && <div>Last known state: the engine does not answer</div>}
           {replication && <div>Replication: {replication.text}</div>}
           <div>{STATUS_LABELS[session.status]}</div>
+          {session.pendingSettingsUpdate && <div>{PENDING_SETTINGS_LABEL}</div>}
           {stale && session.alertLevel && <div>Last known worst alert: {ALERT_LEVEL_LABELS[session.alertLevel]}</div>}
           {!stale && alerts.map((alert) => (
             <div key={alert.probe}>
@@ -108,6 +109,7 @@ export function SessionBox({ session, alerts, selected, onClick, stale = false, 
           <Typography.Text strong ellipsis style={{ fontFamily: token.fontFamilyCode }}>
             {session.id}
             {operatorLoggedOut && <PauseCircleOutlined style={{ marginLeft: 6 }} aria-label="Logged out by an operator" />}
+            {session.pendingSettingsUpdate && <HistoryOutlined style={{ marginLeft: 6 }} aria-label={PENDING_SETTINGS_LABEL} />}
           </Typography.Text>
           <Flex align="center" gap={6} style={{ flexShrink: 0 }}>
             {!stale && session.alertLevel && <AlertBell level={session.alertLevel} count={session.alertCount} tooltip={false} />}

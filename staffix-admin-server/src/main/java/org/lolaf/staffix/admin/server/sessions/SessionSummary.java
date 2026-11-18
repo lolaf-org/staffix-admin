@@ -52,6 +52,10 @@ public class SessionSummary {
     SessionStatus status;
     SessionDesiredState desiredState;
     /**
+     * Its settings changed while it was live and it still runs on the old ones until it next connects.
+     */
+    boolean pendingSettingsUpdate;
+    /**
      * The engine's messages logger instance the session's logs go through, the same for all its configs; it selects
      * the connector they are read from.
      */

@@ -142,14 +142,62 @@ class SimulatedEngineTest {
     }
 
     @Test
-    void anUpdatedSessionRestartsOnItsNewSettings() {
+    void anUpdateAskedToRestartRestartsTheLiveSessionOnItsNewSettings() {
         ticks(3);
         FixSessionSettings acme = settingsOf("acme", "trading");
 
-        paris.updateFixSessionSettings(acme.getFixSessionId(), acme.toBuilder().desiredSessionState(FixSessionDesiredState.LOGGED_OUT).build());
+        paris.updateFixSessionSettings(acme.getFixSessionId(), acme.toBuilder().desiredSessionState(FixSessionDesiredState.LOGGED_OUT).build(), true);
 
         assertThat(session("acme", "trading").isLoggedIn()).isFalse();
         assertThat(settingsOf("acme", "trading").getDesiredSessionState()).isEqualTo(FixSessionDesiredState.LOGGED_OUT);
+        assertThat(session("acme", "trading").hasPendingSettingsUpdate()).isFalse();
+    }
+
+    @Test
+    void aLiveSessionKeepsItsSettingsUntilItNextConnects() {
+        ticks(3);
+        FixSessionSettings acme = settingsOf("acme", "trading");
+
+        paris.updateFixSessionSettings(acme.getFixSessionId(), acme.toBuilder().testingMode(true).build(), false);
+
+        assertThat(session("acme", "trading").isLoggedIn()).isTrue();
+        assertThat(session("acme", "trading").hasPendingSettingsUpdate()).isTrue();
+        assertThat(settingsOf("acme", "trading").isTestingMode()).isFalse();
+
+        paris.logoutSession(acme.getFixSessionId());
+        paris.logonSession(acme.getFixSessionId());
+        ticks(1);
+
+        assertThat(session("acme", "trading").isLoggedIn()).isTrue();
+        assertThat(session("acme", "trading").hasPendingSettingsUpdate()).isFalse();
+        assertThat(settingsOf("acme", "trading").isTestingMode()).isTrue();
+    }
+
+    @Test
+    void aDisconnectedSessionIsUpdatedAtOnceKeepingAnOperatorLogout() {
+        ticks(3);
+        FixSessionSettings acme = settingsOf("acme", "trading");
+        paris.logoutSession(acme.getFixSessionId());
+
+        paris.updateFixSessionSettings(acme.getFixSessionId(), acme.toBuilder().testingMode(true).build(), false);
+
+        assertThat(session("acme", "trading").hasPendingSettingsUpdate()).isFalse();
+        assertThat(settingsOf("acme", "trading").isTestingMode()).isTrue();
+        assertThat(session("acme", "trading").getDesiredState()).isEqualTo(FixSessionDesiredState.LOGGED_OUT);
+    }
+
+    @Test
+    void changingAnAcceptorSessionsIdNeedsTheRestart() {
+        FixSessionSettings acme = settingsOf("acme", "trading");
+        FixSessionSettings renamed = acme.toBuilder()
+                .fixSessionId(FixSessionId.of(FixRegularVersion.VERSION_44, FixSessionId.FixSessionIdBuilder.builder()
+                        .group("acme").name("renamed").senderCompID("STAFFIX-PAR").targetCompID("ACME").build()))
+                .build();
+
+        assertThatThrownBy(() -> paris.updateFixSessionSettings(acme.getFixSessionId(), renamed, false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ask for the restart");
+        assertThat(settingsOf("acme", "trading")).isEqualTo(acme);
     }
 
     @Test
@@ -160,12 +208,12 @@ class SimulatedEngineTest {
                 .findFirst().orElseThrow().getBackupTargets().getFirst().getFixSessionId();
         paris.switchInitiatorSession(backup);
 
-        paris.updateFixSessionSettings(main.getFixSessionId(), main.toBuilder().testingMode(true).build());
+        paris.updateFixSessionSettings(main.getFixSessionId(), main.toBuilder().testingMode(true).build(), true);
 
         assertThat(session("alpha", "trading-drp").getFixSessionSettings().isTestingMode()).isTrue();
         assertThat(paris.findFixSessionsSettingsStore(main.getFixSessionId(), FixSessionType.INITIATOR)).isPresent();
         assertThatThrownBy(() -> paris.updateFixSessionSettings(main.getFixSessionId(), settingsOf("acme", "trading")
-                .toBuilder().fixSessionType(FixSessionType.INITIATOR).build()))
+                .toBuilder().fixSessionType(FixSessionType.INITIATOR).build(), true))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

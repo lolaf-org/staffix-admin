@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { Alert, Button, Flex, Skeleton, Typography } from 'antd'
+import { Alert, Button, Flex, Modal, Skeleton, Typography } from 'antd'
 import { useContext, useState } from 'react'
 import { ApiError, type Schemas } from '../api/client'
 import {
@@ -31,8 +31,9 @@ import { pairOf, REPLICATED_CHANGE_HINT } from '../ha/pairs'
 import { ApplicationSettingsEditor } from '../settings/ApplicationSettingsEditor'
 import { SchemaForm } from '../settings/SchemaForm'
 import { WriteBlock } from './WriteButton'
-import { problems, withConstants, type JsonObject, type JsonSchema } from '../settings/schema'
+import { problems, sameJson, withConstants, type JsonObject, type JsonSchema } from '../settings/schema'
 import { sessionComponentOverrides } from './sessionComponentFields'
+import { PENDING_SETTINGS_LABEL } from './status'
 
 interface Props {
   sessionRef: SessionRef
@@ -51,6 +52,7 @@ export function SessionSettingsTab({ sessionRef, detail }: Props) {
   const pairs = useHaPairs()
   const [draft, setDraft] = useState<JsonObject>()
   const [invalid, setInvalid] = useState<string[]>([])
+  const [documentToSave, setDocumentToSave] = useState<JsonObject>()
 
   if (settings.isPending || schema.isPending) return <Skeleton active />
   if (settings.isError) return <Alert type="error" title={settings.error.message} />
@@ -58,20 +60,35 @@ export function SessionSettingsTab({ sessionRef, detail }: Props) {
 
   const stored = settings.data as JsonObject
   const current = draft ?? stored
-  const changed = draft !== undefined && JSON.stringify(draft) !== JSON.stringify(stored)
+  const changed = draft !== undefined && !sameJson(draft, stored)
   const store = stores.data?.find((s) => s.instanceId === detail.sessionSettingsStore)
   const editable = canWrite && !blocked && detail.sessionSettingsStore !== undefined
   const acceptor = detail.summary.type === 'ACCEPTOR'
   const error = update.error
+  const live = detail.summary.status === 'LOGGED_IN'
+  const idChanges = !sameJson(current.fixSessionId, stored.fixSessionId)
+
+  const write = (document: JsonObject, restart: boolean) =>
+    update.mutate({ settings: document, restart }, {
+      onSuccess: () => setDraft(undefined),
+      onSettled: () => setDocumentToSave(undefined),
+    })
 
   const save = () => {
     const document = withConstants(schema.data as JsonSchema, current)
     const found = problems(schema.data as JsonSchema, document)
     setInvalid(found)
     if (found.length === 0) {
-      update.mutate(document, { onSuccess: () => setDraft(undefined) })
+      if (live) {
+        setDocumentToSave(document)
+      } else {
+        write(document, idChanges)
+      }
     }
   }
+  const saveWith = (restart: boolean) => write(documentToSave!, restart)
+  const restarting = update.isPending && update.variables?.restart
+  const savingForLater = update.isPending && !update.variables?.restart
 
   return (
     <Flex vertical gap={12}>
@@ -83,6 +100,9 @@ export function SessionSettingsTab({ sessionRef, detail }: Props) {
           title={`Store ${store.instanceId} keeps changes in memory: the engine forgets them when it restarts.`}
         />
       ) : null}
+      {detail.summary.pendingSettingsUpdate && (
+        <Alert type="info" title={PENDING_SETTINGS_LABEL} />
+      )}
       {editable && pairOf(pairs.data ?? [], sessionRef.engineId) && <Alert type="info" title={REPLICATED_CHANGE_HINT} />}
       {editable && (
         <Flex gap={8} wrap>
@@ -94,6 +114,29 @@ export function SessionSettingsTab({ sessionRef, detail }: Props) {
           </Button>
         </Flex>
       )}
+      <Modal
+        title={`${sessionRef.group}.${sessionRef.sessionId} is logged on`}
+        open={documentToSave !== undefined}
+        onCancel={() => setDocumentToSave(undefined)}
+        footer={[
+          <Button key="cancel" onClick={() => setDocumentToSave(undefined)}>
+            Cancel
+          </Button>,
+          !idChanges && (
+            <Button key="later" loading={savingForLater} disabled={restarting} onClick={() => saveWith(false)}>
+              At next connection
+            </Button>
+          ),
+          <Button key="restart" type="primary" danger loading={restarting} disabled={savingForLater}
+                  onClick={() => saveWith(true)}>
+            Restart now
+          </Button>,
+        ]}
+      >
+        {idChanges
+          ? 'Changing its id replaces the session: it is logged out and disconnected, then runs under the new id.'
+          : 'Restart it on the new settings now (it is logged out and disconnected, then reconnects), or keep it running on its current ones until it next connects?'}
+      </Modal>
       {invalid.length > 0 && <Alert type="error" title="Fix these fields first" description={<Problems list={invalid} />} />}
       {error && (
         <Alert
