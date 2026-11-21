@@ -158,6 +158,19 @@ class SimulatedHaPairTest {
     }
 
     @Test
+    void bothNodesReplicateEncryptedAndTheQuotesLeaveTheirQuotesUnencrypted() {
+        assertThat(a.getStatus().getFollowerConnections()).singleElement()
+                .satisfies(follower -> assertThat(follower.getCipher()).isEqualTo(SimulatedHaPair.CIPHER));
+        assertThat(b.getStatus().getLeader()).satisfies(leader -> assertThat(leader.getCipher()).isEqualTo(SimulatedHaPair.CIPHER));
+
+        assertThat(b.getSessionStatuses()).filteredOn(session -> !session.getUnencryptedMessageTypes().isEmpty()).singleElement()
+                .satisfies(session -> {
+                    assertThat(session.getFixSessionId().getName()).isEqualTo("quotes");
+                    assertThat(session.getUnencryptedMessageTypes()).containsExactly("S");
+                });
+    }
+
+    @Test
     void sessionsShowEveryStandbyState() {
         List<HaSessionStatus> onFollower = b.getSessionStatuses();
 

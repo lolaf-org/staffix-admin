@@ -149,7 +149,7 @@ class HttpEngineGatewayTest {
              "leaderElectionType":"PrimosLeaderElection","roleSince":"2026-10-10T10:00:00Z","transferLeadershipSupported":true,
              "electableSupported":true,"electable":true,
              "followerConnections":[{"nodeId":"2","lane":1,"address":"/10.0.0.2:40000","connected":true,"inSync":true,
-               "snapshotInProgress":false,"unsentBytes":0,"lagMillis":3}],
+               "snapshotInProgress":false,"unsentBytes":0,"lagMillis":3,"cipher":"AES/CTR/NoPadding 256 HmacSHA256"}],
              "switchoverMaxDuration":"PT4S","monitoringInstanceId":"metrics",
              "droppedFollowers":[{"nodeId":"3","lane":1,"droppedAt":"2026-10-10T10:05:00Z","heldOffUntil":"2026-10-10T10:05:02Z"}],
              "sessionSettingsDifferences":[{"store":"files","fixSessionType":"ACCEPTOR","fixSessionId":"acme.added:VERSION_44:A->B","kind":"MISSING_HERE"}]}
@@ -158,7 +158,8 @@ class HttpEngineGatewayTest {
     private static final String HA_SESSIONS = """
             [{"group":"alpha","name":"trading","fixSessionType":"INITIATOR","replicationMode":"SYNC_RECEIVED",
               "replicationAckTimeout":"PT1S","inSync":false,"notReplicatedReason":"storage shared with the leader",
-              "lastSendUnacknowledged":true,"unacknowledgedSends":2,"nextIncomingSeqNum":-1,"nextOutgoingSeqNum":-1,"handedOver":false,"pendingWrites":3,"lostWrites":4}]
+              "lastSendUnacknowledged":true,"unacknowledgedSends":2,"nextIncomingSeqNum":-1,"nextOutgoingSeqNum":-1,"handedOver":false,"pendingWrites":3,"lostWrites":4,
+              "unencryptedMessageTypes":["S"]}]
             """;
 
     private volatile String sessionsVersion = "v1";
@@ -362,6 +363,7 @@ class HttpEngineGatewayTest {
         assertThat(ha.getFollowerConnections()).singleElement().satisfies(follower -> {
             assertThat(follower.getLane()).isEqualTo(1);
             assertThat(follower.getLagMillis()).isEqualTo(3);
+            assertThat(follower.getCipher()).isEqualTo("AES/CTR/NoPadding 256 HmacSHA256");
         });
         assertThat(ha.getDroppedFollowers()).singleElement()
                 .satisfies(dropped -> assertThat(dropped.getHeldOffUntil()).isEqualTo(Instant.parse("2026-10-10T10:05:02Z")));
@@ -375,6 +377,7 @@ class HttpEngineGatewayTest {
             assertThat(session.getNotReplicatedReason()).isEqualTo("storage shared with the leader");
             assertThat(session.getPendingWrites()).isEqualTo(3);
             assertThat(session.getLostWrites()).isEqualTo(4);
+            assertThat(session.getUnencryptedMessageTypes()).containsExactly("S");
         });
     }
 

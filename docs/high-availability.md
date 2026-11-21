@@ -23,6 +23,8 @@ shows its role, node id, epoch, whether its leadership can be proven, when it to
   with what is still unsent. A follower that has not applied a write for more than 3 seconds reads as stalled, even
   when its last acknowledgement said in sync. A follower dropped as too slow is listed with the time it may reconnect.
 - A **follower** shows its connection to the leader: in sync, catching up or not connected.
+- A connected line says whether the replication is **encrypted**, its cipher on hover, or **in clear**. A follower
+  with several lanes to its leader reads encrypted only once every lane is.
 - Each node lists its `ha` probes and, on a follower, the alerts of its stores, as a follower has no session page to
   show them on.
 
@@ -31,7 +33,8 @@ With no leader, the card says so: the sessions are down until a node is elected.
 ### Sessions
 
 The table lists the pair's sessions with their replication mode, their replication state and the sends that went out
-without the follower's acknowledgement (red when the last one did). A session's state is one of:
+without the follower's acknowledgement (red when the last one did). When a session leaves some message types
+unencrypted on an encrypted replication (staffix's `unencryptedMessageTypes`), an Unencrypted column lists them. A session's state is one of:
 
 | State | Meaning |
 |---|---|
@@ -77,7 +80,8 @@ See [Metrics](metrics.md#high-availability).
 
 ## Alerts
 
-The engine's `ha` probes and each session's `ha-replication` probe are listed with the other alerts; an `ha` alert or
+The engine's `ha` probes and each session's `ha-replication` probe are listed with the other alerts, `ha-encryption`
+among them, raised by a node preferring encryption whose replication runs in clear; an `ha` alert or
 an alert from a follower's store opens the High availability page. The engine refuses to clear its `ha` probes, and a
 follower's store alert has no Clear, as the engine cannot clear a session it does not run. The `ha` probes reach the
 console only when the engine sets `alertsPublisherInstanceId`.
@@ -86,4 +90,4 @@ console only when the engine sets `alertsPublisherInstanceId`.
 
 The [demo](../README.md#demo) has a pair, `geneva-gateway` (`geneva-a` and `geneva-b`), whose two minute script plays
 a stalled follower, a snapshot, a clean handover and a failover. Its actions work, one session is refused and one is
-not replicated.
+not replicated. The pair replicates encrypted, and its `acme.quotes` session leaves its quotes (`35=S`) unencrypted.

@@ -96,6 +96,11 @@ public class HaStatus {
          */
         long unsentBytes;
         long lagMillis;
+        /**
+         * The cipher encrypting this lane; null in clear or while not connected.
+         */
+        @Nullable
+        String cipher;
     }
 
     @Value
@@ -121,6 +126,11 @@ public class HaStatus {
         String address;
         boolean connected;
         boolean inSync;
+        /**
+         * The cipher encrypting every lane from the leader; null when one is in clear or not connected.
+         */
+        @Nullable
+        String cipher;
     }
 
     @Value

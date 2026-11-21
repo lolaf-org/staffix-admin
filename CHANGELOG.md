@@ -39,6 +39,9 @@ could mean.
 - **Session changes on a high availability pair** are made on the leader and reach the follower with staffix 0.9.2. Settings
   not on the follower yet, or differing, show on the session and on the High availability page, and a follower's settings
   cannot be edited.
+- **The High availability page shows whether the replication is encrypted**, with its cipher, on each follower line
+  and on the follower's connection to its leader, and lists the message types a session leaves unencrypted. This
+  needs the replication encryption of staffix 0.9.2; an engine without it reads as in clear.
 - **The demo and the sandbox have a pair of nodes**, the demo's playing a stalled follower, a snapshot, a clean handover
   and a failover.
 - **Settings saved but not yet in use are marked** on the session's box, its status and its settings: a logged-on

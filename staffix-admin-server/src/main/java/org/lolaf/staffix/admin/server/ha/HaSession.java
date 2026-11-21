@@ -21,6 +21,7 @@ import lombok.extern.jackson.Jacksonized;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
+import java.util.List;
 
 /**
  * A replicated session as one node sees it, as its {@code v1/ha/sessions} answers.
@@ -63,4 +64,9 @@ public class HaSession {
      * leader's store, holes included.
      */
     long lostWrites;
+    /**
+     * The message types its leader replicates unencrypted over an encrypted connection, {@code *} for all.
+     */
+    @Builder.Default
+    List<String> unencryptedMessageTypes = List.of();
 }

@@ -156,6 +156,11 @@ cd staffix-admin-sandbox
 ./ha.sh stop witness        # nothing changes until a node is lost as well: the leader then drops its sessions
 ```
 
+The replication between the nodes is encrypted, `REQUIRED` on both. `SANDBOX_HA_ENCRYPTION` (`required`, `preferred`
+or `disabled`) sets a node's mode when it starts: restart the follower with `SANDBOX_HA_ENCRYPTION=disabled ./ha.sh
+start 2` beside a `preferred` leader and the HA page shows the lane in clear, with the `ha-encryption` warning; beside a
+`required` one the follower is refused.
+
 Switchover, maintenance mode (not electable) and re-sync are on the console's HA page. `ha.sh start` alone forgets the
 stores and elections under `target/ha`: `alpha-bank` keeps its sequence numbers in memory, so restart it with the pair,
 as they would no longer agree. Logs and JVM crash reports are in `target/ha/logs`.

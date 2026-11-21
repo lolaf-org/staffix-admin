@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { CaretDownOutlined, CaretRightOutlined, CheckCircleFilled, CloseCircleFilled, ReloadOutlined, SwapOutlined, ToolOutlined, WarningFilled } from '@ant-design/icons'
+import { CaretDownOutlined, CaretRightOutlined, CheckCircleFilled, CloseCircleFilled, LockOutlined, ReloadOutlined, SwapOutlined, ToolOutlined, UnlockOutlined, WarningFilled } from '@ant-design/icons'
 import { Alert, Card, Collapse, Descriptions, Empty, Flex, Skeleton, Space, Table, Tag, theme, Tooltip, Typography } from 'antd'
 import { useComponentProbes, useEngineAlerts, useGroups, useHaPairs, useResync, useResyncSession, useSetElectable, useSwitchover } from '../api/queries'
 import { AlertLevelTag } from '../alerts/AlertLevelTag'
@@ -131,12 +131,13 @@ function NodeCard({ pair, node, leads }: { pair: HaPair; node: HaNode; leads: bo
           <NodeStoreAlerts engineId={node.engineId} />
           <SettingsDifferences differences={status.sessionSettingsDifferences} />
           {status.leader && (
-            <Tooltip title={status.leader.address}>
-              <Typography.Text>
-                <Health ok={status.leader.connected && status.leader.inSync} />
-                Replicating from {nodeName(pair, status.leaderId)}: {!status.leader.connected ? 'not connected' : status.leader.inSync ? 'in sync' : 'catching up'}
-              </Typography.Text>
-            </Tooltip>
+            <Typography.Text>
+              <Health ok={status.leader.connected && status.leader.inSync} />
+              <Tooltip title={status.leader.address}>
+                <span>Replicating from {nodeName(pair, status.leaderId)}: {!status.leader.connected ? 'not connected' : status.leader.inSync ? 'in sync' : 'catching up'}</span>
+              </Tooltip>
+              {status.leader.connected && <Encryption cipher={status.leader.cipher} />}
+            </Typography.Text>
           )}
         </Flex>
       )}
@@ -215,8 +216,15 @@ function FollowerLine({ follower, name }: { follower: Follower; name: string }) 
       <Health ok={follower.connected && follower.inSync && !stalled} />
       Replicating to {name}: {state}
       {follower.unsentBytes > 0 && `, ${Math.round(follower.unsentBytes / 1024)} KiB unsent`}
+      {follower.connected && <Encryption cipher={follower.cipher} />}
     </Typography.Text>
   )
+}
+
+function Encryption({ cipher }: { cipher?: string | null }) {
+  return cipher
+    ? <Tooltip title={cipher}><span>, <LockOutlined /> encrypted</span></Tooltip>
+    : <Tooltip title="Neither the messages nor the session settings are encrypted on this connection"><span>, <UnlockOutlined /> in clear</span></Tooltip>
 }
 
 function Health({ ok }: { ok: boolean }) {
@@ -289,6 +297,7 @@ function PairSessions({ pair }: { pair: HaPair }) {
       replication: replicationState(pair, session.group, session.id),
     }
   })
+  const anyUnencrypted = rows.some((row) => (row.replicated?.unencryptedMessageTypes.length ?? 0) > 0)
   return (
     <Table
       size="small"
@@ -297,6 +306,11 @@ function PairSessions({ pair }: { pair: HaPair }) {
       columns={[
         { title: 'Session', key: 'session', render: (_, row) => row.key },
         { title: 'Mode', key: 'mode', render: (_, row) => row.replicated?.replicationMode ?? 'NONE' },
+        ...(anyUnencrypted ? [{
+          title: <Tooltip title="The message types an encrypted replication leaves unencrypted, still authenticated">Unencrypted</Tooltip>,
+          key: 'unencrypted',
+          render: (_: unknown, row: (typeof rows)[number]) => unencryptedText(row.replicated?.unencryptedMessageTypes ?? []),
+        }] : []),
         { title: 'Replication', key: 'replication', render: (_, row) => <ReplicationTag replication={row.replication} /> },
         {
           title: 'Unacknowledged sends',
@@ -312,6 +326,10 @@ function PairSessions({ pair }: { pair: HaPair }) {
       ]}
     />
   )
+}
+
+function unencryptedText(types: string[]): string {
+  return types.includes('*') ? 'all but Logon' : types.map((type) => `35=${type}`).join(', ')
 }
 
 const REPLICATION_TAG_COLORS = { none: 'default', ok: 'success', warning: 'warning', error: 'error' } as const

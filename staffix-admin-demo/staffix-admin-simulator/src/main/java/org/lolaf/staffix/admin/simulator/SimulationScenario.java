@@ -68,6 +68,7 @@ class SimulationScenario {
         EngineBuilder engine = new EngineBuilder(engineId, "STAFFIX-GVA");
         engine.acceptor("acme", "trading", "clients-acceptor");
         engine.acceptor("acme", "market-data", "clients-acceptor");
+        engine.acceptor("acme", "quotes", "clients-acceptor");
         engine.acceptor("acme", "drop-copy", "clients-acceptor");
         engine.initiator("globex", "trading", "trading-drp");
         engine.initiator("globex", "drop-copy");

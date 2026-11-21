@@ -49,6 +49,7 @@ final class SimulatedHaPair {
     static final int NEW_LEADER_TICK = 105;
     static final int CYCLE_TICKS = 120;
     static final String REFUSAL = "its storage is shared with the leader";
+    static final String CIPHER = "AES/CTR/NoPadding 256 HmacSHA256";
     private static final int RESYNC_TICKS = 5;
     private static final Duration ACK_TIMEOUT = Duration.ofSeconds(1);
     /**
@@ -135,6 +136,10 @@ final class SimulatedHaPair {
         };
     }
 
+    private static List<String> unencryptedMessageTypes(String sessionName) {
+        return sessionName.equals("quotes") ? List.of("S") : List.of();
+    }
+
     static boolean refused(FixSessionId id) {
         return id.getGroup().equals("globex") && id.getName().equals("drop-copy");
     }
@@ -201,7 +206,8 @@ final class SimulatedHaPair {
                 case SimulatedHaProbes.FOLLOWERS -> leader == this ? followersAlert() : null;
                 case SimulatedHaProbes.LEADER_CONNECTION -> leader != null && leader != this && snapshotting()
                         ? Alert.warning("Connected to the leader, not holding every session in full") : null;
-                default -> leader == null ? Alert.critical("This node has no role") : null;
+                case SimulatedHaProbes.LEADERSHIP -> leader == null ? Alert.critical("This node has no role") : null;
+                default -> null;
             };
         }
 
@@ -234,7 +240,7 @@ final class SimulatedHaPair {
                     status.followerConnection(followerConnection());
                 } else if (leader != null) {
                     status.leader(HaStatus.Leader.builder().leaderId(leader.nodeId).address("/10.0.0." + leader.nodeId + ":17101")
-                            .connected(true).inSync(!snapshotting()).build());
+                            .connected(true).inSync(!snapshotting()).cipher(CIPHER).build());
                     if (tick >= SETTINGS_DIFFER_TICK && tick < SETTINGS_ALIGNED_TICK) {
                         engine.runningConfigs().stream()
                                 .filter(session -> session.group().equals("acme") && session.name().equals("drop-copy"))
@@ -260,6 +266,7 @@ final class SimulatedHaPair {
                     .snapshotInProgress(snapshotting())
                     .unsentBytes(stalledTicks * 65_536L)
                     .lagMillis(stalledTicks * 1_000L)
+                    .cipher(CIPHER)
                     .build();
         }
 
@@ -281,6 +288,7 @@ final class SimulatedHaPair {
                     .fixSessionType(session.settings.getFixSessionType())
                     .replicationMode(mode(session.name()))
                     .replicationAckTimeout(ACK_TIMEOUT)
+                    .unencryptedMessageTypes(unencryptedMessageTypes(session.name()))
                     .inSync(!refused && !snapshotting())
                     .notReplicatedReason(refused ? REFUSAL : null)
                     .nextIncomingSeqNum(follows ? session.incomingSeqNum : -1)

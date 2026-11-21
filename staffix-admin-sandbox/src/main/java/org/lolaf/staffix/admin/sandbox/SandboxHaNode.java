@@ -24,6 +24,8 @@ import org.lolaf.staffix.admin.sandbox.Traffic.Publisher;
 import org.lolaf.staffix.admin.sandbox.Traffic.Quoter;
 import org.lolaf.staffix.api.InstanceProvider;
 import org.lolaf.staffix.api.session.FixSessionSettings.HaSessionSettings.ReplicationMode;
+import org.lolaf.staffix.ha.EncryptionMode;
+import org.lolaf.staffix.ha.ReplicationEncryptionSettings;
 import org.lolaf.staffix.ha.ReplicationHaSettings;
 import org.lolaf.staffix.ha.primos.PrimosLeaderElectionSettings;
 import org.lolaf.staffix.stores.core.async.AsyncStoreSettings;
@@ -35,6 +37,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -52,6 +55,7 @@ public class SandboxHaNode {
     private static final String PAIR = "venue-y";
     // the same in witness/witness.properties
     private static final String SECRET = "sandbox-secret-change-it";
+    private static final String REPLICATION_SECRET = "sandbox-replication-secret-change-it";
     private static final int WITNESS_PORT = 7340;
     private static final Duration NEWS_INTERVAL = Duration.ofMillis(500);
     private static final int EVENTS_BATCHING = 1000;
@@ -117,7 +121,19 @@ public class SandboxHaNode {
                         .bindAddress(new InetSocketAddress(HOST, electionPort(nodeId)))
                         .clusterSecret(SECRET.getBytes(StandardCharsets.UTF_8))
                         .build())
+                .encryption(ReplicationEncryptionSettings.builder()
+                        .mode(encryptionMode())
+                        .secret(REPLICATION_SECRET.getBytes(StandardCharsets.UTF_8))
+                        .build())
                 .build();
+    }
+
+    /**
+     * {@code SANDBOX_HA_ENCRYPTION}, {@code required} by default: restarting one node {@code preferred} and the other
+     * {@code disabled} replicates in clear and raises {@code ha-encryption}.
+     */
+    private static EncryptionMode encryptionMode() {
+        return EncryptionMode.valueOf(System.getenv().getOrDefault("SANDBOX_HA_ENCRYPTION", "required").toUpperCase(Locale.ROOT));
     }
 
     private static int electionPort(int nodeId) {
