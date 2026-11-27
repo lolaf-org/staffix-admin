@@ -22,17 +22,26 @@ shows its role, node id, epoch, whether its leadership can be proven, when it to
 - A **leader** lists a line per follower connection: in sync, catching up by snapshot, not in sync or not connected,
   with what is still unsent. A follower that has not applied a write for more than 3 seconds reads as stalled, even
   when its last acknowledgement said in sync. A follower dropped as too slow is listed with the time it may reconnect.
+- With **several followers**, each line is tagged **sync**, one staffix's `syncFollowers` names and `SYNC` sends wait
+  for, or **async (DR)**, a disaster-recovery copy: a failover to it may lose what they acknowledged. A follower behind
+  another on its lane says by how much, in KiB of the replication log. Any other node of the pair with no connection is
+  listed as not connected, in red for a sync follower.
 - A **follower** shows its connection to the leader: in sync, catching up or not connected.
 - A connected line says whether the replication is **encrypted**, its cipher on hover, or **in clear**. A follower
   with several lanes to its leader reads encrypted only once every lane is.
 - Each node lists its `ha` probes and, on a follower, the alerts of its stores, as a follower has no session page to
   show them on.
 
-With no leader, the card says so: the sessions are down until a node is elected.
+With no leader, the card says so: the sessions are down until a node is elected. It then shows where each node stands
+on each lane against a sync follower: level, ahead or behind by how many KiB, or not comparable when they hold writes
+from different leaderships. Use it to choose which node to promote by hand: a disaster-recovery copy behind the
+standby lacks what that gap holds. Keep a disaster-recovery copy in maintenance, as neither an election nor a
+switchover names the node it hands leadership to.
 
 ### Sessions
 
-The table lists the pair's sessions with their replication mode, their replication state and the sends that went out
+The table lists the pair's sessions with their replication mode (with its quorum, when the session waits for only
+some of the sync followers), their replication state, as held by a sync follower, and the sends that went out
 without the follower's acknowledgement (red when the last one did). When a session leaves some message types
 unencrypted on an encrypted replication (staffix's `unencryptedMessageTypes`), an Unencrypted column lists them. A session's state is one of:
 
@@ -42,7 +51,7 @@ unencrypted on an encrypted replication (staffix's `unencryptedMessageTypes`), a
 | in sync | The follower holds what the leader wrote |
 | handed over | Handed over cleanly, ready for the follower to take over |
 | catching up | The follower is not in sync yet |
-| refused (reason) | The follower will not replicate it, for example a mode mismatch or a storage shared with the leader |
+| refused (reason) | The follower will not replicate it, for example a storage shared with the leader |
 | not started | The follower has not started replicating it |
 | follower down | The follower does not answer |
 | unavailable | The node shown does not answer |
@@ -67,7 +76,7 @@ its differences stay listed.
 Writers only, each confirmed and [audited](security.md):
 
 - **Switchover**, on the leader: its sessions log out and log on from the other node, without the sequence number jump
-  of a failover. It needs a follower in sync and a leader election able to hand leadership over. The engine refuses
+  of a failover. It needs a sync follower in sync and a leader election able to hand leadership over. The engine refuses
   it, and the console reports why, when the follower's store is too far behind or no follower is in sync.
 - **Maintenance** and **End maintenance**, on any node whose election supports it: the node stops or resumes standing
   for election. On a leader, maintenance switches over first and fails if that does.
@@ -89,5 +98,6 @@ console only when the engine sets `alertsPublisherInstanceId`.
 ## Demo
 
 The [demo](../README.md#demo) has a pair, `geneva-gateway` (`geneva-a` and `geneva-b`), whose two minute script plays
-a stalled follower, a snapshot, a clean handover and a failover. Its actions work, one session is refused and one is
+a stalled follower, a snapshot, a clean handover and a failover. A third node, `geneva-dr`, is a disaster-recovery copy
+in maintenance, a little behind the standby, and shows where each node stands during the failover. Its actions work, one session is refused and one is
 not replicated. The pair replicates encrypted, and its `acme.quotes` session leaves its quotes (`35=S`) unencrypted.

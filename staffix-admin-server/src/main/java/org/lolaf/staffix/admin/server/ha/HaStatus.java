@@ -62,6 +62,16 @@ public class HaStatus {
     @Nullable
     String monitoringInstanceId;
     /**
+     * The other nodes: while this node leads, the followers it expects, connected or not.
+     */
+    @Builder.Default
+    List<String> peers = List.of();
+    /**
+     * The followers a {@code SYNC} send waits for, this node left out, connected or not; empty makes every follower one.
+     */
+    @Builder.Default
+    List<String> syncFollowers = List.of();
+    /**
      * One entry per follower and lane, while this node leads.
      */
     List<FollowerConnection> followerConnections;
@@ -76,6 +86,11 @@ public class HaStatus {
      */
     @Builder.Default
     List<SessionSettingsDifference> sessionSettingsDifferences = List.of();
+    /**
+     * While this node does not lead: the last write it holds on each lane, to choose which follower to promote.
+     */
+    @Builder.Default
+    List<LanePosition> lanePositions = List.of();
 
     @Value
     @Builder
@@ -90,11 +105,21 @@ public class HaStatus {
          * As of its last acknowledgement: a stalled follower still reads true, {@link #lagMillis} shows it.
          */
         boolean inSync;
+        /**
+         * One a {@code SYNC} send waits for: a failover to one in sync loses nothing acknowledged, unlike a
+         * disaster-recovery copy.
+         */
+        boolean syncFollower;
         boolean snapshotInProgress;
         /**
          * -1 before the leader started sending.
          */
         long unsentBytes;
+        /**
+         * An offset in the lane's replication log, -1 before the follower applied a write: only the gap between two
+         * followers of a lane means anything, in bytes.
+         */
+        long appliedOffset;
         long lagMillis;
         /**
          * The cipher encrypting this lane; null in clear or while not connected.
@@ -131,6 +156,22 @@ public class HaStatus {
          */
         @Nullable
         String cipher;
+    }
+
+    /**
+     * Two nodes' positions compare only at the same epoch and leadership.
+     */
+    @Value
+    @Builder
+    @Jacksonized
+    public static class LanePosition {
+        int lane;
+        long epoch;
+        long leadership;
+        /**
+         * -1 for none since the lane last connected without resuming.
+         */
+        long offset;
     }
 
     @Value

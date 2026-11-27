@@ -43,7 +43,7 @@ import java.util.concurrent.TimeUnit;
  * Engines showing each case the console handles: initiators with backups, acceptors serving many groups,
  * sessions that drop, follow a session window or were logged out, and emitters of every shape (an OTLP logger, one
  * behind an async wrapper, one exporting nothing; monitoring plugins measuring more or less), and a high availability
- * pair.
+ * pair with a disaster-recovery copy.
  */
 @UtilityClass
 class SimulationScenario {
@@ -60,8 +60,9 @@ class SimulationScenario {
     List<SimulatedEngine> engines() {
         SimulatedEngine genevaA = geneva("geneva-a");
         SimulatedEngine genevaB = geneva("geneva-b");
-        new SimulatedHaPair("geneva-gateway", genevaA, genevaB);
-        return List.of(paris(), london(), newYork(), genevaA, genevaB);
+        SimulatedEngine genevaDr = geneva("geneva-dr");
+        new SimulatedHaPair("geneva-gateway", genevaA, genevaB, genevaDr);
+        return List.of(paris(), london(), newYork(), genevaA, genevaB, genevaDr);
     }
 
     private static SimulatedEngine geneva(String engineId) {

@@ -42,8 +42,12 @@ could mean.
 - **The High availability page shows whether the replication is encrypted**, with its cipher, on each follower line
   and on the follower's connection to its leader, and lists the message types a session leaves unencrypted. This
   needs the replication encryption of staffix 0.9.2; an engine without it reads as in clear.
+- **The High availability page handles several followers**: each follower line says whether `SYNC` sends wait for it
+  (sync) or not (a disaster-recovery copy), and how far it is behind another follower; a sync follower that is down is
+  listed as not connected; switchover needs a sync follower in sync; the sessions table shows a session's quorum; and
+  with the leader down, the card shows where each node stands, to choose which to promote.
 - **The demo and the sandbox have a pair of nodes**, the demo's playing a stalled follower, a snapshot, a clean handover
-  and a failover.
+  and a failover, with a disaster-recovery copy beside them in the demo.
 - **Settings saved but not yet in use are marked** on the session's box, its status and its settings: a logged-on
   session whose settings were saved without a restart runs on its previous ones until it next connects.
 

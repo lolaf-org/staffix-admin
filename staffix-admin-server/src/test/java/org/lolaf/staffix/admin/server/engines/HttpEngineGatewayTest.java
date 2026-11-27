@@ -147,17 +147,18 @@ class HttpEngineGatewayTest {
     private static final String HA = """
             {"nodeId":"1","pairName":"gateway","role":"LEADER","epoch":7,"leaderId":"1","leadershipValid":true,
              "leaderElectionType":"PrimosLeaderElection","roleSince":"2026-10-10T10:00:00Z","transferLeadershipSupported":true,
-             "electableSupported":true,"electable":true,
+             "electableSupported":true,"electable":true,"peers":["2","3"],"syncFollowers":["2"],
              "followerConnections":[{"nodeId":"2","lane":1,"address":"/10.0.0.2:40000","connected":true,"inSync":true,
-               "snapshotInProgress":false,"unsentBytes":0,"lagMillis":3,"cipher":"AES/CTR/NoPadding 256 HmacSHA256"}],
+               "syncFollower":true,"snapshotInProgress":false,"unsentBytes":0,"appliedOffset":4096,"lagMillis":3,"cipher":"AES/CTR/NoPadding 256 HmacSHA256"}],
              "switchoverMaxDuration":"PT4S","monitoringInstanceId":"metrics",
              "droppedFollowers":[{"nodeId":"3","lane":1,"droppedAt":"2026-10-10T10:05:00Z","heldOffUntil":"2026-10-10T10:05:02Z"}],
-             "sessionSettingsDifferences":[{"store":"files","fixSessionType":"ACCEPTOR","fixSessionId":"acme.added:VERSION_44:A->B","kind":"MISSING_HERE"}]}
+             "sessionSettingsDifferences":[{"store":"files","fixSessionType":"ACCEPTOR","fixSessionId":"acme.added:VERSION_44:A->B","kind":"MISSING_HERE"}],
+             "lanePositions":[{"lane":0,"epoch":7,"leadership":42,"offset":2048}]}
             """;
 
     private static final String HA_SESSIONS = """
             [{"group":"alpha","name":"trading","fixSessionType":"INITIATOR","replicationMode":"SYNC_RECEIVED",
-              "replicationAckTimeout":"PT1S","inSync":false,"notReplicatedReason":"storage shared with the leader",
+              "replicationAckTimeout":"PT1S","replicationQuorum":1,"inSync":false,"notReplicatedReason":"storage shared with the leader",
               "lastSendUnacknowledged":true,"unacknowledgedSends":2,"nextIncomingSeqNum":-1,"nextOutgoingSeqNum":-1,"handedOver":false,"pendingWrites":3,"lostWrites":4,
               "unencryptedMessageTypes":["S"]}]
             """;
@@ -360,8 +361,12 @@ class HttpEngineGatewayTest {
         assertThat(ha.getPairName()).isEqualTo("gateway");
         assertThat(ha.getRole()).isEqualTo(HaRole.LEADER);
         assertThat(ha.getRoleSince()).isEqualTo(Instant.parse("2026-10-10T10:00:00Z"));
+        assertThat(ha.getPeers()).containsExactly("2", "3");
+        assertThat(ha.getSyncFollowers()).containsExactly("2");
         assertThat(ha.getFollowerConnections()).singleElement().satisfies(follower -> {
             assertThat(follower.getLane()).isEqualTo(1);
+            assertThat(follower.isSyncFollower()).isTrue();
+            assertThat(follower.getAppliedOffset()).isEqualTo(4096);
             assertThat(follower.getLagMillis()).isEqualTo(3);
             assertThat(follower.getCipher()).isEqualTo("AES/CTR/NoPadding 256 HmacSHA256");
         });
@@ -371,9 +376,14 @@ class HttpEngineGatewayTest {
             assertThat(difference.getFixSessionId()).isEqualTo("acme.added:VERSION_44:A->B");
             assertThat(difference.getKind()).isEqualTo(HaStatus.SessionSettingsDifference.Kind.MISSING_HERE);
         });
+        assertThat(ha.getLanePositions()).singleElement().satisfies(position -> {
+            assertThat(position.getLeadership()).isEqualTo(42);
+            assertThat(position.getOffset()).isEqualTo(2048);
+        });
         assertThat(gateway.getHaSessions("alpha-engine")).singleElement().satisfies(session -> {
             assertThat(session.getReplicationMode()).isEqualTo("SYNC_RECEIVED");
             assertThat(session.getReplicationAckTimeout()).isEqualTo(Duration.ofSeconds(1));
+            assertThat(session.getReplicationQuorum()).isEqualTo(1);
             assertThat(session.getNotReplicatedReason()).isEqualTo("storage shared with the leader");
             assertThat(session.getPendingWrites()).isEqualTo(3);
             assertThat(session.getLostWrites()).isEqualTo(4);

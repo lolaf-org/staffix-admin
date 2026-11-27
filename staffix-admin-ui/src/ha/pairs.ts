@@ -56,6 +56,31 @@ export function pairOf(pairs: HaPair[], engineId: string): HaPair | undefined {
   return pairs.find((pair) => pair.nodes.some((node) => node.engineId === engineId))
 }
 
+/**
+ * Whether a failover to this node keeps what `SYNC` sends acknowledged: named by another node's `syncFollowers`, or the
+ * pair names none, which makes every follower one.
+ */
+export function isSyncFollower(pair: HaPair, node: HaNode): boolean {
+  const others = pair.nodes.filter((other) => other !== node && other.status)
+  if (others.every((other) => other.status!.syncFollowers.length === 0)) return true
+  return node.status != null && others.some((other) => other.status!.syncFollowers.includes(node.status!.nodeId))
+}
+
+export type LanePosition = NonNullable<HaNode['status']>['lanePositions'][number]
+
+/**
+ * How many bytes of the lane's log `position` holds beyond `reference`, negative when behind; undefined when they came
+ * from different leaderships, as offsets are in the log of the leadership that sent them.
+ */
+export function positionGap(reference: LanePosition, position: LanePosition): number | undefined {
+  if (reference.epoch !== position.epoch || reference.leadership !== position.leadership) return undefined
+  return position.offset - reference.offset
+}
+
+export function kib(bytes: number): string {
+  return `${Math.ceil(bytes / 1024).toLocaleString('en-US')} KiB`
+}
+
 function sessionOn(node: HaNode | undefined, group: string, sessionId: string) {
   return node?.sessions.find((session) => session.group === group && session.name === sessionId)
 }
@@ -74,7 +99,7 @@ export function needsAttention(replication: ReplicationState): boolean {
 }
 
 /**
- * How a session of the node the overview shows replicates to the follower.
+ * How a session of the node the overview shows replicates to its sync follower, the one a failover goes to.
  */
 export function replicationState(pair: HaPair, group: string, sessionId: string): ReplicationState {
   const link = linkState(pair, group, sessionId)
@@ -93,7 +118,8 @@ function followerSettingsDifference(pair: HaPair, group: string, sessionId: stri
 
 function linkState(pair: HaPair, group: string, sessionId: string): ReplicationState {
   const shown = shownNode(pair)
-  const follower = pair.nodes.find((node) => node !== shown)
+  const followers = pair.nodes.filter((node) => node !== shown)
+  const follower = followers.find((node) => isSyncFollower(pair, node)) ?? followers[0]
   const onShown = sessionOn(shown, group, sessionId)
   if (!shown.status) return { text: 'unavailable', health: 'error' }
   // a node lists every session but those configured with replication mode NONE, even one a follower refuses

@@ -90,7 +90,7 @@ const FLOW_CHARTS: ChartSpec[] = [
     request: meter('ha.follower.unsent', 'VALUE'), format: formatBytes },
   {
     title: 'Unacknowledged SYNC sends by reason',
-    description: "SYNC sends that went out without the follower's ack: timed_out, the ack came too late; no_follower, no follower was in sync. A failover can lose these.",
+    description: "SYNC sends that went out without the follower's ack: timed_out, the ack came too late; no_follower, no follower was in sync; not_enough_followers, fewer sync followers were in sync than the session's quorum. A failover can lose these.",
     request: meter('ha.sync.unacknowledged', 'COUNTER_RATE', ['reason']), format: formatRateValue },
   {
     title: 'Snapshots',

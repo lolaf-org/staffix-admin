@@ -35,7 +35,8 @@ import java.util.TreeMap;
 
 /**
  * Two engines replicating to each other, leadership moving on a script so the console's pair views change on their
- * own: a stalled follower, a snapshot, a clean handover, then a failover. An operator's switchover moves it at once.
+ * own: a stalled follower, a snapshot, a clean handover, then a failover. An operator's switchover moves it at once. A
+ * third engine is a disaster-recovery copy: it never leads, and {@code SYNC} sends do not wait for it.
  */
 final class SimulatedHaPair {
 
@@ -56,9 +57,15 @@ final class SimulatedHaPair {
      * Staffix's {@code followerLagAlertThreshold} default.
      */
     private static final int LAG_ALERT_TICKS = 5;
+    private static final long WRITTEN_PER_TICK = 400_000;
+    private static final long DISASTER_RECOVERY_BEHIND_BYTES = 48 * 1024;
 
     private final String pairName;
+    /**
+     * The two that lead in turn, then the disaster-recovery copy.
+     */
     private final Node[] nodes;
+    private final Node disasterRecovery;
     private int tick;
     private int resyncTicks;
     private long epoch = 1;
@@ -74,15 +81,26 @@ final class SimulatedHaPair {
      * Who led from each instant, null while nobody did, so the meters read back what happened.
      */
     private final TreeMap<Instant, @Nullable Node> leaders = new TreeMap<>();
+    /**
+     * The leadership's log written so far, and where the standby and the disaster-recovery copy stand in it.
+     */
+    private long logOffset;
+    private long standbyApplied;
+    private long disasterRecoveryApplied;
 
-    SimulatedHaPair(String pairName, SimulatedEngine first, SimulatedEngine second) {
+    SimulatedHaPair(String pairName, SimulatedEngine first, SimulatedEngine second, SimulatedEngine disasterRecoveryCopy) {
         this.pairName = pairName;
-        this.nodes = new Node[]{new Node("1", first), new Node("2", second)};
+        this.nodes = new Node[]{new Node("1", first), new Node("2", second), new Node("3", disasterRecoveryCopy)};
+        this.disasterRecovery = nodes[2];
+        disasterRecovery.electable = false;
+        this.standbyApplied = -1;
+        this.disasterRecoveryApplied = -1;
         leader = nodes[0];
         lastLeader = nodes[0];
         leaders.put(Instant.EPOCH, nodes[0]);
         first.joinPair(nodes[0], true);
         second.joinPair(nodes[1], false);
+        disasterRecoveryCopy.joinPair(disasterRecovery, false);
     }
 
     private synchronized void tick() {
@@ -93,9 +111,16 @@ final class SimulatedHaPair {
         } else if (tick == NEW_LEADER_TICK) {
             lead(other(lastLeader));
         }
-        if (leader != null && !stalled()) {
-            other(leader).engine.replicate(leader.engine);
+        if (leader == null) {
+            return;
         }
+        logOffset += WRITTEN_PER_TICK;
+        if (!stalled()) {
+            other(leader).engine.replicate(leader.engine);
+            standbyApplied = logOffset;
+        }
+        disasterRecovery.engine.replicate(leader.engine);
+        disasterRecoveryApplied = logOffset - DISASTER_RECOVERY_BEHIND_BYTES;
     }
 
     private void lead(@Nullable Node next) {
@@ -105,12 +130,18 @@ final class SimulatedHaPair {
         if (next != null) {
             lastLeader = next;
             epoch++;
+            logOffset = 0;
+            standbyApplied = -1;
+            disasterRecoveryApplied = -1;
         }
         leader = next;
         roleSince = Instant.now();
         leaders.put(roleSince, next);
     }
 
+    /**
+     * The other of the two that lead in turn.
+     */
     private Node other(Node node) {
         return node == nodes[0] ? nodes[1] : nodes[0];
     }
@@ -236,9 +267,24 @@ final class SimulatedHaPair {
                         .transferLeadershipSupported(true)
                         .electableSupported(true)
                         .electable(electable);
+                for (Node peer : nodes) {
+                    if (peer != this) {
+                        status.peer(peer.nodeId);
+                    }
+                }
+                for (Node syncFollower : List.of(nodes[0], nodes[1])) {
+                    if (syncFollower != this) {
+                        status.syncFollower(syncFollower.nodeId);
+                    }
+                }
                 if (leads) {
                     status.followerConnection(followerConnection());
-                } else if (leader != null) {
+                    status.followerConnection(disasterRecoveryConnection());
+                } else {
+                    status.lanePosition(HaStatus.LanePosition.builder().lane(0).epoch(epoch).leadership(epoch * 7_919)
+                            .offset(this == disasterRecovery ? disasterRecoveryApplied : standbyApplied).build());
+                }
+                if (!leads && leader != null) {
                     status.leader(HaStatus.Leader.builder().leaderId(leader.nodeId).address("/10.0.0." + leader.nodeId + ":17101")
                             .connected(true).inSync(!snapshotting()).cipher(CIPHER).build());
                     if (tick >= SETTINGS_DIFFER_TICK && tick < SETTINGS_ALIGNED_TICK) {
@@ -263,9 +309,23 @@ final class SimulatedHaPair {
                     .address("/10.0.0." + follower.nodeId + ":40000")
                     .connected(true)
                     .inSync(!snapshotting())
+                    .syncFollower(true)
                     .snapshotInProgress(snapshotting())
                     .unsentBytes(stalledTicks * 65_536L)
+                    .appliedOffset(standbyApplied)
                     .lagMillis(stalledTicks * 1_000L)
+                    .cipher(CIPHER)
+                    .build();
+        }
+
+        private HaStatus.FollowerConnection disasterRecoveryConnection() {
+            return HaStatus.FollowerConnection.builder()
+                    .nodeId(disasterRecovery.nodeId)
+                    .address("/10.0.1." + disasterRecovery.nodeId + ":40000")
+                    .connected(true)
+                    .inSync(true)
+                    .unsentBytes(DISASTER_RECOVERY_BEHIND_BYTES)
+                    .appliedOffset(disasterRecoveryApplied)
                     .cipher(CIPHER)
                     .build();
         }

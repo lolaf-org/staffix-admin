@@ -20,6 +20,7 @@ import org.lolaf.staffix.api.ComponentProbeScope;
 import org.lolaf.staffix.api.alerting.ProbeId;
 import org.lolaf.staffix.api.ha.HaAdmin;
 import org.lolaf.staffix.api.ha.HaSessionStatus;
+import org.lolaf.staffix.api.ha.HaStatus;
 import org.lolaf.staffix.api.ha.LeaderElection.Role;
 import org.lolaf.staffix.api.ha.SwitchoverOutcome;
 import org.lolaf.staffix.api.session.FixSession;
@@ -29,6 +30,7 @@ import java.util.Random;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 class SimulatedHaPairTest {
 
@@ -37,6 +39,7 @@ class SimulatedHaPairTest {
     private final SimulatedEngine second = engine("geneva-b");
     private final HaAdmin a = first.getHa().orElseThrow();
     private final HaAdmin b = second.getHa().orElseThrow();
+    private final HaAdmin dr = engine("geneva-dr").getHa().orElseThrow();
     private final Random random = new Random(42);
 
     private SimulatedEngine engine(String engineId) {
@@ -84,10 +87,39 @@ class SimulatedHaPairTest {
     void aStalledFollowerStaysInSyncWhileItsLagGrows() {
         ticksUntil(SimulatedHaPair.STALL_TICK + 5);
 
-        assertThat(a.getStatus().getFollowerConnections()).singleElement().satisfies(follower -> {
-            assertThat(follower.isInSync()).isTrue();
-            assertThat(follower.getLagMillis()).isEqualTo(6_000);
-        });
+        assertThat(a.getStatus().getFollowerConnections()).filteredOn(HaStatus.FollowerConnection::isSyncFollower)
+                .singleElement().satisfies(follower -> {
+                    assertThat(follower.isInSync()).isTrue();
+                    assertThat(follower.getLagMillis()).isEqualTo(6_000);
+                });
+    }
+
+    @Test
+    void theDisasterRecoveryCopyFollowsBehindTheStandbyWithoutBeingWaitedFor() {
+        ticksUntil(10);
+
+        HaStatus leader = a.getStatus();
+        assertThat(leader.getPeers()).containsExactly("2", "3");
+        assertThat(leader.getSyncFollowers()).containsExactly("2");
+        assertThat(leader.getFollowerConnections()).extracting(HaStatus.FollowerConnection::getNodeId,
+                HaStatus.FollowerConnection::isSyncFollower).containsExactly(tuple("2", true), tuple("3", false));
+        long standby = leader.getFollowerConnections().get(0).getAppliedOffset();
+        assertThat(leader.getFollowerConnections().get(1).getAppliedOffset()).isLessThan(standby);
+        assertThat(dr.getStatus().getSyncFollowers()).containsExactly("1", "2");
+        assertThat(dr.getStatus().isElectable()).isFalse();
+    }
+
+    @Test
+    void withTheLeaderDownTheFollowersPositionsCompareAndTheStandbyHoldsMore() {
+        ticksUntil(SimulatedHaPair.FAILOVER_TICK);
+
+        HaStatus.LanePosition standby = b.getStatus().getLanePositions().get(0);
+        HaStatus.LanePosition copy = dr.getStatus().getLanePositions().get(0);
+        assertThat(copy.getLeadership()).isEqualTo(standby.getLeadership());
+        assertThat(copy.getOffset()).isLessThan(standby.getOffset());
+
+        ticksUntil(SimulatedHaPair.NEW_LEADER_TICK - SimulatedHaPair.FAILOVER_TICK);
+        assertThat(dr.getStatus().getRole()).isEqualTo(Role.FOLLOWER);
     }
 
     @Test
@@ -158,9 +190,9 @@ class SimulatedHaPairTest {
     }
 
     @Test
-    void bothNodesReplicateEncryptedAndTheQuotesLeaveTheirQuotesUnencrypted() {
-        assertThat(a.getStatus().getFollowerConnections()).singleElement()
-                .satisfies(follower -> assertThat(follower.getCipher()).isEqualTo(SimulatedHaPair.CIPHER));
+    void everyNodeReplicatesEncryptedAndTheQuotesLeaveTheirQuotesUnencrypted() {
+        assertThat(a.getStatus().getFollowerConnections()).hasSize(2)
+                .allSatisfy(follower -> assertThat(follower.getCipher()).isEqualTo(SimulatedHaPair.CIPHER));
         assertThat(b.getStatus().getLeader()).satisfies(leader -> assertThat(leader.getCipher()).isEqualTo(SimulatedHaPair.CIPHER));
 
         assertThat(b.getSessionStatuses()).filteredOn(session -> !session.getUnencryptedMessageTypes().isEmpty()).singleElement()

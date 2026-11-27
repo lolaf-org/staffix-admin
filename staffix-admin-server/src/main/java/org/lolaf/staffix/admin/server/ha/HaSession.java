@@ -38,6 +38,10 @@ public class HaSession {
      */
     String replicationMode;
     Duration replicationAckTimeout;
+    /**
+     * How many sync followers a {@code SYNC} send waits for, 0 for every one in sync.
+     */
+    int replicationQuorum;
     boolean inSync;
     /**
      * Why a follower refuses it; null when it is replicated.

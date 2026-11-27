@@ -22,7 +22,7 @@ import { useFolded } from '../layout/useFolded'
 import { WriteButton } from '../sessions/WriteButton'
 import { HaCharts } from './HaCharts'
 import { NodeTag } from './NodeTag'
-import { leaderOf, needsAttention, nodeName, replicationState, SETTINGS_DIFFERENCE_TEXT, shownNode, type HaNode, type HaPair, type ReplicationState, type SettingsDifference } from './pairs'
+import { isSyncFollower, kib, leaderOf, needsAttention, nodeName, positionGap, replicationState, SETTINGS_DIFFERENCE_TEXT, shownNode, type HaNode, type HaPair, type LanePosition, type ReplicationState, type SettingsDifference } from './pairs'
 
 /**
  * Past this a follower reads as stalled, whatever its last acknowledgement says: `inSync` is as of that acknowledgement.
@@ -71,6 +71,7 @@ function PairCard({ pair }: { pair: HaPair }) {
     >
       {!folded && <Flex vertical gap={12}>
         {!leader && <Alert type="warning" title="No leader: the sessions are down until a node is elected" />}
+        {!leader && <LanePositions pair={pair} />}
         {!pair.name && <Alert type="info" title="High availability without a pair name: set pairName to group this node with its pair" />}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: 12 }}>
           {pair.nodes.map((node) => (
@@ -93,6 +94,11 @@ function NodeCard({ pair, node, leads }: { pair: HaPair; node: HaNode; leads: bo
   const status = node.status
   const lanes = new Set([...(status?.followerConnections ?? []), ...(status?.droppedFollowers ?? [])].map((follower) => follower.lane))
   const laneOf = (lane: number) => (lanes.size > 1 ? `, lane ${lane}` : '')
+  const followers = status?.followerConnections ?? []
+  const tagged = (status?.peers.length ?? 0) > 1 || followers.some((follower) => !follower.syncFollower)
+  const syncFollowers = status?.syncFollowers ?? []
+  const absentFollowers = (status?.peers ?? []).filter((nodeId) =>
+    !followers.some((follower) => follower.nodeId === nodeId) && !status!.droppedFollowers.some((dropped) => dropped.nodeId === nodeId))
   return (
     <Card size="small" type="inner" title={<NodeTag node={node} leads={leads} />} extra={status && <NodeActions node={node} leads={leads} />}>
       {!status && <Typography.Text type="secondary">This engine does not answer</Typography.Text>}
@@ -117,9 +123,24 @@ function NodeCard({ pair, node, leads }: { pair: HaPair; node: HaNode; leads: bo
               },
             ]}
           />
-          {status.followerConnections.map((follower) => (
-            <FollowerLine key={`${follower.nodeId}-${follower.lane}`} follower={follower} name={`${nodeName(pair, follower.nodeId)}${laneOf(follower.lane)}`} />
+          {followers.map((follower) => (
+            <FollowerLine
+              key={`${follower.nodeId}-${follower.lane}`}
+              follower={follower}
+              name={`${nodeName(pair, follower.nodeId)}${laneOf(follower.lane)}`}
+              tagged={tagged}
+              behind={behind(pair, followers, follower)}
+            />
           ))}
+          {leads && absentFollowers.map((nodeId) => {
+            const sync = syncFollowers.length === 0 || syncFollowers.includes(nodeId)
+            return (
+              <Typography.Text key={nodeId} type={sync ? 'danger' : 'warning'}>
+                <Health ok={false} />
+                Replicating to {nodeName(pair, nodeId)}: not connected {tagged && <SyncTag sync={sync} />}
+              </Typography.Text>
+            )
+          })}
           {status.droppedFollowers.map((dropped) => (
             <Alert
               key={`${dropped.nodeId}-${dropped.lane}`}
@@ -205,7 +226,19 @@ function SettingsDifferences({ differences }: { differences: SettingsDifference[
 
 type Follower = NonNullable<HaNode['status']>['followerConnections'][number]
 
-function FollowerLine({ follower, name }: { follower: Follower; name: string }) {
+/**
+ * How far this follower is behind the one of its lane holding the most: two followers' offsets are in the same log.
+ */
+function behind(pair: HaPair, followers: Follower[], follower: Follower): string | undefined {
+  if (!follower.connected || follower.appliedOffset < 0) return undefined
+  const furthest = followers
+    .filter((other) => other.lane === follower.lane)
+    .reduce((best, other) => (other.appliedOffset > best.appliedOffset ? other : best), follower)
+  if (furthest === follower) return undefined
+  return `${kib(furthest.appliedOffset - follower.appliedOffset)} behind ${nodeName(pair, furthest.nodeId)}`
+}
+
+function FollowerLine({ follower, name, tagged, behind }: { follower: Follower; name: string; tagged: boolean; behind?: string }) {
   const stalled = follower.lagMillis > STALLED_LAG_MILLIS
   const state = !follower.connected ? 'not connected'
     : follower.snapshotInProgress ? 'catching up by snapshot'
@@ -216,9 +249,58 @@ function FollowerLine({ follower, name }: { follower: Follower; name: string }) 
       <Health ok={follower.connected && follower.inSync && !stalled} />
       Replicating to {name}: {state}
       {follower.unsentBytes > 0 && `, ${Math.round(follower.unsentBytes / 1024)} KiB unsent`}
+      {behind && `, ${behind}`}
       {follower.connected && <Encryption cipher={follower.cipher} />}
+      {tagged && <> <SyncTag sync={follower.syncFollower} /></>}
     </Typography.Text>
   )
+}
+
+function SyncTag({ sync }: { sync: boolean }) {
+  return sync
+    ? <Tooltip title="SYNC sends wait for it: a failover to it, in sync, loses nothing they acknowledged"><Tag color="blue">sync</Tag></Tooltip>
+    : <Tooltip title="SYNC sends do not wait for it: a failover to it may lose what they acknowledged"><Tag color="purple">async (DR)</Tag></Tooltip>
+}
+
+/**
+ * With the leader down, what each node holds, to choose which to promote by hand.
+ */
+function LanePositions({ pair }: { pair: HaPair }) {
+  const holders = pair.nodes.filter((node) => (node.status?.lanePositions.length ?? 0) > 0)
+  if (holders.length < 2) return null
+  const reference = holders.find((node) => isSyncFollower(pair, node)) ?? holders[0]!
+  const lanes = [...new Set(holders.flatMap((node) => node.status!.lanePositions.map((position) => position.lane)))].sort((a, b) => a - b)
+  const positionOf = (node: HaNode, lane: number) => node.status!.lanePositions.find((position) => position.lane === lane)
+  return (
+    <Alert
+      type="info"
+      title={`Where each node stands, compared with ${reference.engineId}${isSyncFollower(pair, reference) ? ', a sync follower' : ''}`}
+      description={
+        <Table
+          size="small"
+          pagination={false}
+          rowKey="lane"
+          dataSource={lanes.map((lane) => ({ lane }))}
+          columns={[
+            { title: 'Lane', dataIndex: 'lane' },
+            ...holders.map((node) => ({
+              title: <Space size={4}>{node.engineId}<SyncTag sync={isSyncFollower(pair, node)} /></Space>,
+              key: node.engineId,
+              render: (_: unknown, row: { lane: number }) => positionText(positionOf(reference, row.lane), positionOf(node, row.lane), node === reference),
+            })),
+          ]}
+        />
+      }
+    />
+  )
+}
+
+function positionText(reference: LanePosition | undefined, position: LanePosition | undefined, isReference: boolean): string {
+  if (!position || position.offset < 0) return 'nothing since it last connected'
+  if (isReference || !reference || reference.offset < 0) return `epoch ${position.epoch}, offset ${position.offset.toLocaleString('en-US')}`
+  const gap = positionGap(reference, position)
+  if (gap === undefined) return `from another leadership (epoch ${position.epoch}), not comparable`
+  return gap === 0 ? 'level' : gap > 0 ? `${kib(gap)} ahead` : `${kib(-gap)} behind`
 }
 
 function Encryption({ cipher }: { cipher?: string | null }) {
@@ -239,11 +321,11 @@ function NodeActions({ node, leads }: { node: HaNode; leads: boolean }) {
   const electable = useSetElectable(node.engineId)
   const resync = useResync(node.engineId)
   const status = node.status!
-  const followerInSync = status.followerConnections.some((follower) => follower.inSync)
+  const followerInSync = status.followerConnections.some((follower) => follower.inSync && follower.syncFollower)
   return (
     <Flex gap={6}>
       {leads && (
-        <Tooltip title={!status.transferLeadershipSupported ? 'The leader election cannot hand leadership over' : !followerInSync ? 'No follower is in sync' : undefined}>
+        <Tooltip title={!status.transferLeadershipSupported ? 'The leader election cannot hand leadership over' : !followerInSync ? 'No sync follower is in sync' : undefined}>
           <span>
             <WriteButton
               size="small"
@@ -305,7 +387,7 @@ function PairSessions({ pair }: { pair: HaPair }) {
       dataSource={rows}
       columns={[
         { title: 'Session', key: 'session', render: (_, row) => row.key },
-        { title: 'Mode', key: 'mode', render: (_, row) => row.replicated?.replicationMode ?? 'NONE' },
+        { title: 'Mode', key: 'mode', render: (_, row) => modeText(row.replicated) },
         ...(anyUnencrypted ? [{
           title: <Tooltip title="The message types an encrypted replication leaves unencrypted, still authenticated">Unencrypted</Tooltip>,
           key: 'unencrypted',
@@ -326,6 +408,11 @@ function PairSessions({ pair }: { pair: HaPair }) {
       ]}
     />
   )
+}
+
+function modeText(session: HaNode['sessions'][number] | undefined): string {
+  if (!session) return 'NONE'
+  return session.replicationQuorum > 0 ? `${session.replicationMode}, quorum ${session.replicationQuorum}` : session.replicationMode
 }
 
 function unencryptedText(types: string[]): string {
