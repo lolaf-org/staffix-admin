@@ -30,7 +30,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -58,7 +60,7 @@ class HaControllerTest {
 
     @Test
     void aSwitchoverAnswersAndAuditsItsOutcome() throws Exception {
-        doReturn(SwitchoverOutcome.NO_FOLLOWER_IN_SYNC).when(gateway).switchover("geneva-a");
+        doReturn(SwitchoverOutcome.NO_FOLLOWER_IN_SYNC).when(gateway).switchover("geneva-a", null);
 
         mockMvc.perform(post(ENGINE + "/switchover").with(csrf()))
                 .andExpect(status().isOk())
@@ -69,8 +71,19 @@ class HaControllerTest {
     }
 
     @Test
+    void aSwitchoverToANamedFollowerPassesItOnAndAuditsIt() throws Exception {
+        doReturn(SwitchoverOutcome.TRANSFERRED).when(gateway).switchover("geneva-a", "2");
+
+        mockMvc.perform(post(ENGINE + "/switchover").param("to", "2").with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.outcome").value("TRANSFERRED"));
+
+        verify(auditSink).record(argThat(entry -> entry.getOperation().equals("switchover to 2: TRANSFERRED")));
+    }
+
+    @Test
     void aRefusedSwitchoverIsAuditedAsFailed() throws Exception {
-        doThrow(GatewayException.rejected("Node 2 does not lead")).when(gateway).switchover("geneva-a");
+        doThrow(GatewayException.rejected("Node 2 does not lead")).when(gateway).switchover("geneva-a", null);
 
         mockMvc.perform(post(ENGINE + "/switchover").with(csrf())).andExpect(status().isConflict());
 
@@ -112,6 +125,6 @@ class HaControllerTest {
     void aReaderCannotActOnThePair() throws Exception {
         mockMvc.perform(post(ENGINE + "/switchover").with(csrf())).andExpect(status().isForbidden());
 
-        verify(gateway, never()).switchover("geneva-a");
+        verify(gateway, never()).switchover(eq("geneva-a"), any());
     }
 }

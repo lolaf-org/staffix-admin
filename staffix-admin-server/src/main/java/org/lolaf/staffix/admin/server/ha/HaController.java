@@ -16,6 +16,7 @@
 package org.lolaf.staffix.admin.server.ha;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.lolaf.staffix.admin.server.audit.AuditLog;
 import org.lolaf.staffix.admin.server.engines.EngineGateway;
 import org.lolaf.staffix.admin.server.engines.SessionRef;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -59,9 +61,10 @@ public class HaController {
      */
     @PreAuthorize(WRITER)
     @PostMapping(ENGINE + "/switchover")
-    public SwitchoverResult switchover(@PathVariable String engineId) {
-        return new SwitchoverResult(auditLog.record(engineId, "switchover", () -> gateway.switchover(engineId),
-                outcome -> "switchover: " + outcome));
+    public SwitchoverResult switchover(@PathVariable String engineId, @RequestParam(required = false) @Nullable String to) {
+        String operation = to == null ? "switchover" : "switchover to " + to;
+        return new SwitchoverResult(auditLog.record(engineId, operation, () -> gateway.switchover(engineId, to),
+                outcome -> operation + ": " + outcome));
     }
 
     @PreAuthorize(WRITER)

@@ -122,6 +122,12 @@ public class HaStatus {
         long appliedOffset;
         long lagMillis;
         /**
+         * How long the lane's last return to sync took, snapshots included; -1 before the first, null from an engine
+         * before staffix 0.9.2.
+         */
+        @Nullable
+        Long catchUpMillis;
+        /**
          * The cipher encrypting this lane; null in clear or while not connected.
          */
         @Nullable

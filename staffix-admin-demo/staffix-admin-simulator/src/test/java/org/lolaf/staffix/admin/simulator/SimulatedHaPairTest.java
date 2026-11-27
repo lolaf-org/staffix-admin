@@ -148,6 +148,14 @@ class SimulatedHaPairTest {
     }
 
     @Test
+    void aSwitchoverToANamedNodeGoesOnlyToTheStandby() {
+        assertThatThrownBy(() -> a.switchover("3")).isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(a.switchover("2")).isEqualTo(SwitchoverOutcome.TRANSFERRED);
+        assertThat(b.getStatus().getRole()).isEqualTo(Role.LEADER);
+    }
+
+    @Test
     void aRefusedSessionIsInAlertOnTheLeaderOnly() {
         ticksUntil(2);
 

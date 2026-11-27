@@ -395,7 +395,7 @@ class HttpEngineGatewayTest {
     void aSwitchoverMayTakeWhatTheEngineAllowsItBeyondTheRequestTimeout() {
         switchoverTakes = Duration.ofMillis(2500);
 
-        assertThat(gateway.switchover("alpha-engine")).isEqualTo(SwitchoverOutcome.NO_FOLLOWER_IN_SYNC);
+        assertThat(gateway.switchover("alpha-engine", null)).isEqualTo(SwitchoverOutcome.NO_FOLLOWER_IN_SYNC);
     }
 
     @Test
@@ -620,7 +620,7 @@ class HttpEngineGatewayTest {
 
     @Test
     void highAvailabilityActionsAddressTheEngineAndTheSession() {
-        assertThat(gateway.switchover("alpha-engine")).isEqualTo(SwitchoverOutcome.NO_FOLLOWER_IN_SYNC);
+        assertThat(gateway.switchover("alpha-engine", null)).isEqualTo(SwitchoverOutcome.NO_FOLLOWER_IN_SYNC);
         gateway.setElectable("alpha-engine", false);
         gateway.resyncSession(trading());
 

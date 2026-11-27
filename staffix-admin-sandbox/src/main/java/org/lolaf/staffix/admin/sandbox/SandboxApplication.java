@@ -35,8 +35,8 @@ import java.util.concurrent.ScheduledExecutorService;
 /**
  * A bank initiating to two venues, which quote it, fill the orders it places on some quotes, publish news to it and copy
  * venue-x's fills on a drop copy. venue-x runs here, storing its messages and its gateway's sessions in Postgres and
- * posting its alerts to Alertmanager. venue-y is a high availability pair in processes of its own, {@link SandboxHaNode},
- * which the bank's initiators reach on either node. Between them every session state the console shows appears: logged
+ * posting its alerts to Alertmanager. venue-y is a high availability group of three nodes in processes of their own,
+ * {@link SandboxHaNode}, which the bank's initiators reach on whichever leads. Between them every session state the console shows appears: logged
  * in, a backup that cannot connect, a session outside its window, and one whose counterparty never connects.
  */
 @Slf4j
@@ -45,7 +45,7 @@ public final class SandboxApplication {
     private static final int ALPHA_BANK_PORT = 7101;
     private static final int VENUE_X_PORT = 7201;
     private static final int VENUE_X_DRP_PORT = 7299;
-    private static final Integer[] VENUE_Y_PORTS = {SandboxHaNode.fixPort(1), SandboxHaNode.fixPort(2)};
+    private static final Integer[] VENUE_Y_PORTS = {SandboxHaNode.fixPort(1), SandboxHaNode.fixPort(2), SandboxHaNode.fixPort(3)};
 
     private SandboxApplication() {
     }

@@ -32,7 +32,7 @@ export const SETTINGS_DIFFERENCE_TEXT: Record<SettingsDifference['kind'], string
 }
 
 export const REPLICATED_CHANGE_HINT =
-  'Made on the leader, which passes it to the follower when this store is replicated. The HA page shows settings that still differ.'
+  'Made on the leader, which passes it to its followers when this store is replicated. The HA page shows settings that still differ.'
 
 export function leaderOf(pair: HaPair): HaNode | undefined {
   return pair.nodes.find((node) => node.status?.role === 'LEADER')
@@ -66,6 +66,21 @@ export function isSyncFollower(pair: HaPair, node: HaNode): boolean {
   return node.status != null && others.some((other) => other.status!.syncFollowers.includes(node.status!.nodeId))
 }
 
+/**
+ * The sync followers the leader may switch over to now, the one it picks first: in sync on every lane, the fewest
+ * writes left to store across their sessions, as the engine chooses.
+ */
+export function switchoverCandidates(pair: HaPair, leader: HaNode): HaNode[] {
+  const connections = leader.status?.followerConnections ?? []
+  const ready = (node: HaNode) => {
+    const lanes = connections.filter((connection) => connection.nodeId === node.status?.nodeId)
+    return lanes.length > 0 && lanes.every((lane) => lane.connected && lane.inSync && lane.syncFollower)
+  }
+  const pendingWrites = (node: HaNode) => node.sessions.reduce((sum, session) => sum + session.pendingWrites, 0)
+  return pair.nodes.filter((node) => node !== leader && node.status && ready(node))
+    .sort((one, other) => pendingWrites(one) - pendingWrites(other))
+}
+
 export type LanePosition = NonNullable<HaNode['status']>['lanePositions'][number]
 
 /**
@@ -81,7 +96,9 @@ export function kib(bytes: number): string {
   return `${Math.ceil(bytes / 1024).toLocaleString('en-US')} KiB`
 }
 
-function sessionOn(node: HaNode | undefined, group: string, sessionId: string) {
+type Session = HaNode['sessions'][number]
+
+function sessionOn(node: HaNode | undefined, group: string, sessionId: string): Session | undefined {
   return node?.sessions.find((session) => session.group === group && session.name === sessionId)
 }
 
@@ -98,33 +115,66 @@ export function needsAttention(replication: ReplicationState): boolean {
   return replication.health === 'warning' || replication.health === 'error'
 }
 
+export interface FollowerReplication {
+  node: HaNode
+  sync: boolean
+  replication: ReplicationState
+}
+
+const HEALTH_RANK: Record<ReplicationState['health'], number> = { none: 0, ok: 1, warning: 2, error: 3 }
+
+function worst(followers: FollowerReplication[]): FollowerReplication {
+  return followers.reduce((worse, follower) => (HEALTH_RANK[follower.replication.health] > HEALTH_RANK[worse.replication.health] ? follower : worse))
+}
+
 /**
- * How a session of the node the overview shows replicates to its sync follower, the one a failover goes to.
+ * How a session of the node the overview shows replicates, summed up: its worst sync follower, as a failover may go to
+ * any of them, and a disaster-recovery copy only when it needs attention, as a warning.
  */
 export function replicationState(pair: HaPair, group: string, sessionId: string): ReplicationState {
-  const link = linkState(pair, group, sessionId)
-  const difference = followerSettingsDifference(pair, group, sessionId)
+  const shown = shownNode(pair)
+  if (!shown.status) return { text: 'unavailable', health: 'error' }
+  // a node lists every session but those configured with replication mode NONE, even one a follower refuses
+  if (!sessionOn(shown, group, sessionId)) return { text: 'off', health: 'none' }
+  const followers = followerReplications(pair, group, sessionId)
+  if (followers.length === 0) return { text: 'follower down', health: 'error' }
+  const syncFollowers = followers.filter((follower) => follower.sync)
+  const shownFollowers = [worst(syncFollowers.length > 0 ? syncFollowers : followers),
+    ...followers.filter((follower) => !follower.sync && needsAttention(follower.replication))]
+  const named = (follower: FollowerReplication) =>
+    (followers.length > 1 ? `${follower.node.engineId}: ${follower.replication.text}` : follower.replication.text)
+  const health = shownFollowers.slice(1).length > 0 && HEALTH_RANK[shownFollowers[0]!.replication.health] < HEALTH_RANK.warning
+    ? 'warning' : shownFollowers[0]!.replication.health
+  return { text: shownFollowers.map(named).join(', '), health }
+}
+
+/**
+ * How the session replicates to each other node, an empty list when the shown node does not run it.
+ */
+export function followerReplications(pair: HaPair, group: string, sessionId: string): FollowerReplication[] {
+  const shown = shownNode(pair)
+  const onShown = sessionOn(shown, group, sessionId)
+  if (!shown.status || !onShown) return []
+  return pair.nodes
+    .filter((node) => node !== shown)
+    .map((node) => ({ node, sync: isSyncFollower(pair, node), replication: followerState(shown, onShown, node, group, sessionId) }))
+}
+
+function followerState(shown: HaNode, onShown: Session, follower: HaNode, group: string, sessionId: string): ReplicationState {
+  const link = linkState(shown, onShown, follower, group, sessionId)
+  const difference = followerSettingsDifference(follower, group, sessionId)
   if (!difference) return link
   return { text: `${link.text}, ${SETTINGS_DIFFERENCE_TEXT[difference.kind]}`, health: link.health === 'error' ? 'error' : 'warning' }
 }
 
-function followerSettingsDifference(pair: HaPair, group: string, sessionId: string): SettingsDifference | undefined {
+function followerSettingsDifference(follower: HaNode, group: string, sessionId: string): SettingsDifference | undefined {
+  if (follower.status?.role !== 'FOLLOWER') return undefined
   const qualifiedName = `${group}.${sessionId}:`
-  return pair.nodes
-    .filter((node) => node.status?.role === 'FOLLOWER')
-    .flatMap((node) => node.status!.sessionSettingsDifferences)
-    .find((difference) => difference.fixSessionId.startsWith(qualifiedName))
+  return follower.status.sessionSettingsDifferences.find((difference) => difference.fixSessionId.startsWith(qualifiedName))
 }
 
-function linkState(pair: HaPair, group: string, sessionId: string): ReplicationState {
-  const shown = shownNode(pair)
-  const followers = pair.nodes.filter((node) => node !== shown)
-  const follower = followers.find((node) => isSyncFollower(pair, node)) ?? followers[0]
-  const onShown = sessionOn(shown, group, sessionId)
-  if (!shown.status) return { text: 'unavailable', health: 'error' }
-  // a node lists every session but those configured with replication mode NONE, even one a follower refuses
-  if (!onShown) return { text: 'off', health: 'none' }
-  if (!follower?.status) return { text: 'follower down', health: 'error' }
+function linkState(shown: HaNode, onShown: Session, follower: HaNode, group: string, sessionId: string): ReplicationState {
+  if (!follower.status) return { text: 'down', health: 'error' }
   const onFollower = sessionOn(follower, group, sessionId)
   const refusal = onFollower?.notReplicatedReason ?? onShown.notReplicatedReason
   if (refusal) return { text: `refused (${refusal})`, health: 'error' }
@@ -139,7 +189,7 @@ function linkState(pair: HaPair, group: string, sessionId: string): ReplicationS
 /**
  * Per node: each store can hold what the other lost, and a re-sync makes the follower match the leader, holes included.
  */
-function lostWrites(node: HaNode, session: NonNullable<ReturnType<typeof sessionOn>>): string {
+function lostWrites(node: HaNode, session: Session): string {
   if (session.lostWrites === 0) return ''
   return `, ${session.lostWrites.toLocaleString('en-US')} ${session.lostWrites === 1 ? 'write' : 'writes'} lost on ${node.engineId}`
 }
@@ -152,7 +202,7 @@ export function notLeadingReason(pairs: HaPair[], engineId: string): string | un
   if (!pair) return undefined
   const leader = leaderOf(pair)
   if (leader?.engineId === engineId) return undefined
-  return leader ? `${engineId} is a follower: use the leader, ${leader.engineId}` : `${engineId} does not lead, and its pair has no leader`
+  return leader ? `${engineId} is a follower: use the leader, ${leader.engineId}` : `${engineId} does not lead, and its group has no leader`
 }
 
 /**

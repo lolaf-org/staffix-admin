@@ -392,5 +392,17 @@ final class SimulatedHaPair {
                 return SwitchoverOutcome.TRANSFERRED;
             }
         }
+
+        /**
+         * The disaster-recovery copy is no sync follower, so only the standby can be named.
+         */
+        @Override
+        public SwitchoverOutcome switchover(String successor) {
+            if (!other(this).nodeId.equals(successor)) {
+                throw new IllegalArgumentException("Node " + nodeId + " cannot switch over to " + successor
+                        + ", which is not one of its sync followers");
+            }
+            return switchover();
+        }
     }
 }

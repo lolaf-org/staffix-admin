@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 import { CaretDownOutlined, CaretRightOutlined, CheckCircleFilled, CloseCircleFilled, LockOutlined, ReloadOutlined, SwapOutlined, ToolOutlined, UnlockOutlined, WarningFilled } from '@ant-design/icons'
-import { Alert, Card, Collapse, Descriptions, Empty, Flex, Skeleton, Space, Table, Tag, theme, Tooltip, Typography } from 'antd'
+import { Alert, Card, Collapse, Descriptions, Empty, Flex, Radio, Skeleton, Space, Table, Tag, theme, Tooltip, Typography } from 'antd'
+import { useState } from 'react'
 import { useComponentProbes, useEngineAlerts, useGroups, useHaPairs, useResync, useResyncSession, useSetElectable, useSwitchover } from '../api/queries'
 import { AlertLevelTag } from '../alerts/AlertLevelTag'
 import { ClearComponentAlertButton } from '../alerts/ClearAlertButton'
@@ -22,7 +23,7 @@ import { useFolded } from '../layout/useFolded'
 import { WriteButton } from '../sessions/WriteButton'
 import { HaCharts } from './HaCharts'
 import { NodeTag } from './NodeTag'
-import { isSyncFollower, kib, leaderOf, needsAttention, nodeName, positionGap, replicationState, SETTINGS_DIFFERENCE_TEXT, shownNode, type HaNode, type HaPair, type LanePosition, type ReplicationState, type SettingsDifference } from './pairs'
+import { followerReplications, isSyncFollower, switchoverCandidates, kib, leaderOf, needsAttention, nodeName, positionGap, replicationState, SETTINGS_DIFFERENCE_TEXT, shownNode, type FollowerReplication, type HaNode, type HaPair, type LanePosition, type ReplicationState, type SettingsDifference } from './pairs'
 
 /**
  * Past this a follower reads as stalled, whatever its last acknowledgement says: `inSync` is as of that acknowledgement.
@@ -58,13 +59,13 @@ function PairCard({ pair }: { pair: HaPair }) {
           <span
             role="button"
             aria-expanded={!folded}
-            aria-label={folded ? 'Show the pair' : 'Hide the pair'}
+            aria-label={folded ? 'Show the group' : 'Hide the group'}
             onClick={toggleFolded}
             style={{ cursor: 'pointer' }}
           >
             {folded ? <CaretRightOutlined /> : <CaretDownOutlined />}
           </span>
-          {pair.name ? <span><Typography.Text type="secondary">HA pair: </Typography.Text><Typography.Text strong>{pair.name}</Typography.Text></span> : pair.nodes[0]?.engineId}
+          {pair.name ? <span><Typography.Text type="secondary">HA group: </Typography.Text><Typography.Text strong>{pair.name}</Typography.Text></span> : pair.nodes[0]?.engineId}
           {pair.nodes.map((node) => <NodeTag key={node.engineId} node={node} leads={node === leader} />)}
         </Space>
       }
@@ -72,7 +73,7 @@ function PairCard({ pair }: { pair: HaPair }) {
       {!folded && <Flex vertical gap={12}>
         {!leader && <Alert type="warning" title="No leader: the sessions are down until a node is elected" />}
         {!leader && <LanePositions pair={pair} />}
-        {!pair.name && <Alert type="info" title="High availability without a pair name: set pairName to group this node with its pair" />}
+        {!pair.name && <Alert type="info" title="High availability without a pair name: set pairName, the same on every node, to group this node with the others" />}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: 12 }}>
           {pair.nodes.map((node) => (
             <NodeCard key={node.engineId} pair={pair} node={node} leads={node === leader} />
@@ -100,7 +101,7 @@ function NodeCard({ pair, node, leads }: { pair: HaPair; node: HaNode; leads: bo
   const absentFollowers = (status?.peers ?? []).filter((nodeId) =>
     !followers.some((follower) => follower.nodeId === nodeId) && !status!.droppedFollowers.some((dropped) => dropped.nodeId === nodeId))
   return (
-    <Card size="small" type="inner" title={<NodeTag node={node} leads={leads} />} extra={status && <NodeActions node={node} leads={leads} />}>
+    <Card size="small" type="inner" title={<NodeTag node={node} leads={leads} />} extra={status && <NodeActions pair={pair} node={node} leads={leads} />}>
       {!status && <Typography.Text type="secondary">This engine does not answer</Typography.Text>}
       {status && (
         <Flex vertical gap={8}>
@@ -248,11 +249,20 @@ function FollowerLine({ follower, name, tagged, behind }: { follower: Follower; 
     <Typography.Text type={stalled ? 'danger' : undefined} strong={stalled}>
       <Health ok={follower.connected && follower.inSync && !stalled} />
       Replicating to {name}: {state}
+      {follower.connected && follower.inSync && follower.catchUpMillis != null && follower.catchUpMillis >= 0 && <CatchUp millis={follower.catchUpMillis} />}
       {follower.unsentBytes > 0 && `, ${Math.round(follower.unsentBytes / 1024)} KiB unsent`}
       {behind && `, ${behind}`}
       {follower.connected && <Encryption cipher={follower.cipher} />}
       {tagged && <> <SyncTag sync={follower.syncFollower} /></>}
     </Typography.Text>
+  )
+}
+
+function CatchUp({ millis }: { millis: number }) {
+  return (
+    <Tooltip title="How long the follower's last return to sync took (connecting, a re-sync, a session added), snapshots included: a failover to it meanwhile would have lost writes">
+      <span>, caught up in {millis < 1000 ? `${millis} ms` : `${(millis / 1000).toFixed(1)} s`}</span>
+    </Tooltip>
   )
 }
 
@@ -316,12 +326,14 @@ function Health({ ok }: { ok: boolean }) {
     : <CloseCircleFilled style={{ color: token.colorError, marginRight: 6 }} />
 }
 
-function NodeActions({ node, leads }: { node: HaNode; leads: boolean }) {
+function NodeActions({ pair, node, leads }: { pair: HaPair; node: HaNode; leads: boolean }) {
   const switchover = useSwitchover(node.engineId)
   const electable = useSetElectable(node.engineId)
   const resync = useResync(node.engineId)
+  const [successor, setSuccessor] = useState<string>()
   const status = node.status!
   const followerInSync = status.followerConnections.some((follower) => follower.inSync && follower.syncFollower)
+  const candidates = leads ? switchoverCandidates(pair, node) : []
   return (
     <Flex gap={6}>
       {leads && (
@@ -332,8 +344,8 @@ function NodeActions({ node, leads }: { node: HaNode; leads: boolean }) {
               icon={<SwapOutlined />}
               disabled={!status.transferLeadershipSupported || !followerInSync}
               loading={switchover.isPending}
-              onConfirm={() => switchover.mutate(undefined)}
-              confirm={`Switch over from ${node.engineId}? Its sessions log out and log on from the other node.`}
+              onConfirm={() => switchover.mutate(successor)}
+              confirm={<SwitchoverConfirm from={node} candidates={candidates} successor={successor} onSuccessor={setSuccessor} />}
             >
               Switchover
             </WriteButton>
@@ -366,6 +378,33 @@ function NodeActions({ node, leads }: { node: HaNode; leads: boolean }) {
   )
 }
 
+/**
+ * With several sync followers ready, the operator may name one; left alone, the engine picks the most caught up.
+ */
+function SwitchoverConfirm({ from, candidates, successor, onSuccessor }: {
+  from: HaNode
+  candidates: HaNode[]
+  successor: string | undefined
+  onSuccessor: (nodeId: string | undefined) => void
+}) {
+  if (candidates.length < 2) {
+    return `Switch over from ${from.engineId}? Its sessions log out and log on from ${candidates[0]?.engineId ?? 'a sync follower once one is ready'}.`
+  }
+  return (
+    <Flex vertical gap={8}>
+      <span>Switch over from {from.engineId}? Its sessions log out and log on from:</span>
+      <Radio.Group
+        value={successor ?? ''}
+        onChange={(event) => onSuccessor(event.target.value || undefined)}
+        options={[
+          { value: '', label: `the most caught up, ${candidates[0]!.engineId} now` },
+          ...candidates.map((candidate) => ({ value: candidate.status!.nodeId, label: candidate.engineId })),
+        ]}
+      />
+    </Flex>
+  )
+}
+
 function PairSessions({ pair }: { pair: HaPair }) {
   const shown = shownNode(pair)
   const groups = useGroups(shown.engineId)
@@ -377,6 +416,7 @@ function PairSessions({ pair }: { pair: HaPair }) {
       id: session.id,
       replicated,
       replication: replicationState(pair, session.group, session.id),
+      followers: followerReplications(pair, session.group, session.id),
     }
   })
   const anyUnencrypted = rows.some((row) => (row.replicated?.unencryptedMessageTypes.length ?? 0) > 0)
@@ -393,7 +433,7 @@ function PairSessions({ pair }: { pair: HaPair }) {
           key: 'unencrypted',
           render: (_: unknown, row: (typeof rows)[number]) => unencryptedText(row.replicated?.unencryptedMessageTypes ?? []),
         }] : []),
-        { title: 'Replication', key: 'replication', render: (_, row) => <ReplicationTag replication={row.replication} /> },
+        { title: 'Replication', key: 'replication', render: (_, row) => <FollowerTags followers={row.followers} summary={row.replication} /> },
         {
           title: 'Unacknowledged sends',
           key: 'unacknowledged',
@@ -420,6 +460,22 @@ function unencryptedText(types: string[]): string {
 }
 
 const REPLICATION_TAG_COLORS = { none: 'default', ok: 'success', warning: 'warning', error: 'error' } as const
+
+/**
+ * One tag per follower once there are several, so a disaster-recovery copy refusing a session shows too.
+ */
+function FollowerTags({ followers, summary }: { followers: FollowerReplication[]; summary: ReplicationState }) {
+  if (followers.length < 2) return <ReplicationTag replication={summary} />
+  return (
+    <Space size={4} wrap>
+      {followers.map((follower) => (
+        <Tooltip key={follower.node.engineId} title={follower.sync ? 'Sync follower: a failover may go to it' : 'Disaster-recovery copy: SYNC sends do not wait for it'}>
+          <span><ReplicationTag replication={{ ...follower.replication, text: `${follower.node.engineId}${follower.sync ? '' : ' (DR)'}: ${follower.replication.text}` }} /></span>
+        </Tooltip>
+      ))}
+    </Space>
+  )
+}
 
 function ReplicationTag({ replication }: { replication: ReplicationState }) {
   return (

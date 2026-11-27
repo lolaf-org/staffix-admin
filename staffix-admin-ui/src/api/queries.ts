@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { App } from 'antd'
 import { api, call, csrfHeader, ApiError, type Schemas } from './client'
 import type { paths } from './schema'
@@ -53,8 +53,8 @@ const HA_ENGINE = '/api/ha/engines/{engineId}'
 
 const SWITCHOVER_MESSAGES: Record<Schemas['SwitchoverResult']['outcome'], string> = {
   TRANSFERRED: 'Leadership switched over',
-  NO_FOLLOWER_IN_SYNC: 'Not switched over: no follower is in sync',
-  FOLLOWER_STORE_BEHIND: 'Not switched over: the follower has too much left to store, the sessions stayed here',
+  NO_FOLLOWER_IN_SYNC: 'Not switched over: no sync follower is in sync',
+  FOLLOWER_STORE_BEHIND: 'Not switched over: the sync followers have too much left to store, the sessions stayed here',
   NOT_HANDED_OVER: 'Not switched over: the follower did not take every write, the sessions resumed here',
   NOT_TRANSFERRED: 'Not switched over: the election did not move leadership, the sessions resumed here',
 }
@@ -77,7 +77,7 @@ function useHaMutation<V, R>(mutationFn: (variables: V) => Promise<R>, report: (
 
 export function useSwitchover(engineId: string) {
   return useHaMutation(
-    (_: undefined) => call(api.POST(`${HA_ENGINE}/switchover`, { params: { path: { engineId } } })),
+    (successor: string | undefined) => call(api.POST(`${HA_ENGINE}/switchover`, { params: { path: { engineId }, query: { to: successor } } })),
     ({ outcome }, message) => (outcome === 'TRANSFERRED' ? message.success : message.warning)(SWITCHOVER_MESSAGES[outcome]),
   )
 }
@@ -440,8 +440,15 @@ export type MetricRequest =
  * the step when unset. `live` refreshes the last minutes every couple of seconds rather than every 15.
  */
 export function useMetrics(scope: MetricScope, request: MetricRequest | undefined, period: number | FixedPeriod, rateWindow?: string, live = false) {
+  return useQuery(metricsQuery(scope, request, period, rateWindow, live))
+}
+
+/**
+ * {@link useMetrics} as query options, for a chart reading one scope per node.
+ */
+export function metricsQuery(scope: MetricScope, request: MetricRequest | undefined, period: number | FixedPeriod, rateWindow?: string, live = false) {
   const relative = typeof period === 'number'
-  return useQuery({
+  return queryOptions({
     queryKey: ['metrics', scope, request, period, rateWindow],
     queryFn: () => {
       const range = relative ? lastMinutes(period) : period
@@ -466,7 +473,7 @@ export function useMetrics(scope: MetricScope, request: MetricRequest | undefine
     },
     enabled: request !== undefined,
     refetchInterval: relative ? (live ? POLL_INTERVAL_MS : 15_000) : false,
-    placeholderData: (previous) => previous,
+    placeholderData: keepPreviousData,
   })
 }
 

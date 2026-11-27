@@ -16,13 +16,13 @@
 import { Collapse, Flex, Tooltip, Typography } from 'antd'
 import { useQueries } from '@tanstack/react-query'
 import { useState } from 'react'
-import { engineMetersQuery, useMetrics, type MetricRequest } from '../api/queries'
+import { engineMetersQuery, metricsQuery, type MetricRequest } from '../api/queries'
 import { MetricChart, SeriesLegend, type ChartSeries } from '../telemetry/MetricChart'
 import { formatRateValue, formatSeconds } from '../telemetry/format'
 import { seriesColors } from '../telemetry/series'
 import { TimeRangeSelector, type Period } from '../telemetry/TimeRangeSelector'
 import { useThemeMode } from '../theme/ThemeMode'
-import { readsP99, shownNode, type HaNode, type HaPair } from './pairs'
+import { nodeName, readsP99, shownNode, type HaNode, type HaPair } from './pairs'
 
 const ROLE_NAMES: Record<number, string> = { 2: 'leader', 1: 'follower', 0: 'unknown' }
 
@@ -45,6 +45,10 @@ interface ChartSpec {
    * Read in p99 or as a mean, as the nodes publish it; the title says which.
    */
   timer?: boolean
+  /**
+   * Split by the follower tag the leader adds: a line per follower, across the leaders it followed.
+   */
+  perFollower?: boolean
 }
 
 /**
@@ -59,16 +63,16 @@ function meter(name: string, statistic: ChartSpec['request']['statistic'], split
 const LATENCY_CHARTS: ChartSpec[] = [
   {
     title: 'Follower lag', timer: true,
-    description: 'How far the follower is behind: from a write to the replication log to the follower applying it, sampled once per round trip. A stalled follower records nothing here until it recovers: Current lag shows the stall.',
-    request: meter('ha.follower.lag', 'MEAN'), format: formatSeconds },
+    description: 'How far each follower is behind: from a write to the replication log to the follower applying it, sampled once per round trip. A stalled follower records nothing here until it recovers: Current lag shows the stall.',
+    request: meter('ha.follower.lag', 'MEAN', ['follower']), format: formatSeconds, perFollower: true },
   {
     title: 'Current lag',
     description: 'How long the most behind follower has not applied a write, 0 when caught up. It keeps growing while a follower is stalled.',
     request: meter('ha.follower.lag.pending', 'VALUE', [], 'MILLISECONDS'), format: formatSeconds },
   {
     title: 'Follower ack latency', timer: true,
-    description: "A follower's round trip, from a batch of writes sent to its acknowledgement. Covers ASYNC sessions too.",
-    request: meter('ha.follower.ack.latency', 'MEAN'), format: formatSeconds },
+    description: "Each follower's round trip, from a batch of writes sent to its acknowledgement. Covers ASYNC sessions too.",
+    request: meter('ha.follower.ack.latency', 'MEAN', ['follower']), format: formatSeconds, perFollower: true },
   {
     title: 'SYNC ack latency by mode', timer: true,
     description: 'How long SYNC sends waited for the follower, for those it acknowledged: SYNC_RECEIVED until it received them, SYNC_APPLIED until it applied them. Empty without a session in a SYNC mode.',
@@ -150,6 +154,18 @@ export function HaCharts({ pair }: { pair: HaPair }) {
   )
 }
 
+type NamedSeries = { name: string; points: ChartSeries['points'] }
+
+/**
+ * A follower's lines from each leader it followed made one: leaderships do not overlap, so it reads on across a
+ * failover.
+ */
+function joinedByName(series: NamedSeries[]): NamedSeries[] {
+  const byName = new Map<string, ChartSeries['points']>()
+  series.forEach((s) => byName.set(s.name, [...(byName.get(s.name) ?? []), ...s.points]))
+  return [...byName].map(([name, points]) => ({ name, points: points.sort((one, other) => one.timestamp.localeCompare(other.timestamp)) }))
+}
+
 interface PairChartProps {
   pair: HaPair
   spec: ChartSpec
@@ -159,25 +175,26 @@ interface PairChartProps {
 }
 
 /**
- * One series per node, so a chart reads on across a failover; a split chart shows the split on the shown node alone,
- * the two together being more series than a chart can plot.
+ * One series per node, so a chart reads on across a failover, or per follower for a per-follower chart; another split
+ * chart shows the split on the shown node alone, the nodes together being more series than a chart can plot.
  */
 function PairChart({ pair, spec, statistic, period, live }: PairChartProps) {
   const { dark } = useThemeMode()
   const colors = seriesColors(dark)
-  const split = spec.request.splitBy[0]
-  const first = split ? shownNode(pair) : pair.nodes[0]!
-  const second = split ? undefined : pair.nodes[1]
+  const split = spec.perFollower ? undefined : spec.request.splitBy[0]
+  const charted = split ? [shownNode(pair)] : pair.nodes
   const request = !spec.timer ? spec.request
     : statistic === 'p99' ? { ...spec.request, statistic: 'QUANTILE' as const, quantile: 0.99 }
     : statistic === 'mean' ? spec.request : undefined
   const title = spec.timer ? `${spec.title} (${statistic ?? 'mean'})` : spec.title
-  const firstMetrics = useMetrics(engineScope(first), request, period, undefined, live)
-  const secondMetrics = useMetrics(engineScope(second ?? first), second ? request : undefined, period, undefined, live)
+  const nodesMetrics = useQueries({ queries: charted.map((node) => metricsQuery(engineScope(node), request, period, undefined, live)) })
 
-  const named = (engineId: string, metrics: typeof firstMetrics) =>
-    (metrics.data?.series ?? []).map((s) => ({ name: split ? s.labels[split] ?? engineId : engineId, points: s.points }))
-  const series: ChartSeries[] = [...named(first.engineId, firstMetrics), ...(second ? named(second.engineId, secondMetrics) : [])]
+  const named = charted.flatMap((node, index) => (nodesMetrics[index]?.data?.series ?? [])
+    .map((s) => ({
+      name: spec.perFollower ? nodeName(pair, s.labels.follower) : split ? s.labels[split] ?? node.engineId : node.engineId,
+      points: s.points,
+    })))
+  const series: ChartSeries[] = (spec.perFollower ? joinedByName(named) : named)
     .filter((s) => s.points.length > 0)
     .slice(0, colors.length)
     .map((s, index) => ({ key: s.name, name: s.name, color: colors[index]!, points: s.points }))

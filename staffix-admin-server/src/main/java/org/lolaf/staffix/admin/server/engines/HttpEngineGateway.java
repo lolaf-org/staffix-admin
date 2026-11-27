@@ -387,9 +387,10 @@ class HttpEngineGateway implements EngineGateway {
     }
 
     @Override
-    public SwitchoverOutcome switchover(String engineId) {
+    public SwitchoverOutcome switchover(String engineId, @Nullable String successor) {
+        String query = successor == null ? null : "to=" + UriUtils.encodeQueryParam(successor, StandardCharsets.UTF_8);
         try {
-            return call(clientForSwitchover(engineId), engineId, HttpMethod.POST, List.of("ha", "switchover"), null,
+            return call(clientForSwitchover(engineId), engineId, HttpMethod.POST, List.of("ha", "switchover"), query,
                     null, ConnectorSwitchover.class).outcome();
         } finally {
             markStale(engineId);

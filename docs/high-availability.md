@@ -5,26 +5,28 @@ their stores, ready to take over. The console shows the pair as one, and needs n
 high availability appears here through the HTTP admin API it already uses. See staffix's high availability guide for
 how to configure a pair.
 
-## Pairs
+## HA groups
 
-Two nodes form a pair when they report the same pair name: `ReplicationHaSettings.pairName`, else the name the leader
-election gives (primos's `applicationName`). A node without a name is shown alone, with a hint to set one. Use a
-different name for each pair: two pairs with the same name show as one group of four.
+Nodes form a group when they report the same pair name: `ReplicationHaSettings.pairName`, else the name the leader
+election gives (primos's `applicationName`): a pair, or a leader with several followers, such as a standby and a
+disaster-recovery copy. A node without a name is shown alone, with a hint to set one. Use a different name for each
+group: two pairs with the same name show as one group of four.
 
-A node that stops answering stays in its pair, shown as not answering. The console remembers its pair in memory only,
+A node that stops answering stays in its group, shown as not answering. The console remembers its group in memory only,
 so after a console restart such a node is not placed until it answers again.
 
 ## High availability page
 
-The High availability tab has one card per pair, also reached from the pair's name on the Sessions page. Each node
+The High availability tab has one card per group, also reached from the group's name on the Sessions page. Each node
 shows its role, node id, epoch, whether its leadership can be proven, when it took its role and whether it can lead.
 
 - A **leader** lists a line per follower connection: in sync, catching up by snapshot, not in sync or not connected,
-  with what is still unsent. A follower that has not applied a write for more than 3 seconds reads as stalled, even
+  with what is still unsent and, once in sync, how long its last catch-up took: after connecting, a re-sync or a
+  session added (a failover to it meanwhile would have lost writes). A follower that has not applied a write for more than 3 seconds reads as stalled, even
   when its last acknowledgement said in sync. A follower dropped as too slow is listed with the time it may reconnect.
 - With **several followers**, each line is tagged **sync**, one staffix's `syncFollowers` names and `SYNC` sends wait
   for, or **async (DR)**, a disaster-recovery copy: a failover to it may lose what they acknowledged. A follower behind
-  another on its lane says by how much, in KiB of the replication log. Any other node of the pair with no connection is
+  another on its lane says by how much, in KiB of the replication log. Any other node of the group with no connection is
   listed as not connected, in red for a sync follower.
 - A **follower** shows its connection to the leader: in sync, catching up or not connected.
 - A connected line says whether the replication is **encrypted**, its cipher on hover, or **in clear**. A follower
@@ -35,14 +37,16 @@ shows its role, node id, epoch, whether its leadership can be proven, when it to
 With no leader, the card says so: the sessions are down until a node is elected. It then shows where each node stands
 on each lane against a sync follower: level, ahead or behind by how many KiB, or not comparable when they hold writes
 from different leaderships. Use it to choose which node to promote by hand: a disaster-recovery copy behind the
-standby lacks what that gap holds. Keep a disaster-recovery copy in maintenance, as neither an election nor a
-switchover names the node it hands leadership to.
+standby lacks what that gap holds. Keep a disaster-recovery copy in maintenance: a switchover never hands it the
+leadership, but an election after a crash may.
 
 ### Sessions
 
-The table lists the pair's sessions with their replication mode (with its quorum, when the session waits for only
-some of the sync followers), their replication state, as held by a sync follower, and the sends that went out
-without the follower's acknowledgement (red when the last one did). When a session leaves some message types
+The table lists the group's sessions with their replication mode (with its quorum, when the session waits for only
+some of the sync followers), their replication state, and the sends that went out without the followers'
+acknowledgement (red when the last one did). With several followers the state is one tag per follower, a
+disaster-recovery copy marked `(DR)`; the overview shows the worst sync follower's, as a failover may go to any of
+them, and a disaster-recovery copy's only when it needs attention. When a session leaves some message types
 unencrypted on an encrypted replication (staffix's `unencryptedMessageTypes`), an Unencrypted column lists them. A session's state is one of:
 
 | State | Meaning |
@@ -75,9 +79,10 @@ its differences stay listed.
 
 Writers only, each confirmed and [audited](security.md):
 
-- **Switchover**, on the leader: its sessions log out and log on from the other node, without the sequence number jump
-  of a failover. It needs a sync follower in sync and a leader election able to hand leadership over. The engine refuses
-  it, and the console reports why, when the follower's store is too far behind or no follower is in sync.
+- **Switchover**, on the leader: its sessions log out and log on from a sync follower, without the sequence number
+  jump of a failover. The confirmation names it, the most caught up; with several ready, pick another. It needs a sync
+  follower in sync and a leader election able to hand leadership over. The engine refuses it, and the console reports
+  why, when the follower's store is too far behind or no follower is in sync.
 - **Maintenance** and **End maintenance**, on any node whose election supports it: the node stops or resumes standing
   for election. On a leader, maintenance switches over first and fails if that does.
 - **Re-sync all** on the leader, or **Re-sync** on one session of the table: copies the session again by snapshot. The

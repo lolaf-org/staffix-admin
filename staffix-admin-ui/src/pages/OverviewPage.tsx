@@ -141,7 +141,7 @@ function EngineCard({ engine, pair }: { engine: Schemas['Engine']; pair?: HaPair
           </span>
           {pair?.name ? (
             <span>
-              <Typography.Text type="secondary">HA pair: </Typography.Text>
+              <Typography.Text type="secondary">HA group: </Typography.Text>
               <Link to="/ha"><Typography.Text strong>{pair.name}</Typography.Text></Link>
             </span>
           ) : (
@@ -192,7 +192,7 @@ function EngineCard({ engine, pair }: { engine: Schemas['Engine']; pair?: HaPair
       }
     >
       {pair && !leader && <Alert type="warning" title="No leader: sessions shown as last known" style={{ marginBottom: 12 }} />}
-      {pair && !pair.name && <Alert type="info" title="High availability without a pair name: set pairName to group this node with its pair" style={{ marginBottom: 12 }} />}
+      {pair && !pair.name && <Alert type="info" title="High availability without a pair name: set pairName, the same on every node, to group this node with the others" style={{ marginBottom: 12 }} />}
       {groups.isPending && <Skeleton active paragraph={{ rows: 2 }} />}
       {groups.isError && <Alert type="error" title={groups.error.message} />}
       {groups.isSuccess && shown.length === 0 && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No matching session" />}

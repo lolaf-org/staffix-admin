@@ -252,7 +252,7 @@ class SimulatedEngineGateway implements EngineGateway {
     }
 
     @Override
-    public SwitchoverOutcome switchover(String engineId) {
+    public SwitchoverOutcome switchover(String engineId, @Nullable String successor) {
         throw noHighAvailability(engineId);
     }
 

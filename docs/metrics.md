@@ -28,8 +28,10 @@ See [Backends](backends.md) for what sets those floors.
 
 ## High availability
 
-The [High availability](high-availability.md) page charts each pair over its own period, one series per node so a
-chart reads across a failover. A chart split by `mode` or `reason` shows one node only. These are engine meters, read
+The [High availability](high-availability.md) page charts each group over its own period, one series per node so a
+chart reads across a failover. Follower lag and follower acknowledgement latency have one series per follower
+instead, joined across the leaders it followed, so a disaster-recovery copy far away does not blur the standby's. A
+chart split by `mode` or `reason` shows one node only. These are engine meters, read
 through the node's monitoring plugin (`monitoringInstanceId` when the engine sets one, else through its sessions).
 
 - Latency: follower lag, current lag, follower acknowledgement latency, `SYNC` acknowledgement latency by mode, follower

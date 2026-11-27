@@ -1,9 +1,10 @@
 #!/bin/sh
-# The venue-y pair: a primos witness in a container and two engines, each in the background logging to target/ha/logs.
+# The venue-y group: a primos witness in a container and three engines, each in the background logging to target/ha/logs.
 #
-#   ha.sh start                       the witness and both nodes, afresh: stores and elections forgotten
-#   ha.sh start 1|2|witness           one process again, carrying on from its stores
-#   ha.sh stop 1|2|leader|follower|witness|all [-9]    SIGTERM stops cleanly, -9 kills as a crash would
+#   ha.sh start                       the witness and the three nodes, afresh: stores and elections forgotten
+#   ha.sh start 1|2|3|witness         one process again, carrying on from its stores
+#   ha.sh stop 1|2|3|leader|follower|witness|all [-9]  SIGTERM stops cleanly, -9 kills as a crash would; follower
+#                                     is the first follower found
 #   ha.sh status
 
 cd "$(dirname "$0")" || exit 1
@@ -12,6 +13,7 @@ HA=target/ha
 JAVA_CMD=${JAVA_HOME:+$JAVA_HOME/bin/}java
 WITNESS_IMAGE=ghcr.io/lolaf-org/primos-witness:0.9.0
 WITNESS_CONTAINER=staffix-admin-sandbox-witness
+NODES="1 2 3"
 
 running() {
   if [ "$1" = witness ]; then
@@ -104,7 +106,7 @@ role() {
 }
 
 node_with_role() {
-  for id in 1 2; do
+  for id in $NODES; do
     if [ "$(role $id)" = "$1" ]; then
       echo "$id"
       return
@@ -121,24 +123,32 @@ fi
 
 case "$1 $2" in
   "start ")
-    if running witness || running venue-y-1 || running venue-y-2; then
-      echo "the pair is running: ha.sh stop all first" >&2
+    for id in $NODES; do
+      if running "venue-y-$id"; then
+        echo "the group is running: ha.sh stop all first" >&2
+        exit 1
+      fi
+    done
+    if running witness; then
+      echo "the group is running: ha.sh stop all first" >&2
       exit 1
     fi
     rm -rf "$HA"
     start_witness
-    start_node 1
-    start_node 2
+    for id in $NODES; do
+      start_node "$id"
+    done
     ;;
   "start witness") start_witness ;;
-  "start 1" | "start 2") start_node "$2" ;;
+  "start 1" | "start 2" | "start 3") start_node "$2" ;;
   "stop all")
-    stop_process venue-y-1 "$3"
-    stop_process venue-y-2 "$3"
+    for id in $NODES; do
+      stop_process "venue-y-$id" "$3"
+    done
     stop_witness "$3"
     ;;
   "stop witness") stop_witness "$3" ;;
-  "stop 1" | "stop 2") stop_process "venue-y-$2" "$3" ;;
+  "stop 1" | "stop 2" | "stop 3") stop_process "venue-y-$2" "$3" ;;
   "stop leader")
     node=$(node_with_role LEADER) || exit 1
     stop_process "venue-y-$node" "$3"
@@ -148,12 +158,13 @@ case "$1 $2" in
     stop_process "venue-y-$node" "$3"
     ;;
   "status "*)
-    echo "venue-y-1: $(role 1)"
-    echo "venue-y-2: $(role 2)"
+    for id in $NODES; do
+      echo "venue-y-$id: $(role "$id")"
+    done
     running witness && echo "witness: RUNNING" || echo "witness: STOPPED"
     ;;
   *)
-    sed -n '2,8s/^# \{0,1\}//p' "$0" >&2
+    sed -n '2,9s/^# \{0,1\}//p' "$0" >&2
     exit 1
     ;;
 esac

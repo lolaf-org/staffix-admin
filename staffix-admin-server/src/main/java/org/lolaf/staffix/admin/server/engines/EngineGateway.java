@@ -161,9 +161,10 @@ public interface EngineGateway {
     List<HaSession> getHaSessions(String engineId);
 
     /**
-     * @throws GatewayException a conflict when this node does not lead
+     * @param successor the sync follower to hand leadership to, by node id; null lets the engine pick the most caught up
+     * @throws GatewayException a conflict when this node does not lead, rejected for a successor that is no sync follower
      */
-    SwitchoverOutcome switchover(String engineId);
+    SwitchoverOutcome switchover(String engineId, @Nullable String successor);
 
     /**
      * False takes the node out of elections for maintenance.

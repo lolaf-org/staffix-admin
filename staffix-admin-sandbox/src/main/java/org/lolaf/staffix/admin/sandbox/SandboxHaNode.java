@@ -43,7 +43,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 /**
- * One node of the venue-y pair, {@code 1} or {@code 2}, in a process of its own so that {@code ha.sh} can kill it. Each
+ * One node of the venue-y group, {@code 1}, {@code 2} or {@code 3}, in a process of its own so that {@code ha.sh} can
+ * kill it. Any node may lead, the others following it; {@code 3} is a disaster-recovery copy, which {@code SYNC} sends
+ * never wait for and a switchover never goes to. Each
  * node has its own schema, as replication refuses a store shared with the leader. Its state lives under
  * {@code target/ha}: a node finding none starts afresh, one finding it carries on, as after a crash.
  */
@@ -60,6 +62,8 @@ public class SandboxHaNode {
     private static final Duration NEWS_INTERVAL = Duration.ofMillis(500);
     private static final int EVENTS_BATCHING = 1000;
     private static final Set<String> SESSIONS_IN_DATABASE = Set.of("fixt-trading", "trading-2");
+    static final int NODES = 3;
+    private static final Set<String> SYNC_FOLLOWERS = Set.of("1", "2");
 
     static int fixPort(int nodeId) {
         return 7300 + nodeId;
@@ -100,23 +104,25 @@ public class SandboxHaNode {
             traffic.shutdownNow();
             database.close();
         }, "sandbox-ha-node-shutdown"));
-        log.info("Node {} of pair {} running, FIX on {}", nodeId, PAIR, fixPort(nodeId));
+        log.info("Node {} of group {} running, FIX on {}", nodeId, PAIR, fixPort(nodeId));
     }
 
     private static ReplicationHaSettings highAvailability(int nodeId, Path directory) {
-        return ReplicationHaSettings.builder()
+        ReplicationHaSettings.ReplicationHaSettingsBuilder<?, ?> settings = ReplicationHaSettings.builder();
+        ClusterConfig.ClusterConfigBuilder cluster = ClusterConfig.builder().applicationName(PAIR).nodeId(nodeId);
+        for (int peer = 1; peer <= NODES; peer++) {
+            settings.peer(String.valueOf(peer), replicationAddress(peer));
+            if (peer != nodeId) {
+                cluster.peer(Peer.application(peer, HOST, electionPort(peer)));
+            }
+        }
+        return settings
                 .nodeId(String.valueOf(nodeId))
-                .peer("1", replicationAddress(1))
-                .peer("2", replicationAddress(2))
+                .syncFollowers(SYNC_FOLLOWERS)
                 .monitoringInstanceId(SandboxEngine.METRICS)
                 .alertsPublisherInstanceId(InstanceProvider.DEFAULT_INSTANCE_ID)
                 .leaderElection(PrimosLeaderElectionSettings.builder()
-                        .cluster(ClusterConfig.builder()
-                                .applicationName(PAIR)
-                                .nodeId(nodeId)
-                                .peer(Peer.application(3 - nodeId, HOST, electionPort(3 - nodeId)))
-                                .witness(Peer.witness(Peer.MAX_ID, HOST, WITNESS_PORT))
-                                .build())
+                        .cluster(cluster.witness(Peer.witness(Peer.MAX_ID, HOST, WITNESS_PORT)).build())
                         .stateDirectory(directory.resolve("primos"))
                         .bindAddress(new InetSocketAddress(HOST, electionPort(nodeId)))
                         .clusterSecret(SECRET.getBytes(StandardCharsets.UTF_8))
